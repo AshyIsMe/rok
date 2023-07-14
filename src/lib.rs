@@ -1,4 +1,6 @@
-// AA TODO: Initially I thought all K Arrays should be arrow arrays...
+use polars::prelude::*;
+
+// Initially I thought all K Arrays should be arrow arrays...
 // but what if they were polars.Series and polars.DataFrames!?
 // Then we'd get fast csv/parquet/json for "free".
 
@@ -9,7 +11,9 @@ pub enum K {
     Float(f64),
     Char(char),
     //Symbol(i64), // index into global Symbols array?
-    // List(Vec<K>), // USE arrow instead! KIntArray(arrow::Int64Array)
+    BoolArray(BooleanChunked),
+    IntArray(Series), // ints are nullable so have to be a series
+    FloatArray(Float64Chunked),
     //Dictionary{ vals: Vec<K>, keys: Vec<K> },
     // Function{ body, args, curry, env }
     // View{ value, r, cache, depends->val }
@@ -107,17 +111,37 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
         .iter()
         .any(|k| if let K::Float(f) = k { true } else { false })
     {
-        todo!("promote float")
+        let fa: Vec<f64> = nums
+            .iter()
+            .map(|k| match k {
+                K::Bool(i) => *i as f64,
+                K::Int(None) => f64::NAN,
+                K::Int(Some(i)) => *i as f64,
+                K::Float(f) => *f,
+                _ => panic!("invalid float"),
+            })
+            .collect();
+
+        Ok(K::FloatArray(Series::new("", fa).f64().unwrap().clone()))
     } else if nums
         .iter()
         .any(|k| if let K::Int(i) = k { true } else { false })
     {
-        todo!("promote int")
+        let ia: Vec<Option<i64>> = nums
+            .iter()
+            .map(|k| match k {
+                K::Bool(i) => Some(*i as i64),
+                K::Int(i) => *i,
+                _ => panic!("invalid int"),
+            })
+            .collect();
+
+        Ok(K::IntArray(Series::new("", ia)))
     } else if nums
         .iter()
         .all(|k| if let K::Bool(i) = k { true } else { false })
     {
-        let bs: Vec<bool> = nums
+        let ba: BooleanChunked = nums
             .iter()
             .map(|k| match k {
                 K::Bool(0) => false,
@@ -126,7 +150,7 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
             })
             .collect();
 
-        todo!("here")
+        Ok(K::BoolArray(ba))
     } else {
         Err("invalid nums")
     }
