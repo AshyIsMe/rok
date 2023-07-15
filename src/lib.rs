@@ -42,16 +42,57 @@ pub fn apply_primitive(v: &str, l: Option<K>, r: K) -> Result<K, &'static str> {
     }
 }
 
+pub fn b2i(b: K) -> K {
+    match b {
+        K::BoolArray(b) => K::IntArray(
+            b.bool()
+                .expect("bool")
+                .into_iter()
+                .map(|b| match b {
+                    Some(true) => Some(1),
+                    Some(false) => Some(0),
+                    _ => None,
+                })
+                .collect::<Series>(),
+        ),
+        _ => panic!("not bool"),
+    }
+}
+
+// TODO: impl ops::Add for K { }
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
-    match (l, r) {
+    match (l.clone(), r) {
+        // There must be an easier way... What's a macro???
+        (K::Bool(l), K::Bool(r)) => Ok(K::Int(Some(l as i64 + r as i64))),
+        (K::Bool(l), K::Int(Some(r))) => Ok(K::Int(Some(l as i64 + r))),
+        (K::Int(Some(l)), K::Bool(r)) => Ok(K::Int(Some(l + r as i64))),
+        (K::Bool(l), K::Float(r)) => Ok(K::Float(l as f64 + r)),
+        (K::Float(l), K::Bool(r)) => Ok(K::Float(l + r as f64)),
+
+        (K::BoolArray(l), K::BoolArray(r)) => Ok(K::IntArray(l + r)),
+        (K::BoolArray(_l), K::Int(Some(r))) => match b2i(l) {
+            K::IntArray(l) => Ok(K::IntArray(l + r)),
+            _ => panic!("impossible"),
+        },
+        (K::Int(Some(l)), K::BoolArray(r)) => Ok(K::IntArray(r + l)),
+        (K::BoolArray(l), K::Float(r)) => Ok(K::FloatArray(l + r)),
+        (K::Float(l), K::BoolArray(r)) => Ok(K::FloatArray(r + l)),
+
         (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(l + r))),
+        (K::Float(l), K::Float(r)) => Ok(K::Float(l + r)),
         _ => todo!("various plus pairs"),
     }
 }
 
 macro_rules! noun {
     () => {
-        K::Bool(_) | K::Int(_) | K::Char(_) | K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_)
+        K::Bool(_)
+            | K::Int(_)
+            | K::Float(_)
+            | K::Char(_)
+            | K::BoolArray(_)
+            | K::IntArray(_)
+            | K::FloatArray(_)
         //| K::Dictionary(_) | K::Table(_)
     };
 }
@@ -60,7 +101,7 @@ pub fn eval(ast: Vec<K>) -> Result<K, &'static str> {
     match &ast[..] {
         [] => Err("Noop not implemented"),
         [noun!()] => Ok(ast[0].clone()),
-        [K::Verb { name }, noun!()] => todo!("monad"),
+        [K::Verb { name: _ }, noun!()] => todo!("monad"),
         [noun!(), K::Verb { name }, noun!()] => {
             Ok(apply_primitive(name, Some(ast[0].clone()), ast[2].clone()).unwrap())
         }
@@ -147,7 +188,7 @@ pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
 }
 
 pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
-    if nums.iter().any(|k| if let K::Float(f) = k { true } else { false }) {
+    if nums.iter().any(|k| if let K::Float(_f) = k { true } else { false }) {
         let fa: Vec<f64> = nums
             .iter()
             .map(|k| match k {
@@ -160,7 +201,7 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
             .collect();
 
         Ok(K::FloatArray(Series::new("", fa)))
-    } else if nums.iter().any(|k| if let K::Int(i) = k { true } else { false }) {
+    } else if nums.iter().any(|k| if let K::Int(_i) = k { true } else { false }) {
         let ia: Vec<Option<i64>> = nums
             .iter()
             .map(|k| match k {
@@ -171,7 +212,7 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
             .collect();
 
         Ok(K::IntArray(Series::new("", ia)))
-    } else if nums.iter().all(|k| if let K::Bool(i) = k { true } else { false }) {
+    } else if nums.iter().all(|k| if let K::Bool(_i) = k { true } else { false }) {
         let ba: BooleanChunked = nums
             .iter()
             .map(|k| match k {

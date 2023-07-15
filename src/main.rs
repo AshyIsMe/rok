@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use rok::*;
 
 fn main() {
-    println!("rok v0.000");
+    println!("rok {}", env!("CARGO_PKG_VERSION"));
 
     let mut buffer = String::new();
     let stdin = io::stdin();
