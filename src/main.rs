@@ -1,4 +1,5 @@
 use std::io::{self, Write};
+use rok::*;
 
 fn main() {
     println!("rok v0.000");
@@ -11,7 +12,9 @@ fn main() {
         stdout.flush().unwrap();
         stdin.read_line(&mut buffer).unwrap();
 
-        stdout.write_all(b"TODO: Actual eval!\n").unwrap(); //prompt
+        let r = eval(scan(&buffer).unwrap());
+        // stdout.write_all(b"{r:?}\n").unwrap();
+        println!("{r:?}\n");
 
         buffer.truncate(0);
     }

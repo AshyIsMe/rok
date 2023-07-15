@@ -85,7 +85,7 @@ pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
             }
             ':' | '+' | '-' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^'
             | '#' | '_' | '$' | '?' | '@' | '.' => words.push(K::Verb { name: c.to_string() }),
-            ' ' | '\t' => continue,
+            ' ' | '\t' | '\n' => continue,
             _ => return Err("TODO"),
         };
     }
