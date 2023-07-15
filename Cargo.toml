@@ -6,4 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# TODO: turn on "simd" feature. Failing to build on 20230715
 polars = { version = "0.30.0", features = ["performant", "parquet"] }

@@ -1,0 +1,20 @@
+
+# Compact but readable.
+
+
+# We don't
+#           write english
+#           like this
+# .
+# So why
+#       write code
+#       like this
+# ? 
+
+# TODO: go through this more and compress the code! https://rust-lang.github.io/rustfmt/?version=master&search=
+
+max_width = 100
+use_small_heuristics = "Max"
+fn_single_line = true
+where_single_line = true
+fn_params_layout = "Compressed"

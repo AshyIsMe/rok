@@ -1,19 +1,21 @@
+use polars::prelude::*;
 use rok::*;
 
 #[test]
 fn test_1() {
-    let k = K::Bool(1u8);
-    let ast = scan("1").unwrap();
-    let ast = scan("2").unwrap();
-    let ast = scan("3.14").unwrap();
-    let ast = scan("1 0 1 0 1").unwrap();
-    let ast = scan("1 2 3").unwrap();
-    let ast = scan("1 2 3.14").unwrap();
-    assert!(true);
+    assert_eq!(scan("1").unwrap(), vec![K::Bool(1u8)]);
+    assert_eq!(scan("2").unwrap(), vec![K::Int(Some(2))]);
+    assert_eq!(scan("3.14").unwrap(), vec![K::Float(3.14)]);
+    assert_eq!(scan("1 0 1 0 1").unwrap(), vec![K::BoolArray(Series::new("", [1, 0, 1, 0, 1u8]))]);
+    assert_eq!(scan("1 2 3").unwrap(), vec![K::IntArray(Series::new("", [1, 2, 3i64]))]);
+    assert_eq!(scan("1 2 3.14").unwrap(), vec![K::FloatArray(Series::new("", [1., 2., 3.14]))]);
 }
 
+#[test]
 fn test_2() {
-    let k = K::Bool(1u8);
-    let ast = scan("2 + 2").unwrap();
-    assert!(true);
+    assert_eq!(
+        scan("2 + 2").unwrap(),
+        vec![K::Int(Some(2)), K::Verb { name: "+".to_string() }, K::Int(Some(2))]
+    );
+    assert_eq!(eval(scan("2 + 2").unwrap()).unwrap(), K::Int(Some(4)));
 }

@@ -1,33 +1,72 @@
 use polars::prelude::*;
 
+// oK.js is 1k lines of javascript in one file for a k6 interpreter.
+// The Challenge: Can we do the same in RUST?
+// (Probably gonna need a lot of macros and to turn of cargo fmt maybe?)
+//
+
 // Initially I thought all K Arrays should be arrow arrays...
 // but what if they were polars.Series and polars.DataFrames!?
 // Then we'd get fast csv/parquet/json for "free".
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum K {
     Bool(u8),
     Int(Option<i64>), //blech option here
     Float(f64),
     Char(char),
     //Symbol(i64), // index into global Symbols array?
-    BoolArray(BooleanChunked),
+    BoolArray(Series),
     IntArray(Series), // ints are nullable so have to be a series
-    FloatArray(Float64Chunked),
+    FloatArray(Series),
     //Dictionary{ vals: Vec<K>, keys: Vec<K> },
+    //Table{ DataFrame },
     // Function{ body, args, curry, env }
     // View{ value, r, cache, depends->val }
     // NameRef { name, l(index?), r(assignment), global? }
-    Verb {
-        name: String,
-        l: Option<Box<K>>,
-        r: Box<K>,
-        curry: Option<Vec<K>>,
-    },
+    // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
+    Verb { name: String },
     // Adverb { name, l(?), verb, r }
     Nil,
     // Cond { body: Vec< Vec<K> > } //list of expressions...
     //Quote(Box<K>)
+}
+
+pub fn apply_primitive(v: &str, l: Option<K>, r: K) -> Result<K, &'static str> {
+    match v {
+        "+" => match l {
+            Some(l) => v_plus(l, r),
+            _ => todo!("monad +"),
+        },
+        _ => Err("invalid primitive"),
+    }
+}
+
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
+    match (l, r) {
+        (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(l + r))),
+        _ => todo!("various plus pairs"),
+    }
+}
+
+macro_rules! noun {
+    () => {
+        K::Bool(_) | K::Int(_) | K::Char(_) | K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_)
+        //| K::Dictionary(_) | K::Table(_)
+    };
+}
+
+pub fn eval(ast: Vec<K>) -> Result<K, &'static str> {
+    match &ast[..] {
+        [] => Err("Noop not implemented"),
+        [noun!()] => Ok(ast[0].clone()),
+        [K::Verb { name }, noun!()] => todo!("monad"),
+        [noun!(), K::Verb { name }, noun!()] => {
+            Ok(apply_primitive(name, Some(ast[0].clone()), ast[2].clone()).unwrap())
+        }
+        [_, _, _] => Err("syntax error"),
+        [_, ..] => eval(ast[ast.len() - 3..].to_vec()),
+    }
 }
 
 pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
@@ -45,7 +84,8 @@ pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
                 skip = j;
             }
             ':' | '+' | '-' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^'
-            | '#' | '_' | '$' | '?' | '@' | '.' => return Err("TODO scan primitive"),
+            | '#' | '_' | '$' | '?' | '@' | '.' => words.push(K::Verb { name: c.to_string() }),
+            ' ' | '\t' => continue,
             _ => return Err("TODO"),
         };
     }
@@ -107,10 +147,7 @@ pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
 }
 
 pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
-    if nums
-        .iter()
-        .any(|k| if let K::Float(f) = k { true } else { false })
-    {
+    if nums.iter().any(|k| if let K::Float(f) = k { true } else { false }) {
         let fa: Vec<f64> = nums
             .iter()
             .map(|k| match k {
@@ -122,11 +159,8 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
             })
             .collect();
 
-        Ok(K::FloatArray(Series::new("", fa).f64().unwrap().clone()))
-    } else if nums
-        .iter()
-        .any(|k| if let K::Int(i) = k { true } else { false })
-    {
+        Ok(K::FloatArray(Series::new("", fa)))
+    } else if nums.iter().any(|k| if let K::Int(i) = k { true } else { false }) {
         let ia: Vec<Option<i64>> = nums
             .iter()
             .map(|k| match k {
@@ -137,10 +171,7 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
             .collect();
 
         Ok(K::IntArray(Series::new("", ia)))
-    } else if nums
-        .iter()
-        .all(|k| if let K::Bool(i) = k { true } else { false })
-    {
+    } else if nums.iter().all(|k| if let K::Bool(i) = k { true } else { false }) {
         let ba: BooleanChunked = nums
             .iter()
             .map(|k| match k {
@@ -150,7 +181,7 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
             })
             .collect();
 
-        Ok(K::BoolArray(ba))
+        Ok(K::BoolArray(Series::new("", ba)))
     } else {
         Err("invalid nums")
     }
