@@ -19,23 +19,27 @@ pub enum K {
     BoolArray(Series),
     IntArray(Series), // ints are nullable so have to be a series
     FloatArray(Series),
+    Nil, // Is Nil a noun?
     //Dictionary{ vals: Vec<K>, keys: Vec<K> },
     //Table{ DataFrame },
+    //Quote(Box<K>) // Is Quote a noun?
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum KW { // KWords
+    Noun(K),
     // Function{ body, args, curry, env }
     // View{ value, r, cache, depends->val }
     // NameRef { name, l(index?), r(assignment), global? }
     // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
     Verb { name: String },
     // Adverb { name, l(?), verb, r }
-    Nil,
     // Cond { body: Vec< Vec<K> > } //list of expressions...
-    //Quote(Box<K>)
 }
 
-pub fn apply_primitive(v: &str, l: Option<K>, r: K) -> Result<K, &'static str> {
+pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
     match v {
-        "+" => match l {
-            Some(l) => v_plus(l, r),
+        "+" => match (l,r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_plus(l, r).unwrap())),
             _ => todo!("monad +"),
         },
         _ => Err("invalid primitive"),
@@ -84,25 +88,12 @@ pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
     }
 }
 
-macro_rules! noun {
-    () => {
-        K::Bool(_)
-            | K::Int(_)
-            | K::Float(_)
-            | K::Char(_)
-            | K::BoolArray(_)
-            | K::IntArray(_)
-            | K::FloatArray(_)
-        //| K::Dictionary(_) | K::Table(_)
-    };
-}
-
-pub fn eval(ast: Vec<K>) -> Result<K, &'static str> {
+pub fn eval(ast: Vec<KW>) -> Result<KW, &'static str> {
     match &ast[..] {
         [] => Err("Noop not implemented"),
-        [noun!()] => Ok(ast[0].clone()),
-        [K::Verb { name: _ }, noun!()] => todo!("monad"),
-        [noun!(), K::Verb { name }, noun!()] => {
+        [KW::Noun(_)] => Ok(ast[0].clone()),
+        [KW::Verb { name: _ }, KW::Noun(_)] => todo!("monad"),
+        [KW::Noun(_), KW::Verb { name }, KW::Noun(_)] => {
             Ok(apply_primitive(name, Some(ast[0].clone()), ast[2].clone()).unwrap())
         }
         [_, _, _] => Err("syntax error"),
@@ -110,7 +101,7 @@ pub fn eval(ast: Vec<K>) -> Result<K, &'static str> {
     }
 }
 
-pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
+pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     let mut words = vec![];
     let mut skip: usize = 0;
     for (i, c) in code.char_indices() {
@@ -125,7 +116,7 @@ pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
                 skip = j;
             }
             ':' | '+' | '-' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^'
-            | '#' | '_' | '$' | '?' | '@' | '.' => words.push(K::Verb { name: c.to_string() }),
+            | '#' | '_' | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
             ' ' | '\t' | '\n' => continue,
             _ => return Err("TODO"),
         };
@@ -133,7 +124,7 @@ pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
     Ok(words.into())
 }
 
-pub fn scan_number(code: &str) -> Result<(usize, K), &'static str> {
+pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
     // read until first char outside 0123456789.-
     // split on space and parse to numeric
     //
@@ -158,8 +149,8 @@ pub fn scan_number(code: &str) -> Result<(usize, K), &'static str> {
         let nums: Vec<K> = parts.into_iter().map(|(_term, num)| num).collect();
         match nums.len() {
             0 => panic!("impossible"),
-            1 => Ok((l, nums[0].clone())),
-            _ => Ok((l, promote_num(nums).unwrap())),
+            1 => Ok((l, KW::Noun(nums[0].clone()))),
+            _ => Ok((l, KW::Noun(promote_num(nums).unwrap()))),
         }
     } else {
         Err("syntax error: a sentence starting with a digit must contain a valid number")
