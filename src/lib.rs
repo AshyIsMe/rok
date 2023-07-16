@@ -1,5 +1,7 @@
+use itertools::Itertools;
+use log::{debug};
 use polars::prelude::*;
-use std::ops;
+use std::{collections::VecDeque, iter::repeat, ops};
 
 // oK.js is 1k lines of javascript in one file for a k6 interpreter.
 // The Challenge: Can we do the same in RUST?
@@ -18,7 +20,7 @@ pub enum K {
     Char(char),
     //Symbol(i64), // index into global Symbols array?
     BoolArray(Series),
-    IntArray(Series), // ints are nullable so have to be a series
+    IntArray(Series),
     FloatArray(Series),
     Nil, // Is Nil a noun?
          //Dictionary{ vals: Vec<K>, keys: Vec<K> },
@@ -35,6 +37,10 @@ pub enum KW /* KWords */ {
     Verb { name: String },
     // Adverb { name, l(?), verb, r }
     // Cond { body: Vec< Vec<K> > } //list of expressions...
+    StartOfLine,
+    Nothing,
+    LP,
+    RP,
 }
 
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
@@ -124,27 +130,53 @@ pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { Ok(l - r) }
 pub fn v_times(l: K, r: K) -> Result<K, &'static str> { Ok(l * r) }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { Ok(l / r) }
 
-pub fn eval(ast: Vec<KW>) -> Result<KW, &'static str> {
-    match &ast[..] {
-        [] => Err("Noop not implemented"),
-        [KW::Noun(_)] => Ok(ast[0].clone()),
-        [KW::Verb { name: _ }, KW::Noun(_)] => todo!("monad"),
-        [KW::Noun(_), KW::Verb { name }, KW::Noun(_)] => {
-            let r = apply_primitive(name, Some(ast[0].clone()), ast[2].clone()).unwrap();
-            let mut new_ast: Vec<KW> = vec![]; // TODO: shorten this, concat!() macro?
-            new_ast.extend(ast[..ast.len()-3].iter().cloned());
-            new_ast.append(&mut vec![r]);
-            eval(new_ast)
-        }
-        [_, _, _] => Err("syntax error"),
-        [_, ..] => {
-            let r = eval(ast[ast.len() - 3..].to_vec()).unwrap();
-            let mut new_ast: Vec<KW> = vec![]; // TODO: shorten this, concat!() macro?
-            new_ast.extend(ast[..ast.len()-3].iter().cloned());
-            new_ast.append(&mut vec![r]);
-            eval(new_ast)
-        },
+pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
+    let mut queue = VecDeque::from(vec![vec![KW::StartOfLine], sentence].concat());
+    let mut stack: VecDeque<KW> = VecDeque::new();
+
+    let mut converged: bool = false;
+    while !converged {
+        debug!("{stack:?}");
+        // let fragment: Vec<KW> = stack.drain(..4).collect();
+        let fragment = get_fragment(&mut stack);
+        let result: Result<Vec<KW>, &'static str> = match fragment {
+            (w, KW::Verb { name: _ }, KW::Noun(_), _any) if matches!(w, KW::LP) => todo!("0 monad"),
+            (_, KW::Verb { name: _ }, KW::Verb { name: _ }, KW::Noun(_)) => todo!("1 monad"),
+            (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_)) => {
+                // 2 dyad
+                Ok(vec![any.clone(), apply_primitive(&name, Some(x.clone()), y.clone()).unwrap()])
+            }
+            // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
+            (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
+            (w1, w2, w3, w4) => match queue.pop_back() {
+                Some(v) => Ok(vec![v, w1.clone(), w2.clone(), w3.clone(), w4.clone()]),
+                None => {
+                    converged = true;
+                    Ok(vec![w1.clone(), w2.clone(), w3.clone(), w4.clone()])
+                }
+            },
+        };
+
+        stack.retain(|w| !matches!(w, KW::Nothing));
+        debug!("result: {:?} with {stack:?}", result);
+        stack = vec![result?, stack.into()].concat().into();
     }
+    stack.retain(|w| !matches!(w, KW::StartOfLine | KW::Nothing));
+    let r: Vec<KW> = stack.iter().cloned().collect();
+    if r.len() == 1 {
+        Ok(r[0].clone())
+    } else {
+        debug!("{:?}", r);
+        Err("invalid result stack")
+    }
+}
+
+fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
+    stack
+        .drain(..stack.len().min(4))
+        .chain(repeat(KW::Nothing))
+        .next_tuple()
+        .expect("infinite iterator can't be empty")
 }
 
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
@@ -156,6 +188,8 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
             continue;
         }
         match c {
+            '(' => words.push(KW::LP),
+            ')' => words.push(KW::RP),
             '0'..='9' | '-' => {
                 if let Ok((j, k)) = scan_number(&code[i..]) {
                     words.push(k);
