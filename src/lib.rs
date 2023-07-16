@@ -44,6 +44,18 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
             (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_plus(l, r).unwrap())),
             _ => todo!("monad +"),
         },
+        "-" => match (l, r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_minus(l, r).unwrap())),
+            _ => todo!("monad -"),
+        },
+        "*" => match (l, r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_times(l, r).unwrap())),
+            _ => todo!("monad *"),
+        },
+        "%" => match (l, r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_divide(l, r).unwrap())),
+            _ => todo!("monad %"),
+        },
         _ => Err("invalid primitive"),
     }
 }
@@ -65,34 +77,53 @@ pub fn b2i(b: K) -> K {
     }
 }
 
-impl ops::Add for K {
-    type Output = Self;
-    fn add(self, r: Self) -> Self::Output {
-        match (self.clone(), r) {
+macro_rules! impl_op {
+    ($op:tt, $self:ident, $r:ident) => {
+        match ($self.clone(), $r) {
             // There must be an easier way... What's a macro???
-            (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 + r as i64)),
-            (K::Bool(l), K::Int(Some(r))) => K::Int(Some(l as i64 + r)),
-            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l + r as i64)),
-            (K::Bool(l), K::Float(r)) => K::Float(l as f64 + r),
-            (K::Float(l), K::Bool(r)) => K::Float(l + r as f64),
+            (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
+            (K::Bool(l), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
+            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l $op r as i64)),
+            (K::Bool(l), K::Float(r)) => K::Float(l as f64 $op r),
+            (K::Float(l), K::Bool(r)) => K::Float(l $op r as f64),
 
-            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l + r),
-            (K::BoolArray(_l), K::Int(Some(r))) => match b2i(self) {
-                K::IntArray(l) => K::IntArray(l + r),
+            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
+            (K::BoolArray(_l), K::Int(Some(r))) => match b2i($self) {
+                K::IntArray(l) => K::IntArray(l $op r),
                 _ => panic!("impossible"),
             },
-            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(r + l),
-            (K::BoolArray(l), K::Float(r)) => K::FloatArray(l + r),
-            (K::Float(l), K::BoolArray(r)) => K::FloatArray(r + l),
+            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(r $op l),
+            (K::BoolArray(l), K::Float(r)) => K::FloatArray(l $op r),
+            (K::Float(l), K::BoolArray(r)) => K::FloatArray(r $op l),
 
-            (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l + r)),
-            (K::Float(l), K::Float(r)) => K::Float(l + r),
-            _ => todo!("various plus pairs"),
+            (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l $op r)),
+            (K::Float(l), K::Float(r)) => K::Float(l $op r),
+            _ => todo!("various $op pairs - LOTS MORE to do still: dicts/tables/etc"),
         }
-    }
+    };
+}
+
+impl ops::Add for K {
+    type Output = Self;
+    fn add(self, r: Self) -> Self::Output { impl_op!(+, self, r) }
+}
+impl ops::Sub for K {
+    type Output = Self;
+    fn sub(self, r: Self) -> Self::Output { impl_op!(-, self, r) }
+}
+impl ops::Mul for K {
+    type Output = Self;
+    fn mul(self, r: Self) -> Self::Output { impl_op!(*, self, r) }
+}
+impl ops::Div for K {
+    type Output = Self;
+    fn div(self, r: Self) -> Self::Output { impl_op!(/, self, r) }
 }
 
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { Ok(l + r) }
+pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { Ok(l - r) }
+pub fn v_times(l: K, r: K) -> Result<K, &'static str> { Ok(l * r) }
+pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { Ok(l / r) }
 
 pub fn eval(ast: Vec<KW>) -> Result<KW, &'static str> {
     match &ast[..] {
@@ -117,12 +148,15 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
         }
         match c {
             '0'..='9' | '-' => {
-                let (j, k) = scan_number(&code[i..])?;
-                words.push(k);
-                skip = j;
+                if let Ok((j, k)) = scan_number(&code[i..]) {
+                    words.push(k);
+                    skip = j;
+                } else {
+                    words.push(KW::Verb { name: c.to_string() })
+                }
             }
-            ':' | '+' | '-' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^'
-            | '#' | '_' | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
+            ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#'
+            | '_' | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
             ' ' | '\t' | '\n' => continue,
             _ => return Err("TODO"),
         };
