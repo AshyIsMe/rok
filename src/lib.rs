@@ -1,4 +1,5 @@
 use polars::prelude::*;
+use std::ops;
 
 // oK.js is 1k lines of javascript in one file for a k6 interpreter.
 // The Challenge: Can we do the same in RUST?
@@ -20,12 +21,13 @@ pub enum K {
     IntArray(Series), // ints are nullable so have to be a series
     FloatArray(Series),
     Nil, // Is Nil a noun?
-    //Dictionary{ vals: Vec<K>, keys: Vec<K> },
-    //Table{ DataFrame },
-    //Quote(Box<K>) // Is Quote a noun?
+         //Dictionary{ vals: Vec<K>, keys: Vec<K> },
+         //Table{ DataFrame },
+         //Quote(Box<K>) // Is Quote a noun?
 }
 #[derive(Clone, Debug, PartialEq)]
-pub enum KW { // KWords
+pub enum KW {
+    // KWords
     Noun(K),
     // Function{ body, args, curry, env }
     // View{ value, r, cache, depends->val }
@@ -38,7 +40,7 @@ pub enum KW { // KWords
 
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
     match v {
-        "+" => match (l,r) {
+        "+" => match (l, r) {
             (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_plus(l, r).unwrap())),
             _ => todo!("monad +"),
         },
@@ -63,30 +65,34 @@ pub fn b2i(b: K) -> K {
     }
 }
 
-// TODO: impl ops::Add for K { }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
-    match (l.clone(), r) {
-        // There must be an easier way... What's a macro???
-        (K::Bool(l), K::Bool(r)) => Ok(K::Int(Some(l as i64 + r as i64))),
-        (K::Bool(l), K::Int(Some(r))) => Ok(K::Int(Some(l as i64 + r))),
-        (K::Int(Some(l)), K::Bool(r)) => Ok(K::Int(Some(l + r as i64))),
-        (K::Bool(l), K::Float(r)) => Ok(K::Float(l as f64 + r)),
-        (K::Float(l), K::Bool(r)) => Ok(K::Float(l + r as f64)),
+impl ops::Add for K {
+    type Output = Self;
+    fn add(self, r: Self) -> Self::Output {
+        match (self.clone(), r) {
+            // There must be an easier way... What's a macro???
+            (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 + r as i64)),
+            (K::Bool(l), K::Int(Some(r))) => K::Int(Some(l as i64 + r)),
+            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l + r as i64)),
+            (K::Bool(l), K::Float(r)) => K::Float(l as f64 + r),
+            (K::Float(l), K::Bool(r)) => K::Float(l + r as f64),
 
-        (K::BoolArray(l), K::BoolArray(r)) => Ok(K::IntArray(l + r)),
-        (K::BoolArray(_l), K::Int(Some(r))) => match b2i(l) {
-            K::IntArray(l) => Ok(K::IntArray(l + r)),
-            _ => panic!("impossible"),
-        },
-        (K::Int(Some(l)), K::BoolArray(r)) => Ok(K::IntArray(r + l)),
-        (K::BoolArray(l), K::Float(r)) => Ok(K::FloatArray(l + r)),
-        (K::Float(l), K::BoolArray(r)) => Ok(K::FloatArray(r + l)),
+            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l + r),
+            (K::BoolArray(_l), K::Int(Some(r))) => match b2i(self) {
+                K::IntArray(l) => K::IntArray(l + r),
+                _ => panic!("impossible"),
+            },
+            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(r + l),
+            (K::BoolArray(l), K::Float(r)) => K::FloatArray(l + r),
+            (K::Float(l), K::BoolArray(r)) => K::FloatArray(r + l),
 
-        (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(l + r))),
-        (K::Float(l), K::Float(r)) => Ok(K::Float(l + r)),
-        _ => todo!("various plus pairs"),
+            (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l + r)),
+            (K::Float(l), K::Float(r)) => K::Float(l + r),
+            _ => todo!("various plus pairs"),
+        }
     }
 }
+
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { Ok(l + r) }
 
 pub fn eval(ast: Vec<KW>) -> Result<KW, &'static str> {
     match &ast[..] {
