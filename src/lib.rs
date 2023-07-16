@@ -1,4 +1,5 @@
 use polars::prelude::*;
+use std::ops;
 
 // oK.js is 1k lines of javascript in one file for a k6 interpreter.
 // The Challenge: Can we do the same in RUST?
@@ -19,24 +20,40 @@ pub enum K {
     BoolArray(Series),
     IntArray(Series), // ints are nullable so have to be a series
     FloatArray(Series),
-    //Dictionary{ vals: Vec<K>, keys: Vec<K> },
-    //Table{ DataFrame },
+    Nil, // Is Nil a noun?
+         //Dictionary{ vals: Vec<K>, keys: Vec<K> },
+         //Table{ DataFrame },
+         //Quote(Box<K>) // Is Quote a noun?
+}
+#[derive(Clone, Debug, PartialEq)]
+pub enum KW /* KWords */ {
+    Noun(K),
     // Function{ body, args, curry, env }
     // View{ value, r, cache, depends->val }
     // NameRef { name, l(index?), r(assignment), global? }
     // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
     Verb { name: String },
     // Adverb { name, l(?), verb, r }
-    Nil,
     // Cond { body: Vec< Vec<K> > } //list of expressions...
-    //Quote(Box<K>)
 }
 
-pub fn apply_primitive(v: &str, l: Option<K>, r: K) -> Result<K, &'static str> {
+pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
     match v {
-        "+" => match l {
-            Some(l) => v_plus(l, r),
+        "+" => match (l, r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_plus(l, r).unwrap())),
             _ => todo!("monad +"),
+        },
+        "-" => match (l, r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_minus(l, r).unwrap())),
+            _ => todo!("monad -"),
+        },
+        "*" => match (l, r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_times(l, r).unwrap())),
+            _ => todo!("monad *"),
+        },
+        "%" => match (l, r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_divide(l, r).unwrap())),
+            _ => todo!("monad %"),
         },
         _ => Err("invalid primitive"),
     }
@@ -59,58 +76,78 @@ pub fn b2i(b: K) -> K {
     }
 }
 
-// TODO: impl ops::Add for K { }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
-    match (l.clone(), r) {
-        // There must be an easier way... What's a macro???
-        (K::Bool(l), K::Bool(r)) => Ok(K::Int(Some(l as i64 + r as i64))),
-        (K::Bool(l), K::Int(Some(r))) => Ok(K::Int(Some(l as i64 + r))),
-        (K::Int(Some(l)), K::Bool(r)) => Ok(K::Int(Some(l + r as i64))),
-        (K::Bool(l), K::Float(r)) => Ok(K::Float(l as f64 + r)),
-        (K::Float(l), K::Bool(r)) => Ok(K::Float(l + r as f64)),
+macro_rules! impl_op {
+    ($op:tt, $self:ident, $r:ident) => {
+        match ($self.clone(), $r) {
+            // There must be an easier way... What's a macro???
+            (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
+            (K::Bool(l), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
+            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l $op r as i64)),
+            (K::Bool(l), K::Float(r)) => K::Float(l as f64 $op r),
+            (K::Float(l), K::Bool(r)) => K::Float(l $op r as f64),
 
-        (K::BoolArray(l), K::BoolArray(r)) => Ok(K::IntArray(l + r)),
-        (K::BoolArray(_l), K::Int(Some(r))) => match b2i(l) {
-            K::IntArray(l) => Ok(K::IntArray(l + r)),
-            _ => panic!("impossible"),
-        },
-        (K::Int(Some(l)), K::BoolArray(r)) => Ok(K::IntArray(r + l)),
-        (K::BoolArray(l), K::Float(r)) => Ok(K::FloatArray(l + r)),
-        (K::Float(l), K::BoolArray(r)) => Ok(K::FloatArray(r + l)),
+            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
+            (K::BoolArray(_l), K::Int(Some(r))) => match b2i($self) {
+                K::IntArray(l) => K::IntArray(l $op r),
+                _ => panic!("impossible"),
+            },
+            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(r $op l),
+            (K::BoolArray(l), K::Float(r)) => K::FloatArray(l $op r),
+            (K::Float(l), K::BoolArray(r)) => K::FloatArray(r $op l),
 
-        (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(l + r))),
-        (K::Float(l), K::Float(r)) => Ok(K::Float(l + r)),
-        _ => todo!("various plus pairs"),
-    }
-}
-
-macro_rules! noun {
-    () => {
-        K::Bool(_)
-            | K::Int(_)
-            | K::Float(_)
-            | K::Char(_)
-            | K::BoolArray(_)
-            | K::IntArray(_)
-            | K::FloatArray(_)
-        //| K::Dictionary(_) | K::Table(_)
+            (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l $op r)),
+            (K::Float(l), K::Float(r)) => K::Float(l $op r),
+            _ => todo!("various $op pairs - LOTS MORE to do still: dicts/tables/etc"),
+        }
     };
 }
 
-pub fn eval(ast: Vec<K>) -> Result<K, &'static str> {
+impl ops::Add for K {
+    type Output = Self;
+    fn add(self, r: Self) -> Self::Output { impl_op!(+, self, r) }
+}
+impl ops::Sub for K {
+    type Output = Self;
+    fn sub(self, r: Self) -> Self::Output { impl_op!(-, self, r) }
+}
+impl ops::Mul for K {
+    type Output = Self;
+    fn mul(self, r: Self) -> Self::Output { impl_op!(*, self, r) }
+}
+impl ops::Div for K {
+    type Output = Self;
+    fn div(self, r: Self) -> Self::Output { impl_op!(/, self, r) }
+}
+
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { Ok(l + r) }
+pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { Ok(l - r) }
+pub fn v_times(l: K, r: K) -> Result<K, &'static str> { Ok(l * r) }
+pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { Ok(l / r) }
+
+pub fn eval(ast: Vec<KW>) -> Result<KW, &'static str> {
     match &ast[..] {
         [] => Err("Noop not implemented"),
-        [noun!()] => Ok(ast[0].clone()),
-        [K::Verb { name: _ }, noun!()] => todo!("monad"),
-        [noun!(), K::Verb { name }, noun!()] => {
-            Ok(apply_primitive(name, Some(ast[0].clone()), ast[2].clone()).unwrap())
+        [KW::Noun(_)] => Ok(ast[0].clone()),
+        [KW::Verb { name: _ }, KW::Noun(_)] => todo!("monad"),
+        [KW::Noun(_), KW::Verb { name }, KW::Noun(_)] => {
+            let r = apply_primitive(name, Some(ast[0].clone()), ast[2].clone()).unwrap();
+            let mut new_ast: Vec<KW> = vec![]; // TODO: shorten this, concat!() macro?
+            new_ast.extend(ast[..ast.len()-3].iter().cloned());
+            new_ast.append(&mut vec![r]);
+            eval(new_ast)
         }
         [_, _, _] => Err("syntax error"),
-        [_, ..] => eval(ast[ast.len() - 3..].to_vec()),
+        [_, ..] => {
+            let r = eval(ast[ast.len() - 3..].to_vec()).unwrap();
+            let mut new_ast: Vec<KW> = vec![]; // TODO: shorten this, concat!() macro?
+            new_ast.extend(ast[..ast.len()-3].iter().cloned());
+            new_ast.append(&mut vec![r]);
+            eval(new_ast)
+        },
     }
 }
 
-pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
+pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     let mut words = vec![];
     let mut skip: usize = 0;
     for (i, c) in code.char_indices() {
@@ -120,12 +157,15 @@ pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
         }
         match c {
             '0'..='9' | '-' => {
-                let (j, k) = scan_number(&code[i..])?;
-                words.push(k);
-                skip = j;
+                if let Ok((j, k)) = scan_number(&code[i..]) {
+                    words.push(k);
+                    skip = j;
+                } else {
+                    words.push(KW::Verb { name: c.to_string() })
+                }
             }
-            ':' | '+' | '-' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^'
-            | '#' | '_' | '$' | '?' | '@' | '.' => words.push(K::Verb { name: c.to_string() }),
+            ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#'
+            | '_' | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
             ' ' | '\t' | '\n' => continue,
             _ => return Err("TODO"),
         };
@@ -133,7 +173,7 @@ pub fn scan(code: &str) -> Result<Vec<K>, &'static str> {
     Ok(words.into())
 }
 
-pub fn scan_number(code: &str) -> Result<(usize, K), &'static str> {
+pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
     // read until first char outside 0123456789.-
     // split on space and parse to numeric
     //
@@ -158,8 +198,8 @@ pub fn scan_number(code: &str) -> Result<(usize, K), &'static str> {
         let nums: Vec<K> = parts.into_iter().map(|(_term, num)| num).collect();
         match nums.len() {
             0 => panic!("impossible"),
-            1 => Ok((l, nums[0].clone())),
-            _ => Ok((l, promote_num(nums).unwrap())),
+            1 => Ok((l, KW::Noun(nums[0].clone()))),
+            _ => Ok((l, KW::Noun(promote_num(nums).unwrap()))),
         }
     } else {
         Err("syntax error: a sentence starting with a digit must contain a valid number")
