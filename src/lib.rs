@@ -26,8 +26,7 @@ pub enum K {
          //Quote(Box<K>) // Is Quote a noun?
 }
 #[derive(Clone, Debug, PartialEq)]
-pub enum KW {
-    // KWords
+pub enum KW /* KWords */ {
     Noun(K),
     // Function{ body, args, curry, env }
     // View{ value, r, cache, depends->val }
@@ -131,10 +130,20 @@ pub fn eval(ast: Vec<KW>) -> Result<KW, &'static str> {
         [KW::Noun(_)] => Ok(ast[0].clone()),
         [KW::Verb { name: _ }, KW::Noun(_)] => todo!("monad"),
         [KW::Noun(_), KW::Verb { name }, KW::Noun(_)] => {
-            Ok(apply_primitive(name, Some(ast[0].clone()), ast[2].clone()).unwrap())
+            let r = apply_primitive(name, Some(ast[0].clone()), ast[2].clone()).unwrap();
+            let mut new_ast: Vec<KW> = vec![]; // TODO: shorten this, concat!() macro?
+            new_ast.extend(ast[..ast.len()-3].iter().cloned());
+            new_ast.append(&mut vec![r]);
+            eval(new_ast)
         }
         [_, _, _] => Err("syntax error"),
-        [_, ..] => eval(ast[ast.len() - 3..].to_vec()),
+        [_, ..] => {
+            let r = eval(ast[ast.len() - 3..].to_vec()).unwrap();
+            let mut new_ast: Vec<KW> = vec![]; // TODO: shorten this, concat!() macro?
+            new_ast.extend(ast[..ast.len()-3].iter().cloned());
+            new_ast.append(&mut vec![r]);
+            eval(new_ast)
+        },
     }
 }
 

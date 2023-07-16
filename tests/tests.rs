@@ -26,6 +26,7 @@ fn test_2() {
         vec![Noun(K::Int(Some(2))), Verb { name: "+".to_string() }, Noun(K::Int(Some(2)))]
     );
     assert_eq!(eval(scan("2 + 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+    assert_eq!(eval(scan("2 + 2 + 2").unwrap()).unwrap(), Noun(K::Int(Some(6))));
 
     assert_eq!(
         scan("1.0 + 2.0").unwrap(),
