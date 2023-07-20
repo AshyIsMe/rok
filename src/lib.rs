@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use log::{debug};
+use log::debug;
 use polars::prelude::*;
 use std::{collections::VecDeque, iter::repeat, ops};
 
@@ -83,25 +83,31 @@ pub fn b2i(b: K) -> K {
 }
 
 macro_rules! impl_op {
-    ($op:tt, $self:ident, $r:ident) => {
+    ($op:tt, $opf:expr, $self:ident, $r:ident) => {
+        // This doesn't work like i hoped it would.
+        // Not sure how to get it to be able to do: l.add(r) or l.$opf(r)
         match ($self.clone(), $r) {
             // There must be an easier way... What's a macro???
             (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
             (K::Bool(l), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
-            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l $op r as i64)),
             (K::Bool(l), K::Float(r)) => K::Float(l as f64 $op r),
-            (K::Float(l), K::Bool(r)) => K::Float(l $op r as f64),
+
+            (K::Bool(l), K::BoolArray(r)) => K::IntArray($opf(l as i64, &r)),
+            // (K::Bool(l), K::IntArray(r)) => K::IntArray(l as i64 $op r),
+            // (K::Bool(l), K::FloatArray(r)) => K::FloatArray(l as f64 $op r),
 
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
-            (K::BoolArray(_l), K::Int(Some(r))) => match b2i($self) {
-                K::IntArray(l) => K::IntArray(l $op r),
-                _ => panic!("impossible"),
-            },
-            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(r $op l),
+            (K::BoolArray(_l), K::Int(Some(r))) => match b2i($self) { K::IntArray(l) => K::IntArray(l $op r), _ => panic!("impossible"), },
             (K::BoolArray(l), K::Float(r)) => K::FloatArray(l $op r),
+
+            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l $op r as i64)),
+            (K::Float(l), K::Bool(r)) => K::Float(l $op r as f64),
+
+            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(r $op l),
             (K::Float(l), K::BoolArray(r)) => K::FloatArray(r $op l),
 
             (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l $op r)),
+
             (K::Float(l), K::Float(r)) => K::Float(l $op r),
             _ => todo!("various $op pairs - LOTS MORE to do still: dicts/tables/etc"),
         }
@@ -110,19 +116,61 @@ macro_rules! impl_op {
 
 impl ops::Add for K {
     type Output = Self;
-    fn add(self, r: Self) -> Self::Output { impl_op!(+, self, r) }
+    // fn add(self, r: Self) -> Self::Output { impl_op!(+, (|l:_,r:_|l.add(r)), self, r) }
+    fn add(self, r: Self) -> Self::Output { 
+        match (self.clone(), r) {
+            (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 + r as i64)),
+            (K::Bool(l), K::Int(Some(r))) => K::Int(Some(l as i64 + r)),
+            (K::Bool(l), K::Float(r)) => K::Float(l as f64 + r),
+            (K::Bool(l), K::BoolArray(r)) => K::IntArray(polars::prelude::LhsNumOps::add(l as i64, &r)),
+            (K::Bool(l), K::IntArray(r)) => K::IntArray(polars::prelude::LhsNumOps::add(l as i64, &r)),
+            (K::Bool(l), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::add(l as f64, &r)),
+
+            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l as i64 + r as i64)),
+            (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l as i64 + r)),
+            (K::Int(Some(l)), K::Float(r)) => K::Float(l as f64 + r),
+            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(polars::prelude::LhsNumOps::add(l as i64, &r)),
+            (K::Int(Some(l)), K::IntArray(r)) => K::IntArray(polars::prelude::LhsNumOps::add(l as i64, &r)),
+            (K::Int(Some(l)), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::add(l as f64, &r)),
+            (K::Int(None), K::Bool(_)) => K::Int(None),
+            (K::Int(None), K::Int(Some(_))) => K::Int(None),
+            (K::Int(None), K::Float(_)) => K::Float(f64::NAN),
+            (K::Int(None), K::BoolArray(r)) => K::IntArray(Series::new_null("",r.len())), // not sure about this
+            (K::Int(None), K::IntArray(r)) => K::IntArray(Series::new_null("",r.len())),
+            (K::Int(None), K::FloatArray(r)) => K::FloatArray(Series::new_null("",r.len())),
+
+            (K::Float(l), K::Bool(r)) => K::Float(l + r as f64),
+            (K::Float(l), K::Int(Some(r))) => K::Float(l + r as f64),
+            (K::Float(l), K::Float(r)) => K::Float(l + r),
+            (K::Float(l), K::BoolArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::add(l, &r)),
+            (K::Float(l), K::IntArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::add(l, &r.cast(&DataType::Float64).unwrap())),
+            (K::Float(l), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::add(l, &r)),
+
+
+
+            (K::BoolArray(l), K::Bool(r)) => K::IntArray(l + r),
+            (K::BoolArray(_l), K::Int(Some(r))) => match b2i(self) { K::IntArray(l) => K::IntArray(l + r), _ => panic!("impossible"), },
+            (K::BoolArray(l), K::Float(r)) => K::FloatArray(l + r),
+            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l + r),
+            (K::BoolArray(l), K::IntArray(r)) => K::IntArray(l+r),
+            (K::BoolArray(l), K::FloatArray(r)) => K::FloatArray(l+r),
+
+            _ => todo!("various + pairs - LOTS MORE to do still: dicts/tables/etc"),
+        }
+    }
 }
+
 impl ops::Sub for K {
     type Output = Self;
-    fn sub(self, r: Self) -> Self::Output { impl_op!(-, self, r) }
+    fn sub(self, r: Self) -> Self::Output { impl_op!(-, (LhsNumOps::sub), self, r) }
 }
 impl ops::Mul for K {
     type Output = Self;
-    fn mul(self, r: Self) -> Self::Output { impl_op!(*, self, r) }
+    fn mul(self, r: Self) -> Self::Output { impl_op!(*, (LhsNumOps::mul), self, r) }
 }
 impl ops::Div for K {
     type Output = Self;
-    fn div(self, r: Self) -> Self::Output { impl_op!(/, self, r) }
+    fn div(self, r: Self) -> Self::Output { impl_op!(/, (LhsNumOps::div), self, r) }
 }
 
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { Ok(l + r) }
