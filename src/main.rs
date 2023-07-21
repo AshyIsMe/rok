@@ -1,21 +1,25 @@
-use std::io::{self, Write};
 use rok::*;
+use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
 
 fn main() {
     println!("rok {}", env!("CARGO_PKG_VERSION"));
 
-    let mut buffer = String::new();
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
+    let mut rl = DefaultEditor::new().unwrap();
     loop {
-        stdout.write_all(b" ").unwrap(); //prompt
-        stdout.flush().unwrap();
-        stdin.read_line(&mut buffer).unwrap();
-
-        let r = eval(scan(&buffer).unwrap());
-        // stdout.write_all(b"{r:?}\n").unwrap();
-        println!("{r:?}\n");
-
-        buffer.truncate(0);
+        let readline = rl.readline(" ");
+        match readline {
+            Ok(line) => {
+                let r = eval(scan(&line).unwrap());
+                println!("{r:?}\n");
+            },
+            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
+                break
+            },
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break
+            }
+        }
     }
 }
