@@ -43,6 +43,13 @@ pub enum KW /* KWords */ {
     RP,
 }
 
+#[macro_export]
+macro_rules! arr {
+    ($v:expr) => {
+        Series::new("", $v)
+    };
+}
+
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
     match v {
         "+" => match (l, r) {
@@ -60,6 +67,11 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
         "%" => match (l, r) {
             (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_divide(l, r).unwrap())),
             _ => todo!("monad %"),
+        },
+        "!" => match (l, r) {
+            (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
+            (Some(KW::Noun(_l)), KW::Noun(_r)) => todo!("dyad !"),
+            _ => todo!("wat"),
         },
         _ => Err("invalid primitive"),
     }
@@ -153,6 +165,13 @@ pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { Ok(l + r) }
 pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { Ok(l - r) }
 pub fn v_times(l: K, r: K) -> Result<K, &'static str> { Ok(l * r) }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { Ok(l / r) }
+pub fn v_bang(r: K) -> Result<K, &'static str> {
+    debug!("v_bang");
+    match r {
+        K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
+        _ => todo!("v_bang variants"),
+    }
+}
 
 pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
     let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
@@ -164,8 +183,12 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
         // let fragment: Vec<KW> = stack.drain(..4).collect();
         let fragment = get_fragment(&mut stack);
         let result: Result<Vec<KW>, &'static str> = match fragment {
-            (w, KW::Verb { name: _ }, KW::Noun(_), _any) if matches!(w, KW::LP) => todo!("0 monad"),
-            (_, KW::Verb { name: _ }, KW::Verb { name: _ }, KW::Noun(_)) => todo!("1 monad"),
+            (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::LP) => {
+                Ok(vec![w, apply_primitive(&name, None, x.clone()).unwrap(), any])
+            }
+            (w, v@ KW::Verb {..}, KW::Verb {name}, x@KW::Noun(_)) => {
+                Ok(vec![w, v, apply_primitive(&name, None, x.clone()).unwrap()])
+            },
             (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_)) => {
                 // 2 dyad
                 Ok(vec![any.clone(), apply_primitive(&name, Some(x.clone()), y.clone()).unwrap()])

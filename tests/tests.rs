@@ -3,11 +3,6 @@ use rok::*;
 
 use rok::KW::*;
 
-macro_rules! arr {
-    ($v:expr) => {
-        Series::new("", $v)
-    };
-}
 
 #[test]
 fn test_scan() {
@@ -90,4 +85,9 @@ fn test_array_maths() {
     assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 1 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([1.1, 2.1])))));
     assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 2 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([0.55, 1.05])))));
     assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 2.0 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([0.55, 1.05])))));
+}
+
+#[test]
+fn test_iota() {
+    assert_eq!(format!("{:?}", eval(scan("! 4").unwrap()).unwrap()), format!("{:?}", Noun(K::IntArray(arr!([0, 1, 2, 3])))));
 }

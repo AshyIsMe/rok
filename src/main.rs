@@ -3,6 +3,7 @@ use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 
 fn main() {
+    env_logger::init();
     println!("rok {}", env!("CARGO_PKG_VERSION"));
 
     let mut rl = DefaultEditor::new().unwrap();
