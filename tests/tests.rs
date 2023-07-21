@@ -10,7 +10,7 @@ macro_rules! arr {
 }
 
 #[test]
-fn test_1() {
+fn test_scan() {
     assert_eq!(scan("1").unwrap(), vec![Noun(K::Bool(1u8))]);
     assert_eq!(scan("2").unwrap(), vec![Noun(K::Int(Some(2)))]);
     assert_eq!(scan("3.14").unwrap(), vec![Noun(K::Float(3.14))]);
@@ -20,7 +20,7 @@ fn test_1() {
 }
 
 #[test]
-fn test_2() {
+fn test_eval() {
     assert_eq!(
         scan("2 + 2").unwrap(),
         vec![Noun(K::Int(Some(2))), Verb { name: "+".to_string() }, Noun(K::Int(Some(2)))]
@@ -46,15 +46,27 @@ fn test_2() {
 }
 
 #[test]
-fn test_3() {
+fn test_parens() {
     assert_eq!(scan("(1)").unwrap(), vec![KW::LP, Noun(K::Bool(1)), KW::RP]);
     assert_eq!(eval(scan("(1)").unwrap()).unwrap(), Noun(K::Bool(1)));
     assert_eq!(eval(scan("(1+1)").unwrap()).unwrap(), Noun(K::Int(Some(2))));
     assert_eq!(eval(scan("(1+1)+3").unwrap()).unwrap(), Noun(K::Int(Some(5))));
     assert_eq!(eval(scan("(1*1)+(3*3)").unwrap()).unwrap(), Noun(K::Int(Some(10))));
     assert_eq!(eval(scan("((2 + 0 + 0 + 1 - 1) * (3*1)) + 1").unwrap()).unwrap(), Noun(K::Int(Some(7))));
+}
 
+#[test]
+fn test_array_maths() {
     // TODO: Why do these fail the assert_eq even though they look correctly matched? (pointers vs values maybe?)
     // assert_eq!(eval(scan("3.14 + 1 2 3").unwrap()).unwrap(), Noun(K::FloatArray(arr!([4.14, 5.14, 6.14]))));
     // assert_eq!(eval(scan("3.14 + 1.0 2.0 3.0").unwrap()).unwrap(), Noun(K::FloatArray(arr!([4.14, 5.14, 6.14]))));
+    assert_eq!(format!("{:?}", eval(scan("3.14 + 1 2 3").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([4.14, 5.14, 6.14])))));
+    assert_eq!(format!("{:?}", eval(scan("3.14 + 1.0 2.0 3.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([4.14, 5.14, 6.14])))));
+
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([2.1, 3.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([3.1, 4.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([3.1, 4.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 1 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([2.1, 3.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 2 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([3.1, 4.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 2.0 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([3.1, 4.1])))));
 }

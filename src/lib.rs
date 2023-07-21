@@ -146,14 +146,27 @@ impl ops::Add for K {
             (K::Float(l), K::IntArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::add(l, &r.cast(&DataType::Float64).unwrap())),
             (K::Float(l), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::add(l, &r)),
 
-
-
             (K::BoolArray(l), K::Bool(r)) => K::IntArray(l + r),
             (K::BoolArray(_l), K::Int(Some(r))) => match b2i(self) { K::IntArray(l) => K::IntArray(l + r), _ => panic!("impossible"), },
             (K::BoolArray(l), K::Float(r)) => K::FloatArray(l + r),
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l + r),
             (K::BoolArray(l), K::IntArray(r)) => K::IntArray(l+r),
             (K::BoolArray(l), K::FloatArray(r)) => K::FloatArray(l+r),
+
+            (K::IntArray(l), K::Bool(r)) => K::IntArray(l + r),
+            (K::IntArray(_l), K::Int(Some(r))) => match b2i(self) { K::IntArray(l) => K::IntArray(l + r), _ => panic!("impossible"), },
+            (K::IntArray(l), K::Float(r)) => K::FloatArray(l + r),
+            (K::IntArray(l), K::BoolArray(r)) => K::IntArray(l + r),
+            (K::IntArray(l), K::IntArray(r)) => K::IntArray(l+r),
+            (K::IntArray(l), K::FloatArray(r)) => K::FloatArray(l+r),
+
+            (K::FloatArray(l), K::Bool(r)) => K::FloatArray(l + r as f64),
+            (K::FloatArray(l), K::Int(Some(r))) => K::FloatArray(l + r as f64),
+            (K::FloatArray(l), K::Float(r)) => K::FloatArray(l + r),
+            (K::FloatArray(l), K::BoolArray(r)) => K::FloatArray(l + r),
+            (K::FloatArray(l), K::IntArray(r)) => K::FloatArray(l + r),
+            (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l + r),
+
 
             _ => todo!("various + pairs - LOTS MORE to do still: dicts/tables/etc"),
         }
