@@ -69,4 +69,25 @@ fn test_array_maths() {
     assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 1 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([2.1, 3.1])))));
     assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 2 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([3.1, 4.1])))));
     assert_eq!(format!("{:?}", eval(scan("1.1 2.1 + 2.0 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([3.1, 4.1])))));
+
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 - 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([0.1, 1.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 - 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([-0.9, 0.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 - 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([-0.9, 0.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 - 1 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([0.1, 1.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 - 2 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([-0.9, 0.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 - 2.0 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([-0.9, 0.1])))));
+
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 * 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([1.1, 2.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 * 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([2.2, 4.2])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 * 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([2.2, 4.2])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 * 1 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([1.1, 2.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 * 2 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([2.2, 4.2])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 * 2.0 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([2.2, 4.2])))));
+
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([1.1, 2.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([0.55, 1.05])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([0.55, 1.05])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 1 1").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([1.1, 2.1])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 2 2").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([0.55, 1.05])))));
+    assert_eq!(format!("{:?}", eval(scan("1.1 2.1 % 2.0 2.0").unwrap()).unwrap()), format!("{:?}", Noun(K::FloatArray(arr!([0.55, 1.05])))));
 }
