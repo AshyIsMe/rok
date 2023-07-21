@@ -155,7 +155,7 @@ pub fn v_times(l: K, r: K) -> Result<K, &'static str> { Ok(l * r) }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { Ok(l / r) }
 
 pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
-    let mut queue = VecDeque::from(vec![vec![KW::StartOfLine], sentence].concat());
+    let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
     let mut stack: VecDeque<KW> = VecDeque::new();
 
     let mut converged: bool = false;
@@ -183,7 +183,7 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
 
         stack.retain(|w| !matches!(w, KW::Nothing));
         debug!("result: {:?} with {stack:?}", result);
-        stack = vec![result?, stack.into()].concat().into();
+        stack = [result?, stack.into()].concat().into();
     }
     stack.retain(|w| !matches!(w, KW::StartOfLine | KW::Nothing));
     let r: Vec<KW> = stack.iter().cloned().collect();
@@ -228,7 +228,7 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
             _ => return Err("TODO"),
         };
     }
-    Ok(words.into())
+    Ok(words)
 }
 
 pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
@@ -286,7 +286,7 @@ pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
 }
 
 pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
-    if nums.iter().any(|k| if let K::Float(_f) = k { true } else { false }) {
+    if nums.iter().any(|k| matches!(k, K::Float(_))) {
         let fa: Vec<f64> = nums
             .iter()
             .map(|k| match k {
@@ -299,7 +299,7 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
             .collect();
 
         Ok(K::FloatArray(Series::new("", fa)))
-    } else if nums.iter().any(|k| if let K::Int(_i) = k { true } else { false }) {
+    } else if nums.iter().any(|k| matches!(k, K::Int(_))) {
         let ia: Vec<Option<i64>> = nums
             .iter()
             .map(|k| match k {
@@ -310,7 +310,7 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
             .collect();
 
         Ok(K::IntArray(Series::new("", ia)))
-    } else if nums.iter().all(|k| if let K::Bool(_i) = k { true } else { false }) {
+    } else if nums.iter().all(|k| matches!(k, K::Bool(_))) {
         let ba: BooleanChunked = nums
             .iter()
             .map(|k| match k {
