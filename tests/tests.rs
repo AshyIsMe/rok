@@ -89,5 +89,5 @@ fn test_array_maths() {
 
 #[test]
 fn test_iota() {
-    assert_eq!(format!("{:?}", eval(scan("! 4").unwrap()).unwrap()), format!("{:?}", Noun(K::IntArray(arr!([0, 1, 2, 3])))));
+    assert_eq!(format!("{:?}", eval(scan("! 4").unwrap()).unwrap()), format!("{:?}", Noun(K::IntArray(arr!([0, 1, 2, 3i64])))));
 }

@@ -179,19 +179,23 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
 
     let mut converged: bool = false;
     while !converged {
-        debug!("{stack:?}");
+        debug!("stack: {stack:?}");
         // let fragment: Vec<KW> = stack.drain(..4).collect();
         let fragment = get_fragment(&mut stack);
         let result: Result<Vec<KW>, &'static str> = match fragment {
-            (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::LP) => {
+            (w, KW::Verb { name }, x @ KW::Noun(_), any)
+                if matches!(w, KW::StartOfLine | KW::LP) =>
+            {
                 Ok(vec![w, apply_primitive(&name, None, x.clone()).unwrap(), any])
+                // 0 monad
             }
-            (w, v@ KW::Verb {..}, KW::Verb {name}, x@KW::Noun(_)) => {
+            (w, v @ KW::Verb { .. }, KW::Verb { name }, x @ KW::Noun(_)) => {
                 Ok(vec![w, v, apply_primitive(&name, None, x.clone()).unwrap()])
-            },
+                // 1 monad
+            }
             (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_)) => {
-                // 2 dyad
                 Ok(vec![any.clone(), apply_primitive(&name, Some(x.clone()), y.clone()).unwrap()])
+                // 2 dyad
             }
             // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
             (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
