@@ -91,3 +91,10 @@ fn test_array_maths() {
 fn test_iota() {
     assert_eq!(format!("{:?}", eval(scan("! 4").unwrap()).unwrap()), format!("{:?}", Noun(K::IntArray(arr!([0, 1, 2, 3i64])))));
 }
+
+#[test]
+fn test_strings() {
+    assert_eq!(format!("{:?}", eval(scan("\"a\"").unwrap()).unwrap()), format!("{:?}", Noun(K::Char('a'))));
+    assert_eq!(format!("{:?}", eval(scan("\"\"").unwrap()).unwrap()), format!("{:?}", Noun(K::CharArray(Series::new("", "")))));
+    assert_eq!(format!("{:?}", eval(scan("\"abcABC\"").unwrap()).unwrap()), format!("{:?}", Noun(K::CharArray(Series::new("", "abcABC")))));
+}

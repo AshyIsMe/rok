@@ -22,6 +22,7 @@ pub enum K {
     BoolArray(Series),
     IntArray(Series),
     FloatArray(Series),
+    CharArray(Series),
     Nil, // Is Nil a noun?
          //Dictionary{ vals: Vec<K>, keys: Vec<K> },
          //Table{ DataFrame },
@@ -249,6 +250,11 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
                     words.push(KW::Verb { name: c.to_string() })
                 }
             }
+            '"' => {
+                let (j, k) = scan_string(&code[i..]).unwrap();
+                words.push(k);
+                skip = j;
+            }
             ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#'
             | '_' | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
             ' ' | '\t' | '\n' => continue,
@@ -288,6 +294,39 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
         }
     } else {
         Err("syntax error: a sentence starting with a digit must contain a valid number")
+    }
+}
+
+pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
+    // read string, accounting for C style escapes: \", \n, \t, etc
+    if code.chars().nth(0) != Some('"') {
+        panic!("called scan_string() on invalid input")
+    } else {
+        let mut i: usize = 1;
+        let mut s = String::new();
+        // TODO: Yeah this is awful...
+        while i < code.len() {
+            if code.chars().nth(i) == Some('"') {
+                return Ok(match s.len() {
+                    // Does k really have char atoms?
+                    1 => (i, KW::Noun(K::Char(s.chars().nth(0).unwrap()))),
+                    _ => (i, KW::Noun(K::CharArray(Series::new("", &s)))),
+                });
+            } else if code.chars().nth(i) == Some('\\') {
+                match code.chars().nth(i + 1) {
+                    Some('\\') => s.push_str("\\"),
+                    Some('t') => s.push_str("\t"),
+                    Some('n') => s.push_str("\n"),
+                    // TODO: handle the rest
+                    _ => return Err("parse error: invalid string"),
+                }
+                i += 1; // skip next char.
+            } else {
+                s.extend(code.chars().nth(i));
+            }
+            i += 1;
+        }
+        Err("parse error: unmatched \"")
     }
 }
 
