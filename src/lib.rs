@@ -44,6 +44,20 @@ pub enum KW /* KWords */ {
     RP,
 }
 
+impl K {
+    pub fn len<'s>(&'s self) -> usize {
+        use K::*;
+        match self {
+            Nil => 0,
+            BoolArray(a) => a.len(),
+            IntArray(a) => a.len(),
+            FloatArray(a) => a.len(),
+            CharArray(a) => a.len(),
+            _ => 1,
+        }
+    }
+}
+
 #[macro_export]
 macro_rules! arr {
     ($v:expr) => {
@@ -54,7 +68,9 @@ macro_rules! arr {
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
     match v {
         "+" => match (l, r) {
-            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_plus(l, r).unwrap())),
+            // (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_plus(l, r).unwrap())),
+            // AA TODO: do the same for the rest of the primitives
+            (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l,r).and_then(|n| Ok(KW::Noun(n))),
             _ => todo!("monad +"),
         },
         "-" => match (l, r) {
@@ -162,7 +178,17 @@ impl ops::Div for K {
     fn div(self, r: Self) -> Self::Output { impl_op!(/, div, self, r) }
 }
 
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { Ok(l + r) }
+fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
+    if l.len() == r.len() || l.len() == 1 || r.len() == 1 {
+        Ok(true)
+    } else {
+        Err("length")
+    }
+}
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
+    let b = len_ok(&l, &r);
+    if let Err(e) = b { Err(e) } else { Ok(l + r) }
+}
 pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { Ok(l - r) }
 pub fn v_times(l: K, r: K) -> Result<K, &'static str> { Ok(l * r) }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { Ok(l / r) }
