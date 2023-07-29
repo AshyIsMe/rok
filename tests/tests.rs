@@ -98,3 +98,19 @@ fn test_strings() {
     assert_eq!(format!("{:?}", eval(scan("\"\"").unwrap()).unwrap()), format!("{:?}", Noun(K::CharArray(Series::new("", "")))));
     assert_eq!(format!("{:?}", eval(scan("\"abcABC\"").unwrap()).unwrap()), format!("{:?}", Noun(K::CharArray(Series::new("", "abcABC")))));
 }
+
+#[test]
+fn test_length_errors() {
+    assert_eq!(eval(scan("1 2 3 + 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1 2 + 3 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1.0 2.0 + 3 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1 2 3 - 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1 2 - 3 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1.0 2.0 - 3 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1 2 3 * 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1 2 * 3 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1.0 2.0 * 3 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1 2 3 % 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1 2 % 3 4 5").unwrap()), Err::<KW,&'static str>("length"));
+    assert_eq!(eval(scan("1.0 2.0 % 3 4 5").unwrap()), Err::<KW,&'static str>("length"));
+}
