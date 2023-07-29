@@ -68,21 +68,19 @@ macro_rules! arr {
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
     match v {
         "+" => match (l, r) {
-            // (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_plus(l, r).unwrap())),
-            // AA TODO: do the same for the rest of the primitives
-            (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l,r).and_then(|n| Ok(KW::Noun(n))),
+            (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
             _ => todo!("monad +"),
         },
         "-" => match (l, r) {
-            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_minus(l, r).unwrap())),
+            (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
             _ => todo!("monad -"),
         },
         "*" => match (l, r) {
-            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_times(l, r).unwrap())),
+            (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
             _ => todo!("monad *"),
         },
         "%" => match (l, r) {
-            (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_divide(l, r).unwrap())),
+            (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
             _ => todo!("monad %"),
         },
         "!" => match (l, r) {
@@ -145,7 +143,7 @@ macro_rules! impl_op {
             (K::BoolArray(l), K::IntArray(r)) => K::IntArray(l $op r),
             (K::BoolArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
             (K::IntArray(l), K::Bool(r)) => K::IntArray(l $op r),
-            (K::IntArray(_l), K::Int(Some(r))) => match b2i($self) { K::IntArray(l) => K::IntArray(l $op r), _ => panic!("impossible"), },
+            (K::IntArray(l), K::Int(Some(r))) => K::IntArray(l $op r),
             (K::IntArray(l), K::Float(r)) => K::FloatArray(l $op r),
             (K::IntArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
@@ -185,13 +183,10 @@ fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
         Err("length")
     }
 }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
-    let b = len_ok(&l, &r);
-    if let Err(e) = b { Err(e) } else { Ok(l + r) }
-}
-pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { Ok(l - r) }
-pub fn v_times(l: K, r: K) -> Result<K, &'static str> { Ok(l * r) }
-pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { Ok(l / r) }
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l + r)) }
+pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l - r)) }
+pub fn v_times(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l * r)) }
+pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l / r)) }
 pub fn v_bang(r: K) -> Result<K, &'static str> {
     debug!("v_bang");
     match r {
@@ -213,16 +208,16 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
             (w, KW::Verb { name }, x @ KW::Noun(_), any)
                 if matches!(w, KW::StartOfLine | KW::LP) =>
             {
-                Ok(vec![w, apply_primitive(&name, None, x.clone()).unwrap(), any])
                 // 0 monad
+                apply_primitive(&name, None, x.clone()).and_then(|r| Ok(vec![w, r, any]))
             }
             (w, v @ KW::Verb { .. }, KW::Verb { name }, x @ KW::Noun(_)) => {
-                Ok(vec![w, v, apply_primitive(&name, None, x.clone()).unwrap()])
                 // 1 monad
+                apply_primitive(&name, None, x.clone()).and_then(|r| Ok(vec![w, v, r]))
             }
             (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_)) => {
-                Ok(vec![any.clone(), apply_primitive(&name, Some(x.clone()), y.clone()).unwrap()])
                 // 2 dyad
+                apply_primitive(&name, Some(x.clone()), y.clone()).and_then(|r| Ok(vec![any, r]))
             }
             // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
             (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
