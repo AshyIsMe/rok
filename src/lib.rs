@@ -14,99 +14,99 @@ use std::{collections::VecDeque, iter::repeat, ops};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum K {
-    Bool(u8),
-    Int(Option<i64>), //blech option here
-    Float(f64),
-    Char(char),
-    //Symbol(i64), // index into global Symbols array?
-    BoolArray(Series),
-    IntArray(Series),
-    FloatArray(Series),
-    CharArray(Series),
-    Nil, // Is Nil a noun?
-         //Dictionary{ vals: Vec<K>, keys: Vec<K> },
-         //Table{ DataFrame },
-         //Quote(Box<K>) // Is Quote a noun?
+  Bool(u8),
+  Int(Option<i64>), //blech option here
+  Float(f64),
+  Char(char),
+  //Symbol(i64), // index into global Symbols array?
+  BoolArray(Series),
+  IntArray(Series),
+  FloatArray(Series),
+  CharArray(Series),
+  Nil, // Is Nil a noun?
+  // Dictionary { vals: Vec<K>, keys: Vec<K> },
+  //Table{ DataFrame },
+  //Quote(Box<K>) // Is Quote a noun?
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
-    Noun(K),
-    // Function{ body, args, curry, env }
-    // View{ value, r, cache, depends->val }
-    // NameRef { name, l(index?), r(assignment), global? }
-    // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
-    Verb { name: String },
-    // Adverb { name, l(?), verb, r }
-    // Cond { body: Vec< Vec<K> > } //list of expressions...
-    StartOfLine,
-    Nothing,
-    LP,
-    RP,
+  Noun(K),
+  // Function{ body, args, curry, env }
+  // View{ value, r, cache, depends->val }
+  // NameRef { name, l(index?), r(assignment), global? }
+  // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
+  Verb { name: String },
+  // Adverb { name, l(?), verb, r }
+  // Cond { body: Vec< Vec<K> > } //list of expressions...
+  StartOfLine,
+  Nothing,
+  LP,
+  RP,
 }
 
 impl K {
-    pub fn len<'s>(&'s self) -> usize {
-        use K::*;
-        match self {
-            Nil => 0,
-            BoolArray(a) => a.len(),
-            IntArray(a) => a.len(),
-            FloatArray(a) => a.len(),
-            CharArray(a) => a.len(),
-            _ => 1,
-        }
+  pub fn len<'s>(&'s self) -> usize {
+    use K::*;
+    match self {
+      Nil => 0,
+      BoolArray(a) => a.len(),
+      IntArray(a) => a.len(),
+      FloatArray(a) => a.len(),
+      CharArray(a) => a.len(),
+      _ => 1,
     }
+  }
 }
 
 #[macro_export]
 macro_rules! arr {
-    ($v:expr) => {
-        Series::new("", $v)
-    };
+  ($v:expr) => {
+    Series::new("", $v)
+  };
 }
 
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
-    match v {
-        "+" => match (l, r) {
-            (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
-            _ => todo!("monad +"),
-        },
-        "-" => match (l, r) {
-            (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
-            _ => todo!("monad -"),
-        },
-        "*" => match (l, r) {
-            (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
-            _ => todo!("monad *"),
-        },
-        "%" => match (l, r) {
-            (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
-            _ => todo!("monad %"),
-        },
-        "!" => match (l, r) {
-            (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
-            (Some(KW::Noun(_l)), KW::Noun(_r)) => todo!("dyad !"),
-            _ => todo!("wat"),
-        },
-        _ => Err("invalid primitive"),
-    }
+  match v {
+    "+" => match (l, r) {
+      (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
+      _ => todo!("monad +"),
+    },
+    "-" => match (l, r) {
+      (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
+      _ => todo!("monad -"),
+    },
+    "*" => match (l, r) {
+      (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
+      _ => todo!("monad *"),
+    },
+    "%" => match (l, r) {
+      (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
+      _ => todo!("monad %"),
+    },
+    "!" => match (l, r) {
+      (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
+      (Some(KW::Noun(_l)), KW::Noun(_r)) => todo!("dyad !"),
+      _ => todo!("wat"),
+    },
+    _ => Err("invalid primitive"),
+  }
 }
 
 pub fn b2i(b: K) -> K {
-    match b {
-        K::BoolArray(b) => K::IntArray(
-            b.bool()
-                .expect("bool")
-                .into_iter()
-                .map(|b| match b {
-                    Some(true) => Some(1),
-                    Some(false) => Some(0),
-                    _ => None,
-                })
-                .collect::<Series>(),
-        ),
-        _ => panic!("not bool"),
-    }
+  match b {
+    K::BoolArray(b) => K::IntArray(
+      b.bool()
+        .expect("bool")
+        .into_iter()
+        .map(|b| match b {
+          Some(true) => Some(1),
+          Some(false) => Some(0),
+          _ => None,
+        })
+        .collect::<Series>(),
+    ),
+    _ => panic!("not bool"),
+  }
 }
 
 macro_rules! impl_op {
@@ -160,255 +160,253 @@ macro_rules! impl_op {
 }
 
 impl ops::Add for K {
-    type Output = Self;
-    fn add(self, r: Self) -> Self::Output { impl_op!(+, add, self, r) }
+  type Output = Self;
+  fn add(self, r: Self) -> Self::Output { impl_op!(+, add, self, r) }
 }
 impl ops::Sub for K {
-    type Output = Self;
-    fn sub(self, r: Self) -> Self::Output { impl_op!(-, sub, self, r) }
+  type Output = Self;
+  fn sub(self, r: Self) -> Self::Output { impl_op!(-, sub, self, r) }
 }
 impl ops::Mul for K {
-    type Output = Self;
-    fn mul(self, r: Self) -> Self::Output { impl_op!(*, mul, self, r) }
+  type Output = Self;
+  fn mul(self, r: Self) -> Self::Output { impl_op!(*, mul, self, r) }
 }
 impl ops::Div for K {
-    type Output = Self;
-    fn div(self, r: Self) -> Self::Output { impl_op!(/, div, self, r) }
+  type Output = Self;
+  fn div(self, r: Self) -> Self::Output { impl_op!(/, div, self, r) }
 }
 
 fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
-    if l.len() == r.len() || l.len() == 1 || r.len() == 1 {
-        Ok(true)
-    } else {
-        Err("length")
-    }
+  if l.len() == r.len() || l.len() == 1 || r.len() == 1 {
+    Ok(true)
+  } else {
+    Err("length")
+  }
 }
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l + r)) }
 pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l - r)) }
 pub fn v_times(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l * r)) }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l / r)) }
 pub fn v_bang(r: K) -> Result<K, &'static str> {
-    debug!("v_bang");
-    match r {
-        K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
-        _ => todo!("v_bang variants"),
-    }
+  debug!("v_bang");
+  match r {
+    K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
+    _ => todo!("v_bang variants"),
+  }
 }
 
 pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
-    let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
-    let mut stack: VecDeque<KW> = VecDeque::new();
+  let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
+  let mut stack: VecDeque<KW> = VecDeque::new();
 
-    let mut converged: bool = false;
-    while !converged {
-        debug!("stack: {stack:?}");
-        // let fragment: Vec<KW> = stack.drain(..4).collect();
-        let fragment = get_fragment(&mut stack);
-        let result: Result<Vec<KW>, &'static str> = match fragment {
-            (w, KW::Verb { name }, x @ KW::Noun(_), any)
-                if matches!(w, KW::StartOfLine | KW::LP) =>
-            {
-                // 0 monad
-                apply_primitive(&name, None, x.clone()).and_then(|r| Ok(vec![w, r, any]))
-            }
-            (w, v @ KW::Verb { .. }, KW::Verb { name }, x @ KW::Noun(_)) => {
-                // 1 monad
-                apply_primitive(&name, None, x.clone()).and_then(|r| Ok(vec![w, v, r]))
-            }
-            (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_)) => {
-                // 2 dyad
-                apply_primitive(&name, Some(x.clone()), y.clone()).and_then(|r| Ok(vec![any, r]))
-            }
-            // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
-            (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
-            (w1, w2, w3, w4) => match queue.pop_back() {
-                Some(v) => Ok(vec![v, w1.clone(), w2.clone(), w3.clone(), w4.clone()]),
-                None => {
-                    converged = true;
-                    Ok(vec![w1.clone(), w2.clone(), w3.clone(), w4.clone()])
-                }
-            },
-        };
+  let mut converged: bool = false;
+  while !converged {
+    debug!("stack: {stack:?}");
+    // let fragment: Vec<KW> = stack.drain(..4).collect();
+    let fragment = get_fragment(&mut stack);
+    let result: Result<Vec<KW>, &'static str> = match fragment {
+      (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
+        // 0 monad
+        apply_primitive(&name, None, x.clone()).and_then(|r| Ok(vec![w, r, any]))
+      }
+      (w, v @ KW::Verb { .. }, KW::Verb { name }, x @ KW::Noun(_)) => {
+        // 1 monad
+        apply_primitive(&name, None, x.clone()).and_then(|r| Ok(vec![w, v, r]))
+      }
+      (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_)) => {
+        // 2 dyad
+        apply_primitive(&name, Some(x.clone()), y.clone()).and_then(|r| Ok(vec![any, r]))
+      }
+      // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
+      (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
+      (w1, w2, w3, w4) => match queue.pop_back() {
+        Some(v) => Ok(vec![v, w1.clone(), w2.clone(), w3.clone(), w4.clone()]),
+        None => {
+          converged = true;
+          Ok(vec![w1.clone(), w2.clone(), w3.clone(), w4.clone()])
+        }
+      },
+    };
 
-        stack.retain(|w| !matches!(w, KW::Nothing));
-        debug!("result: {:?} with {stack:?}", result);
-        stack = [result?, stack.into()].concat().into();
-    }
-    stack.retain(|w| !matches!(w, KW::StartOfLine | KW::Nothing));
-    let r: Vec<KW> = stack.iter().cloned().collect();
-    if r.len() == 1 {
-        Ok(r[0].clone())
-    } else {
-        debug!("{:?}", r);
-        Err("invalid result stack")
-    }
+    stack.retain(|w| !matches!(w, KW::Nothing));
+    debug!("result: {:?} with {stack:?}", result);
+    stack = [result?, stack.into()].concat().into();
+  }
+  stack.retain(|w| !matches!(w, KW::StartOfLine | KW::Nothing));
+  let r: Vec<KW> = stack.iter().cloned().collect();
+  if r.len() == 1 {
+    Ok(r[0].clone())
+  } else {
+    debug!("{:?}", r);
+    Err("invalid result stack")
+  }
 }
 
 fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
-    stack
-        .drain(..stack.len().min(4))
-        .chain(repeat(KW::Nothing))
-        .next_tuple()
-        .expect("infinite iterator can't be empty")
+  stack
+    .drain(..stack.len().min(4))
+    .chain(repeat(KW::Nothing))
+    .next_tuple()
+    .expect("infinite iterator can't be empty")
 }
 
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
-    let mut words = vec![];
-    let mut skip: usize = 0;
-    for (i, c) in code.char_indices() {
-        if skip > 0 {
-            skip -= 1;
-            continue;
-        }
-        match c {
-            '(' => words.push(KW::LP),
-            ')' => words.push(KW::RP),
-            '0'..='9' | '-' => {
-                if let Ok((j, k)) = scan_number(&code[i..]) {
-                    words.push(k);
-                    skip = j;
-                } else {
-                    words.push(KW::Verb { name: c.to_string() })
-                }
-            }
-            '"' => {
-                let (j, k) = scan_string(&code[i..]).unwrap();
-                words.push(k);
-                skip = j;
-            }
-            ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#'
-            | '_' | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
-            ' ' | '\t' | '\n' => continue,
-            _ => return Err("TODO"),
-        };
+  let mut words = vec![];
+  let mut skip: usize = 0;
+  for (i, c) in code.char_indices() {
+    if skip > 0 {
+      skip -= 1;
+      continue;
     }
-    Ok(words)
+    match c {
+      '(' => words.push(KW::LP),
+      ')' => words.push(KW::RP),
+      '0'..='9' | '-' => {
+        if let Ok((j, k)) = scan_number(&code[i..]) {
+          words.push(k);
+          skip = j;
+        } else {
+          words.push(KW::Verb { name: c.to_string() })
+        }
+      }
+      '"' => {
+        let (j, k) = scan_string(&code[i..]).unwrap();
+        words.push(k);
+        skip = j;
+      }
+      ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
+      | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
+      ' ' | '\t' | '\n' => continue,
+      _ => return Err("TODO"),
+    };
+  }
+  Ok(words)
 }
 
 pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
-    // read until first char outside 0123456789.-
-    // split on space and parse to numeric
-    //
-    // an array *potentially* extends until the first symbol character
-    let sentence = match code.find(|c: char| {
-        !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '-', 'n', 'N'].contains(&c))
-    }) {
-        Some(c) => &code[..c],
-        None => code,
-    };
+  // read until first char outside 0123456789.-
+  // split on space and parse to numeric
+  //
+  // an array *potentially* extends until the first symbol character
+  let sentence = match code.find(|c: char| {
+    !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '-', 'n', 'N'].contains(&c))
+  }) {
+    Some(c) => &code[..c],
+    None => code,
+  };
 
-    // split on the whitespace, and try to parse each 'word', stopping when we can't parse a word
-    let parts: Vec<(&str, K)> = sentence
-        .split_whitespace()
-        .map_while(|term| scan_num_token(term).ok().map(|x| (term, x)))
-        .collect();
+  // split on the whitespace, and try to parse each 'word', stopping when we can't parse a word
+  let parts: Vec<(&str, K)> = sentence
+    .split_whitespace()
+    .map_while(|term| scan_num_token(term).ok().map(|x| (term, x)))
+    .collect();
 
-    // the end is the end of the last successfully parsed term
-    if let Some((term, _)) = parts.last() {
-        let l = term.as_ptr() as usize - sentence.as_ptr() as usize + term.len() - 1;
+  // the end is the end of the last successfully parsed term
+  if let Some((term, _)) = parts.last() {
+    let l = term.as_ptr() as usize - sentence.as_ptr() as usize + term.len() - 1;
 
-        let nums: Vec<K> = parts.into_iter().map(|(_term, num)| num).collect();
-        match nums.len() {
-            0 => panic!("impossible"),
-            1 => Ok((l, KW::Noun(nums[0].clone()))),
-            _ => Ok((l, KW::Noun(promote_num(nums).unwrap()))),
-        }
-    } else {
-        Err("syntax error: a sentence starting with a digit must contain a valid number")
+    let nums: Vec<K> = parts.into_iter().map(|(_term, num)| num).collect();
+    match nums.len() {
+      0 => panic!("impossible"),
+      1 => Ok((l, KW::Noun(nums[0].clone()))),
+      _ => Ok((l, KW::Noun(promote_num(nums).unwrap()))),
     }
+  } else {
+    Err("syntax error: a sentence starting with a digit must contain a valid number")
+  }
 }
 
 pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
-    // read string, accounting for C style escapes: \", \n, \t, etc
-    if code.chars().nth(0) != Some('"') {
-        panic!("called scan_string() on invalid input")
-    } else {
-        let mut i: usize = 1;
-        let mut s = String::new();
-        // TODO: Yeah this is awful...
-        while i < code.len() {
-            if code.chars().nth(i) == Some('"') {
-                return Ok(match s.len() {
-                    // Does k really have char atoms?
-                    1 => (i, KW::Noun(K::Char(s.chars().nth(0).unwrap()))),
-                    _ => (i, KW::Noun(K::CharArray(Series::new("", &s)))),
-                });
-            } else if code.chars().nth(i) == Some('\\') {
-                match code.chars().nth(i + 1) {
-                    Some('\\') => s.push_str("\\"),
-                    Some('t') => s.push_str("\t"),
-                    Some('n') => s.push_str("\n"),
-                    // TODO: handle the rest
-                    _ => return Err("parse error: invalid string"),
-                }
-                i += 1; // skip next char.
-            } else {
-                s.extend(code.chars().nth(i));
-            }
-            i += 1;
+  // read string, accounting for C style escapes: \", \n, \t, etc
+  if code.chars().nth(0) != Some('"') {
+    panic!("called scan_string() on invalid input")
+  } else {
+    let mut i: usize = 1;
+    let mut s = String::new();
+    // TODO: Yeah this is awful...
+    while i < code.len() {
+      if code.chars().nth(i) == Some('"') {
+        return Ok(match s.len() {
+          // Does k really have char atoms?
+          1 => (i, KW::Noun(K::Char(s.chars().nth(0).unwrap()))),
+          _ => (i, KW::Noun(K::CharArray(Series::new("", &s)))),
+        });
+      } else if code.chars().nth(i) == Some('\\') {
+        match code.chars().nth(i + 1) {
+          Some('\\') => s.push_str("\\"),
+          Some('t') => s.push_str("\t"),
+          Some('n') => s.push_str("\n"),
+          // TODO: handle the rest
+          _ => return Err("parse error: invalid string"),
         }
-        Err("parse error: unmatched \"")
+        i += 1; // skip next char.
+      } else {
+        s.extend(code.chars().nth(i));
+      }
+      i += 1;
     }
+    Err("parse error: unmatched \"")
+  }
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
-    match term {
-        "0N" => Ok(K::Int(None)),
-        "0n" => Ok(K::Float(f64::NAN)),
-        _ => {
-            if let Ok(i) = term.parse::<u8>() {
-                match i {
-                    0 | 1 => Ok(K::Bool(i)),
-                    _ => Ok(K::Int(Some(i as i64))),
-                }
-            } else if let Ok(i) = term.parse::<i64>() {
-                Ok(K::Int(Some(i)))
-            } else if let Ok(f) = term.parse::<f64>() {
-                Ok(K::Float(f))
-            } else {
-                Err("invalid num token")
-            }
+  match term {
+    "0N" => Ok(K::Int(None)),
+    "0n" => Ok(K::Float(f64::NAN)),
+    _ => {
+      if let Ok(i) = term.parse::<u8>() {
+        match i {
+          0 | 1 => Ok(K::Bool(i)),
+          _ => Ok(K::Int(Some(i as i64))),
         }
+      } else if let Ok(i) = term.parse::<i64>() {
+        Ok(K::Int(Some(i)))
+      } else if let Ok(f) = term.parse::<f64>() {
+        Ok(K::Float(f))
+      } else {
+        Err("invalid num token")
+      }
     }
+  }
 }
 
 pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
-    if nums.iter().any(|k| matches!(k, K::Float(_))) {
-        let fa: Vec<f64> = nums
-            .iter()
-            .map(|k| match k {
-                K::Bool(i) => *i as f64,
-                K::Int(None) => f64::NAN,
-                K::Int(Some(i)) => *i as f64,
-                K::Float(f) => *f,
-                _ => panic!("invalid float"),
-            })
-            .collect();
+  if nums.iter().any(|k| matches!(k, K::Float(_))) {
+    let fa: Vec<f64> = nums
+      .iter()
+      .map(|k| match k {
+        K::Bool(i) => *i as f64,
+        K::Int(None) => f64::NAN,
+        K::Int(Some(i)) => *i as f64,
+        K::Float(f) => *f,
+        _ => panic!("invalid float"),
+      })
+      .collect();
 
-        Ok(K::FloatArray(Series::new("", fa)))
-    } else if nums.iter().any(|k| matches!(k, K::Int(_))) {
-        let ia: Vec<Option<i64>> = nums
-            .iter()
-            .map(|k| match k {
-                K::Bool(i) => Some(*i as i64),
-                K::Int(i) => *i,
-                _ => panic!("invalid int"),
-            })
-            .collect();
+    Ok(K::FloatArray(Series::new("", fa)))
+  } else if nums.iter().any(|k| matches!(k, K::Int(_))) {
+    let ia: Vec<Option<i64>> = nums
+      .iter()
+      .map(|k| match k {
+        K::Bool(i) => Some(*i as i64),
+        K::Int(i) => *i,
+        _ => panic!("invalid int"),
+      })
+      .collect();
 
-        Ok(K::IntArray(Series::new("", ia)))
-    } else if nums.iter().all(|k| matches!(k, K::Bool(_))) {
-        let ba: BooleanChunked = nums
-            .iter()
-            .map(|k| match k {
-                K::Bool(0) => false,
-                K::Bool(1) => true,
-                _ => panic!("invalid bool"),
-            })
-            .collect();
+    Ok(K::IntArray(Series::new("", ia)))
+  } else if nums.iter().all(|k| matches!(k, K::Bool(_))) {
+    let ba: BooleanChunked = nums
+      .iter()
+      .map(|k| match k {
+        K::Bool(0) => false,
+        K::Bool(1) => true,
+        _ => panic!("invalid bool"),
+      })
+      .collect();
 
-        Ok(K::BoolArray(Series::new("", ba)))
-    } else {
-        Err("invalid nums")
-    }
+    Ok(K::BoolArray(Series::new("", ba)))
+  } else {
+    Err("invalid nums")
+  }
 }
