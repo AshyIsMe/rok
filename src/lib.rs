@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
-use std::{collections::VecDeque, iter::repeat, ops};
+use std::{collections::{VecDeque, HashMap}, iter::repeat, ops};
 
 // oK.js is 1k lines of javascript in one file for a k6 interpreter.
 // The Challenge: Can we do the same in RUST?
@@ -24,7 +24,7 @@ pub enum K {
   FloatArray(Series),
   CharArray(Series),
   Nil, // Is Nil a noun?
-  // Dictionary { vals: Vec<K>, keys: Vec<K> },
+  Dictionary(HashMap<String, K>) // String instead of Symbol for now
   //Table{ DataFrame },
   //Quote(Box<K>) // Is Quote a noun?
 }
