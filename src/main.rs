@@ -3,24 +3,22 @@ use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 
 fn main() {
-    env_logger::init();
-    println!("rok {}", env!("CARGO_PKG_VERSION"));
+  env_logger::init();
+  println!("rok {}", env!("CARGO_PKG_VERSION"));
 
-    let mut rl = DefaultEditor::new().unwrap();
-    loop {
-        let readline = rl.readline(" ");
-        match readline {
-            Ok(line) => {
-                let r = eval(scan(&line).unwrap());
-                println!("{r:?}\n");
-            },
-            Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => {
-                break
-            },
-            Err(err) => {
-                println!("Error: {:?}", err);
-                break
-            }
-        }
+  let mut rl = DefaultEditor::new().unwrap();
+  loop {
+    let readline = rl.readline(" ");
+    match readline {
+      Ok(line) => {
+        let r = eval(scan(&line).unwrap());
+        println!("{r:?}\n");
+      }
+      Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
+      Err(err) => {
+        println!("Error: {:?}", err);
+        break;
+      }
     }
+  }
 }
