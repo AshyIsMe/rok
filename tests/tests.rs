@@ -192,6 +192,23 @@ fn test_strings() {
 }
 
 #[test]
+fn test_symbols() {
+  assert_eq!(
+    format!("{:?}", eval(scan("`a").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::Symbol("a".to_string())))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`abc ").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::Symbol("abc".to_string())))
+  );
+//   assert_eq!(
+//     format!("{:?}", eval(scan("`a`b`c").unwrap()).unwrap()),
+//     format!("{:?}", Noun(K::SymbolArray(Series::new("", whatever-goes-here))))
+//   );
+}
+
+
+#[test]
 fn test_length_errors() {
   assert_eq!(eval(scan("1 2 3 + 4 5").unwrap()), Err::<KW, &'static str>("length"));
   assert_eq!(eval(scan("1 2 + 3 4 5").unwrap()), Err::<KW, &'static str>("length"));

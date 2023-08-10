@@ -18,7 +18,8 @@ pub enum K {
   Int(Option<i64>), //blech option here
   Float(f64),
   Char(char),
-  //Symbol(i64), // index into global Symbols array?
+  Symbol(String), // Symbol(i64), // TODO: index into global Symbols array?
+  // SymbolArray(Series), // TODO: index into global Symbols array?
   BoolArray(Series),
   IntArray(Series),
   FloatArray(Series),
@@ -274,6 +275,11 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
         words.push(k);
         skip = j;
       }
+      '`' => {
+        let (j, k) = scan_symbol(&code[i..]).unwrap();
+        words.push(k);
+        skip = j;
+      }
       ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
       | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
       ' ' | '\t' | '\n' => continue,
@@ -348,6 +354,29 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
     Err("parse error: unmatched \"")
   }
 }
+
+pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
+  // read string, accounting for C style escapes: \", \n, \t, etc
+  if code.chars().nth(0) != Some('`') {
+    panic!("called scan_symbol() on invalid input")
+  } else {
+    let mut i: usize = 1;
+    let mut s = String::new();
+    // TODO: Yeah this is awful...
+    while i < code.len() {
+      if code.chars().nth(i) == Some(' ') {
+        return Ok((i, KW::Noun(K::Symbol(s))))
+      } else if code.chars().nth(i) == Some('`') {
+        todo!("handle symbol arrays: `a`b`c etc")
+      } else {
+        s.extend(code.chars().nth(i));
+      }
+      i += 1;
+    }
+    return Ok((i, KW::Noun(K::Symbol(s))))
+  }
+}
+
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
   match term {
