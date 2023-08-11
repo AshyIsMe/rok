@@ -379,20 +379,27 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     let mut i: usize = 1;
     let mut s = String::new();
     let mut ss: Vec<String> = vec![];
+    let mut b_in_sym = true;
     // TODO: Yeah this is awful...
     while i < sentence.len() {
       if sentence.chars().nth(i) == Some(' ') {
-        if s.len() > 0 {
+        if b_in_sym {
           ss.extend(vec![s.clone()]);
           s.clear();
         }
+        b_in_sym = false;
       } else if sentence.chars().nth(i) == Some('`') {
-        if sentence.chars().nth(i-1) != Some(' ') {
+        if b_in_sym {
           ss.extend(vec![s.clone()]);
           s.clear();
         }
+        b_in_sym = true;
       } else {
-        s.extend(sentence.chars().nth(i));
+        if b_in_sym {
+          s.extend(sentence.chars().nth(i));
+        } else {
+          break;
+        }
       }
       i += 1;
     }

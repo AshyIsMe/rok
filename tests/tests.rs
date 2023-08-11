@@ -217,6 +217,7 @@ fn test_symbols() {
     format!("{:?}", eval(scan("`a ` `b `c").unwrap()).unwrap()),
     format!("{:?}", Noun(K::SymbolArray(Series::new("a", ["a", "", "b", "c"]).cast(&DataType::Categorical(None)).unwrap())))
   );
+  assert!(scan("`a ` abc").is_err());
 }
 
 
