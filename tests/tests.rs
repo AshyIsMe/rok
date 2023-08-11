@@ -201,10 +201,22 @@ fn test_symbols() {
     format!("{:?}", eval(scan("`abc ").unwrap()).unwrap()),
     format!("{:?}", Noun(K::Symbol("abc".to_string())))
   );
-//   assert_eq!(
-//     format!("{:?}", eval(scan("`a`b`c").unwrap()).unwrap()),
-//     format!("{:?}", Noun(K::SymbolArray(Series::new("", whatever-goes-here))))
-//   );
+  assert_eq!(
+    format!("{:?}", eval(scan("`a`b`c").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap())))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`a`b`c`").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::SymbolArray(Series::new("a", ["a", "b", "c", ""]).cast(&DataType::Categorical(None)).unwrap())))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`a `b `c").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap())))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`a ` `b `c").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::SymbolArray(Series::new("a", ["a", "", "b", "c"]).cast(&DataType::Categorical(None)).unwrap())))
+  );
 }
 
 
