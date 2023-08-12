@@ -87,7 +87,7 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
     },
     "!" => match (l, r) {
       (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
-      (Some(KW::Noun(_l)), KW::Noun(_r)) => todo!("dyad !"),
+      (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_bang(l,r).unwrap())),
       _ => todo!("wat"),
     },
     _ => Err("invalid primitive"),
@@ -194,6 +194,23 @@ pub fn v_bang(r: K) -> Result<K, &'static str> {
   match r {
     K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
     _ => todo!("v_bang variants"),
+  }
+}
+pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
+  match (l, r) {
+    (K::SymbolArray(s), K::List(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
+      } else if v.len()==1 {
+        Ok(K::Dictionary(Box::new(K::SymbolArray(s.clone())), Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect()))))
+      } else {
+        Err("length")
+      }
+    },
+    _ => {
+      todo!("modulo")
+      // len_ok(&l, &r).and_then(|_| Ok(l % r)) 
+    }
   }
 }
 

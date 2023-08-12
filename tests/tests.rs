@@ -236,3 +236,17 @@ fn test_length_errors() {
   assert_eq!(eval(scan("1 2 % 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
   assert_eq!(eval(scan("1.0 2.0 % 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
 }
+
+
+#[test]
+fn test_dict() {
+  let k = K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Bool(1u8), K::Int(Some(42)), K::Float(3.14)]);
+  let d1 = v_d_bang(k, v);
+  println!("{:?}", d1);
+
+  let k = K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Bool(1u8)]);
+  let d2 = v_d_bang(k, v);
+  println!("{:?}", d2)
+}
