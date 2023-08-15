@@ -239,6 +239,18 @@ fn test_length_errors() {
 
 
 #[test]
+fn test_lists() {
+  assert_eq!(
+    format!("{:?}", eval(scan("(1 2; 3 4)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::List(vec![K::IntArray(arr!([1, 2i64])), K::IntArray(arr!([3, 4i64]))])))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("(1;\"a\";2)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::List(vec![K::Bool(1u8), K::Char('a'),K::Int(Some(2))])))
+  );
+}
+
+#[test]
 fn test_dict() {
   let k = K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Bool(1u8), K::Int(Some(42)), K::Float(3.14)]);
