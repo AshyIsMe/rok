@@ -69,6 +69,7 @@ macro_rules! arr {
 }
 
 pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
+  //TODO handle same atom types promotion: (1;2;3) => IntArray([1 2 3])
   if nouns.iter().all(|w| matches!(w, KW::Noun(_))) {
     // check they're all nouns and make a List of the K objects within
     let v = nouns

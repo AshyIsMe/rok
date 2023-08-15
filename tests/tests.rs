@@ -248,6 +248,16 @@ fn test_lists() {
     format!("{:?}", eval(scan("(1;\"a\";2)").unwrap()).unwrap()),
     format!("{:?}", Noun(K::List(vec![K::Bool(1u8), K::Char('a'),K::Int(Some(2))])))
   );
+  assert_eq!(
+    format!("{:?}", eval(scan("(1+1;2+2)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::List(vec![K::Int(Some(2)), K::Int(Some(4))])))
+  );
+
+  // TODO fix vec2list() for this case
+  assert_eq!(
+    format!("{:?}", eval(scan("(1;2;3)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::IntArray(arr!([1,2,3i64]))))
+  );
 }
 
 #[test]
