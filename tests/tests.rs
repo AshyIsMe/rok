@@ -314,5 +314,14 @@ fn test_dict() {
     K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Bool(1u8)]);
   let d2 = v_d_bang(k, v);
-  println!("{:?}", d2)
+  println!("{:?}", d2);
+
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Char('a'), K::Int(Some(42))]);
+  let d1 = v_d_bang(k, v).unwrap();
+  assert_eq!(
+    format!("{:?}", eval(scan("`a`b!(\"a\";42)").unwrap()).unwrap()),
+    format!("{:?}", KW::Noun(d1))
+  );
 }
