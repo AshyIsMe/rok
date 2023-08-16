@@ -18,15 +18,17 @@ pub enum K {
   Int(Option<i64>), //blech option here
   Float(f64),
   Char(char),
-  //Symbol(i64), // index into global Symbols array?
+  Symbol(String),
+  SymbolArray(Series),
   BoolArray(Series),
   IntArray(Series),
   FloatArray(Series),
   CharArray(Series),
   Nil, // Is Nil a noun?
-  // Dictionary { vals: Vec<K>, keys: Vec<K> },
-  //Table{ DataFrame },
-  //Quote(Box<K>) // Is Quote a noun?
+  List(Vec<K>),
+  Dictionary(Box<K>, Box<K>), // Dictionary(SymbolArray, List)
+                              //Table{ DataFrame },
+                              //Quote(Box<K>) // Is Quote a noun?
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
@@ -42,6 +44,7 @@ pub enum KW /* KWords */ {
   Nothing,
   LP,
   RP,
+  SC, // semicolon
 }
 
 impl K {
@@ -65,6 +68,66 @@ macro_rules! arr {
   };
 }
 
+pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
+  if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_)))) {
+    let v: Vec<u8> = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(K::Bool(b)) => *b,
+        _ => panic!("impossible"),
+      })
+      .collect();
+    Ok(K::BoolArray(arr!(v)))
+  } else if nouns
+    .iter()
+    .all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Int(Some(_)))))
+  {
+    let v: Vec<i64> = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(K::Bool(b)) => *b as i64,
+        KW::Noun(K::Int(Some(i))) => *i,
+        _ => panic!("impossible"),
+      })
+      .collect();
+    Ok(K::IntArray(arr!(v)))
+  } else if nouns
+    .iter()
+    .all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Float(_))))
+  {
+    let v: Vec<f64> = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(K::Bool(b)) => *b as f64,
+        KW::Noun(K::Float(f)) => *f,
+        _ => panic!("impossible"),
+      })
+      .collect();
+    Ok(K::FloatArray(arr!(v)))
+  } else if nouns.iter().all(|w| matches!(w, KW::Noun(K::Char(_)))) {
+    let v: String = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(K::Char(c)) => *c,
+        _ => panic!("impossible"),
+      })
+      .collect();
+    Ok(K::CharArray(arr!(v)))
+  } else if nouns.iter().all(|w| matches!(w, KW::Noun(_))) {
+    // check they're all nouns and make a List of the K objects within
+    let v = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(n) => n.clone(),
+        _ => K::Nil,
+      })
+      .collect();
+    Ok(K::List(v))
+  } else {
+    Err("invalid list")
+  }
+}
+
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
   match v {
     "+" => match (l, r) {
@@ -85,7 +148,7 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
     },
     "!" => match (l, r) {
       (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
-      (Some(KW::Noun(_l)), KW::Noun(_r)) => todo!("dyad !"),
+      (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_bang(l, r).unwrap())),
       _ => todo!("wat"),
     },
     _ => Err("invalid primitive"),
@@ -194,6 +257,26 @@ pub fn v_bang(r: K) -> Result<K, &'static str> {
     _ => todo!("v_bang variants"),
   }
 }
+pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
+  match (l, r) {
+    (K::SymbolArray(s), K::List(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
+      } else if v.len() == 1 {
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s.clone())),
+          Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
+        ))
+      } else {
+        Err("length")
+      }
+    }
+    _ => {
+      todo!("modulo")
+      // len_ok(&l, &r).and_then(|_| Ok(l % r))
+    }
+  }
+}
 
 pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
   let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
@@ -201,7 +284,7 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
 
   let mut converged: bool = false;
   while !converged {
-    debug!("stack: {stack:?}");
+    // debug!("stack: {stack:?}");
     // let fragment: Vec<KW> = stack.drain(..4).collect();
     let fragment = get_fragment(&mut stack);
     let result: Result<Vec<KW>, &'static str> = match fragment {
@@ -219,6 +302,21 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
       (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
+      (KW::LP, KW::Noun(n1), KW::SC, KW::Noun(n2)) => {
+        // List
+        if let Some(i) = stack.iter().position(|w| matches!(w, KW::RP)) {
+          // Pull off stack until first KW::RP, Drop all KW::SC and KW::RP tokens.
+          let nouns: VecDeque<KW> = stack
+            .drain(..i + 1)
+            .filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP))
+            .collect();
+          Ok(vec![KW::Noun(
+            vec2list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
+          )])
+        } else {
+          Err("invalid list syntax")
+        }
+      }
       (w1, w2, w3, w4) => match queue.pop_back() {
         Some(v) => Ok(vec![v, w1.clone(), w2.clone(), w3.clone(), w4.clone()]),
         None => {
@@ -229,7 +327,7 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
     };
 
     stack.retain(|w| !matches!(w, KW::Nothing));
-    debug!("result: {:?} with {stack:?}", result);
+    debug!("result: {:?} with stack: {:?}", result, stack);
     stack = [result?, stack.into()].concat().into();
   }
   stack.retain(|w| !matches!(w, KW::StartOfLine | KW::Nothing));
@@ -238,7 +336,7 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
     Ok(r[0].clone())
   } else {
     debug!("{:?}", r);
-    Err("invalid result stack")
+    Err("parse error")
   }
 }
 
@@ -261,6 +359,7 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     match c {
       '(' => words.push(KW::LP),
       ')' => words.push(KW::RP),
+      ';' => words.push(KW::SC),
       '0'..='9' | '-' => {
         if let Ok((j, k)) = scan_number(&code[i..]) {
           words.push(k);
@@ -271,6 +370,11 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       }
       '"' => {
         let (j, k) = scan_string(&code[i..]).unwrap();
+        words.push(k);
+        skip = j;
+      }
+      '`' => {
+        let (j, k) = scan_symbol(&code[i..]).unwrap();
         words.push(k);
         skip = j;
       }
@@ -346,6 +450,69 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
       i += 1;
     }
     Err("parse error: unmatched \"")
+  }
+}
+
+pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
+  // read a Symbol or SymbolArray
+  //
+  // read until first char outside [a-z0-9`]
+  // split on ` or space`
+  //
+  // a SymbolArray *potentially* extends until the first symbol character
+  let sentence = match code
+    .find(|c: char| !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['`'].contains(&c)))
+  {
+    Some(c) => &code[..c],
+    None => code,
+  };
+
+  if sentence.chars().nth(0) != Some('`') {
+    panic!("called scan_symbol() on invalid input")
+  } else {
+    let mut i: usize = 1;
+    let mut s = String::new();
+    let mut ss: Vec<String> = vec![];
+    let mut b_in_sym = true;
+    // TODO: Yeah this is awful...
+    while i < sentence.len() {
+      if sentence.chars().nth(i) == Some(' ') {
+        if b_in_sym {
+          ss.extend(vec![s.clone()]);
+          s.clear();
+        }
+        b_in_sym = false;
+      } else if sentence.chars().nth(i) == Some('`') {
+        if b_in_sym {
+          ss.extend(vec![s.clone()]);
+          s.clear();
+        }
+        b_in_sym = true;
+      } else {
+        if b_in_sym {
+          s.extend(sentence.chars().nth(i));
+        } else {
+          break;
+        }
+      }
+      i += 1;
+    }
+    if s.len() > 0 || sentence.chars().nth(sentence.len() - 1) == Some('`') {
+      // catch trailing empty symbol eg: `a`b`c` (SymbolArray(["a","b","c",""]))
+      ss.extend(vec![s.clone()]);
+    }
+    match ss.len() {
+      0 => panic!("wat - invalid scansymbol()"),
+      1 => return Ok((i-1, KW::Noun(K::Symbol(ss[0].clone())))),
+      _ => {
+        return Ok((
+          i-1,
+          KW::Noun(K::SymbolArray(
+            Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap(),
+          )),
+        ))
+      }
+    }
   }
 }
 

@@ -192,6 +192,55 @@ fn test_strings() {
 }
 
 #[test]
+fn test_symbols() {
+  assert_eq!(
+    format!("{:?}", eval(scan("`a").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::Symbol("a".to_string())))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`abc ").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::Symbol("abc".to_string())))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`a`b`c").unwrap()).unwrap()),
+    format!(
+      "{:?}",
+      Noun(K::SymbolArray(
+        Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+      ))
+    )
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`a`b`c`").unwrap()).unwrap()),
+    format!(
+      "{:?}",
+      Noun(K::SymbolArray(
+        Series::new("a", ["a", "b", "c", ""]).cast(&DataType::Categorical(None)).unwrap()
+      ))
+    )
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`a `b `c").unwrap()).unwrap()),
+    format!(
+      "{:?}",
+      Noun(K::SymbolArray(
+        Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+      ))
+    )
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("`a ` `b `c").unwrap()).unwrap()),
+    format!(
+      "{:?}",
+      Noun(K::SymbolArray(
+        Series::new("a", ["a", "", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+      ))
+    )
+  );
+  assert!(scan("`a ` abc").is_err());
+}
+
+#[test]
 fn test_length_errors() {
   assert_eq!(eval(scan("1 2 3 + 4 5").unwrap()), Err::<KW, &'static str>("length"));
   assert_eq!(eval(scan("1 2 + 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
@@ -205,4 +254,74 @@ fn test_length_errors() {
   assert_eq!(eval(scan("1 2 3 % 4 5").unwrap()), Err::<KW, &'static str>("length"));
   assert_eq!(eval(scan("1 2 % 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
   assert_eq!(eval(scan("1.0 2.0 % 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
+}
+
+#[test]
+fn test_lists() {
+  assert_eq!(
+    format!("{:?}", eval(scan("(1 2; 3 4)").unwrap()).unwrap()),
+    format!(
+      "{:?}",
+      Noun(K::List(vec![K::IntArray(arr!([1, 2i64])), K::IntArray(arr!([3, 4i64]))]))
+    )
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("(1;\"a\";2)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::List(vec![K::Bool(1u8), K::Char('a'), K::Int(Some(2))])))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("(1+1;2+2)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::IntArray(arr!([2, 4i64]))))
+  );
+
+  assert_eq!(
+    format!("{:?}", eval(scan("(1;2;3)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::IntArray(arr!([1, 2, 3i64]))))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("(1;0;1)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::BoolArray(arr!([1, 0, 1u8]))))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("(1;0;1.5)").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::FloatArray(arr!([1.0, 0.0, 1.5f64]))))
+  );
+  assert_eq!(
+    format!("{:?}", eval(scan("(\"a\";\"b\";\"c\")").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::CharArray(Series::new("", "abc"))))
+  );
+  // TODO SymbolArray promotion
+  // assert_eq!(
+  //   format!("{:?}", eval(scan("(`a;`b;`c)").unwrap()).unwrap()),
+  //   format!(
+  //     "{:?}",
+  //     Noun(K::SymbolArray(
+  //       Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+  //     ))
+  //   )
+  // );
+}
+
+#[test]
+fn test_dict() {
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Bool(1u8), K::Int(Some(42)), K::Float(3.14)]);
+  let d1 = v_d_bang(k, v);
+  println!("{:?}", d1);
+
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Bool(1u8)]);
+  let d2 = v_d_bang(k, v);
+  println!("{:?}", d2);
+
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Char('a'), K::Int(Some(42))]);
+  let d1 = v_d_bang(k, v).unwrap();
+  assert_eq!(
+    format!("{:?}", eval(scan("`a`b!(\"a\";42)").unwrap()).unwrap()),
+    format!("{:?}", KW::Noun(d1))
+  );
 }
