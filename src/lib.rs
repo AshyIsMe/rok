@@ -336,7 +336,7 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
     Ok(r[0].clone())
   } else {
     debug!("{:?}", r);
-    Err("invalid result stack")
+    Err("parse error")
   }
 }
 
@@ -503,11 +503,10 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     }
     match ss.len() {
       0 => panic!("wat - invalid scansymbol()"),
-      // 0 => return Ok((i, KW::Noun(K::Symbol(s)))),
-      1 => return Ok((i, KW::Noun(K::Symbol(ss[0].clone())))),
+      1 => return Ok((i-1, KW::Noun(K::Symbol(ss[0].clone())))),
       _ => {
         return Ok((
-          i,
+          i-1,
           KW::Noun(K::SymbolArray(
             Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap(),
           )),
