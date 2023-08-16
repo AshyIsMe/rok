@@ -69,8 +69,51 @@ macro_rules! arr {
 }
 
 pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
-  //TODO handle same atom types promotion: (1;2;3) => IntArray([1 2 3])
-  if nouns.iter().all(|w| matches!(w, KW::Noun(_))) {
+  if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_)))) {
+    let v: Vec<u8> = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(K::Bool(b)) => *b,
+        _ => panic!("impossible"),
+      })
+      .collect();
+    Ok(K::BoolArray(arr!(v)))
+  } else if nouns
+    .iter()
+    .all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Int(Some(_)))))
+  {
+    let v: Vec<i64> = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(K::Bool(b)) => *b as i64,
+        KW::Noun(K::Int(Some(i))) => *i,
+        _ => panic!("impossible"),
+      })
+      .collect();
+    Ok(K::IntArray(arr!(v)))
+  } else if nouns
+    .iter()
+    .all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Float(_))))
+  {
+    let v: Vec<f64> = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(K::Bool(b)) => *b as f64,
+        KW::Noun(K::Float(f)) => *f,
+        _ => panic!("impossible"),
+      })
+      .collect();
+    Ok(K::FloatArray(arr!(v)))
+  } else if nouns.iter().all(|w| matches!(w, KW::Noun(K::Char(_)))) {
+    let v: String = nouns
+      .iter()
+      .map(|w| match w {
+        KW::Noun(K::Char(c)) => *c,
+        _ => panic!("impossible"),
+      })
+      .collect();
+    Ok(K::CharArray(arr!(v)))
+  } else if nouns.iter().all(|w| matches!(w, KW::Noun(_))) {
     // check they're all nouns and make a List of the K objects within
     let v = nouns
       .iter()
@@ -263,8 +306,10 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
         // List
         if let Some(i) = stack.iter().position(|w| matches!(w, KW::RP)) {
           // Pull off stack until first KW::RP, Drop all KW::SC and KW::RP tokens.
-          let nouns: VecDeque<KW> =
-            stack.drain(..i + 1).filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP)).collect();
+          let nouns: VecDeque<KW> = stack
+            .drain(..i + 1)
+            .filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP))
+            .collect();
           Ok(vec![KW::Noun(
             vec2list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
           )])

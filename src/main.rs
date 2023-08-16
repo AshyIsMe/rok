@@ -11,11 +11,14 @@ fn main() {
     let readline = rl.readline(" ");
     match readline {
       Ok(line) => {
-        if line.trim_end() == "\\" {//help
+        if line.trim_end() == "\\" {
+          //help
           println!("'nyi\n");
-        } else if line.trim_end() == "\\\\" {//quit
+        } else if line.trim_end() == "\\\\" {
+          //quit
           break;
-        } else if line.starts_with("\\s ") {//scan tokens instead of eval
+        } else if line.starts_with("\\s ") {
+          //scan tokens instead of eval
           let r = scan(&line[2..]).unwrap();
           println!("{r:?}\n");
         } else {
