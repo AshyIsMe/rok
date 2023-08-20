@@ -25,6 +25,7 @@ fn main() {
     let readline = rl.readline(" ");
     match readline {
       Ok(line) => {
+        let _ = rl.add_history_entry(&line);
         if line.trim_end() == "\\" {
           //help
           println!("'nyi\n");
@@ -47,6 +48,6 @@ fn main() {
       }
     }
   }
-  println!("rl.save_history({:?})", hf);
+  // println!("rl.save_history({:?})", hf);
   let _ = rl.save_history(&hf);
 }
