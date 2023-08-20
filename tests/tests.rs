@@ -324,4 +324,22 @@ fn test_dict() {
     format!("{:?}", eval(scan("`a`b!(\"a\";42)").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
   );
+
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Int(Some(1)), K::Int(Some(2))]);
+  let d1 = v_d_bang(k, v).unwrap();
+  assert_eq!(
+    format!("{:?}", eval(scan("`a`b!1 2").unwrap()).unwrap()),
+    format!("{:?}", KW::Noun(d1))
+  );
+
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Int(Some(1)), K::Int(None)]);
+  let d1 = v_d_bang(k, v).unwrap();
+  assert_eq!(
+    format!("{:?}", eval(scan("`a`b!1 0N").unwrap()).unwrap()),
+    format!("{:?}", KW::Noun(d1))
+  );
 }

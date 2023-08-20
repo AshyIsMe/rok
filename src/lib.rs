@@ -273,7 +273,22 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
     }
     (K::SymbolArray(s), K::IntArray(v)) => {
       if s.len() == v.len() {
-        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v.iter().map(|i | K::Int(Some(i.try_extract::<i64>().unwrap()))).collect()))))
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s)),
+          Box::new(K::List(
+            v.iter()
+              .map(|i| {
+                return if i.try_extract::<i64>().is_ok() {
+                  K::Int(Some(i.try_extract::<i64>().unwrap()))
+                } else if i.is_nested_null() {
+                  K::Int(None)
+                } else {
+                  panic!("oops")
+                }
+              })
+              .collect(),
+          )),
+        ))
       } else {
         Err("length")
       }
@@ -510,10 +525,10 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     }
     match ss.len() {
       0 => panic!("wat - invalid scansymbol()"),
-      1 => return Ok((i-1, KW::Noun(K::Symbol(ss[0].clone())))),
+      1 => return Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
       _ => {
         return Ok((
-          i-1,
+          i - 1,
           KW::Noun(K::SymbolArray(
             Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap(),
           )),
