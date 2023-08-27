@@ -271,6 +271,7 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
         Err("length")
       }
     }
+    // TODO: reduce this repetition with a macro
     (K::SymbolArray(s), K::IntArray(v)) => {
       if s.len() == v.len() {
         Ok(K::Dictionary(
@@ -282,6 +283,28 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
                   K::Int(Some(i.try_extract::<i64>().unwrap()))
                 } else if i.is_nested_null() {
                   K::Int(None)
+                } else {
+                  panic!("oops")
+                }
+              })
+              .collect(),
+          )),
+        ))
+      } else {
+        Err("length")
+      }
+    }
+    (K::SymbolArray(s), K::FloatArray(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s)),
+          Box::new(K::List(
+            v.iter()
+              .map(|i| {
+                return if i.try_extract::<f64>().is_ok() {
+                  K::Float(i.try_extract::<f64>().unwrap())
+                } else if i.is_nested_null() {
+                  K::Float(f64::NAN)
                 } else {
                   panic!("oops")
                 }
