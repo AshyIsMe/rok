@@ -272,6 +272,26 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
       }
     }
     // TODO: reduce this repetition with a macro
+    (K::SymbolArray(s), K::BoolArray(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s)),
+          Box::new(K::List(
+            v.iter()
+              .map(|i| {
+                return if i.try_extract::<u8>().is_ok() {
+                  K::Bool(i.try_extract::<u8>().unwrap())
+                } else {
+                  panic!("oops")
+                }
+              })
+              .collect(),
+          )),
+        ))
+      } else {
+        Err("length")
+      }
+    }
     (K::SymbolArray(s), K::IntArray(v)) => {
       if s.len() == v.len() {
         Ok(K::Dictionary(
