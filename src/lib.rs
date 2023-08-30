@@ -271,6 +271,87 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
         Err("length")
       }
     }
+    // TODO: reduce this repetition with a macro
+    (K::SymbolArray(s), K::BoolArray(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s)),
+          Box::new(K::List(
+            v.iter()
+              .map(|i| {
+                return if i.try_extract::<u8>().is_ok() {
+                  K::Bool(i.try_extract::<u8>().unwrap())
+                } else {
+                  panic!("oops")
+                }
+              })
+              .collect(),
+          )),
+        ))
+      } else {
+        Err("length")
+      }
+    }
+    (K::SymbolArray(s), K::IntArray(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s)),
+          Box::new(K::List(
+            v.iter()
+              .map(|i| {
+                return if i.try_extract::<i64>().is_ok() {
+                  K::Int(Some(i.try_extract::<i64>().unwrap()))
+                } else if i.is_nested_null() {
+                  K::Int(None)
+                } else {
+                  panic!("oops")
+                }
+              })
+              .collect(),
+          )),
+        ))
+      } else {
+        Err("length")
+      }
+    }
+    (K::SymbolArray(s), K::FloatArray(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s)),
+          Box::new(K::List(
+            v.iter()
+              .map(|i| {
+                return if i.try_extract::<f64>().is_ok() {
+                  K::Float(i.try_extract::<f64>().unwrap())
+                } else if i.is_nested_null() {
+                  K::Float(f64::NAN)
+                } else {
+                  panic!("oops")
+                }
+              })
+              .collect(),
+          )),
+        ))
+      } else {
+        Err("length")
+      }
+    }
+    (K::SymbolArray(s), K::CharArray(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s)),
+          Box::new(K::List(
+            v.u8().unwrap().into_iter()
+              .map(|c| {
+                  K::Char(c.unwrap() as char)
+              })
+              .collect(),
+          )),
+        ))
+      } else {
+        Err("length")
+      }
+    }
     _ => {
       todo!("modulo")
       // len_ok(&l, &r).and_then(|_| Ok(l % r))
@@ -503,10 +584,10 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     }
     match ss.len() {
       0 => panic!("wat - invalid scansymbol()"),
-      1 => return Ok((i-1, KW::Noun(K::Symbol(ss[0].clone())))),
+      1 => return Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
       _ => {
         return Ok((
-          i-1,
+          i - 1,
           KW::Noun(K::SymbolArray(
             Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap(),
           )),
