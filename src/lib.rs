@@ -316,6 +316,22 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
         Err("length")
       }
     }
+    (K::SymbolArray(s), K::CharArray(v)) => {
+      if s.len() == v.len() {
+        Ok(K::Dictionary(
+          Box::new(K::SymbolArray(s)),
+          Box::new(K::List(
+            v.u8().unwrap().into_iter()
+              .map(|c| {
+                  K::Char(c.unwrap() as char)
+              })
+              .collect(),
+          )),
+        ))
+      } else {
+        Err("length")
+      }
+    }
     _ => {
       todo!("modulo")
       // len_ok(&l, &r).and_then(|_| Ok(l % r))
