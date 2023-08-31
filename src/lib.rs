@@ -56,6 +56,7 @@ impl K {
       IntArray(a) => a.len(),
       FloatArray(a) => a.len(),
       CharArray(a) => a.len(),
+      Dictionary(k, _v) => k.len(),
       _ => 1,
     }
   }
