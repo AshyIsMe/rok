@@ -369,4 +369,13 @@ fn test_dict() {
     format!("{:?}", eval(scan("`a`b!1 0").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
   );
+
+  let k =
+    K::SymbolArray(Series::new("a", ["a"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Bool(1)]);
+  let d1 = v_d_bang(k, v).unwrap();
+  assert_eq!(
+    format!("{:?}", eval(scan("`a!1").unwrap()).unwrap()),
+    format!("{:?}", KW::Noun(d1))
+  );
 }
