@@ -310,29 +310,35 @@ pub fn v_bang(r: K) -> Result<K, &'static str> {
 }
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   match l {
-    K::SymbolArray(s) => {
-      match r {
-        K::List(v) => {
-          if s.len() == v.len() {
-            Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
-          } else if v.len() == 1 {
-            Ok(K::Dictionary(
-              Box::new(K::SymbolArray(s.clone())),
-              Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
-            ))
-          } else {
-            Err("length")
-          }
-        }
-        K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
+    K::SymbolArray(s) => match r {
+      K::List(v) => {
+        if s.len() == v.len() {
+          Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
+        } else if v.len() == 1 {
           Ok(K::Dictionary(
-              Box::new(K::SymbolArray(s)),
-              Box::new(enlist(r).unwrap())
+            Box::new(K::SymbolArray(s.clone())),
+            Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
+          ))
+        } else {
+          Err("length")
+        }
+      }
+      K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
+        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(enlist(r).unwrap())))
+      }
+      _ => {
+        if s.len() == 0 {
+          Err("length")
+        } else if s.len() == 1 {
+          Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(r)))
+        } else {
+          Ok(K::Dictionary(
+            Box::new(K::SymbolArray(s.clone())),
+            Box::new(K::List(std::iter::repeat(r).take(s.len()).collect())),
           ))
         }
-        _ => Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(r))),
       }
-    }
+    },
     K::Symbol(s) => match r {
       _ => Ok(K::Dictionary(
         Box::new(K::SymbolArray(Series::new("a", [s]).cast(&DataType::Categorical(None)).unwrap())),
