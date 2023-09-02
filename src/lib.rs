@@ -69,6 +69,56 @@ macro_rules! arr {
   };
 }
 
+pub fn enlist(k: K) -> Result<K, &'static str> {
+  match k {
+    K::List(v) => Ok(K::List(v)),
+    // TODO: reduce this repetition with a macro
+    K::BoolArray(a) => Ok(K::List(
+      a.iter()
+        .map(|i| {
+          return if i.try_extract::<u8>().is_ok() {
+            K::Bool(i.try_extract::<u8>().unwrap())
+          } else {
+            panic!("oops")
+          };
+        })
+        .collect(),
+    )),
+    K::IntArray(v) => Ok(K::List(
+      v.iter()
+        .map(|i| {
+          return if i.try_extract::<i64>().is_ok() {
+            K::Int(Some(i.try_extract::<i64>().unwrap()))
+          } else if i.is_nested_null() {
+            K::Int(None)
+          } else {
+            panic!("oops")
+          };
+        })
+        .collect(),
+    )),
+    K::FloatArray(v) => Ok(K::List(
+      v.iter()
+        .map(|i| {
+          return if i.try_extract::<f64>().is_ok() {
+            K::Float(i.try_extract::<f64>().unwrap())
+          } else if i.is_nested_null() {
+            K::Float(f64::NAN)
+          } else {
+            panic!("oops")
+          };
+        })
+        .collect(),
+    )),
+    K::CharArray(v) => {
+      Ok(K::List(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect()))
+    }
+    K::SymbolArray(_v) => {
+      todo!("enlist(SymbolArray(...))")
+    }
+    _ => Err("todo"),
+  }
+}
 pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
   if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_)))) {
     let v: Vec<u8> = nouns
@@ -274,87 +324,13 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
             Err("length")
           }
         }
-        // TODO: reduce this repetition with a macro
-        K::BoolArray(v) => {
-          if s.len() == v.len() {
-            Ok(K::Dictionary(
+        K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
+          Ok(K::Dictionary(
               Box::new(K::SymbolArray(s)),
-              Box::new(K::List(
-                v.iter()
-                  .map(|i| {
-                    return if i.try_extract::<u8>().is_ok() {
-                      K::Bool(i.try_extract::<u8>().unwrap())
-                    } else {
-                      panic!("oops")
-                    };
-                  })
-                  .collect(),
-              )),
-            ))
-          } else {
-            Err("length")
-          }
+              Box::new(enlist(r).unwrap())
+          ))
         }
-        K::IntArray(v) => {
-          if s.len() == v.len() {
-            Ok(K::Dictionary(
-              Box::new(K::SymbolArray(s)),
-              Box::new(K::List(
-                v.iter()
-                  .map(|i| {
-                    return if i.try_extract::<i64>().is_ok() {
-                      K::Int(Some(i.try_extract::<i64>().unwrap()))
-                    } else if i.is_nested_null() {
-                      K::Int(None)
-                    } else {
-                      panic!("oops")
-                    };
-                  })
-                  .collect(),
-              )),
-            ))
-          } else {
-            Err("length")
-          }
-        }
-        K::FloatArray(v) => {
-          if s.len() == v.len() {
-            Ok(K::Dictionary(
-              Box::new(K::SymbolArray(s)),
-              Box::new(K::List(
-                v.iter()
-                  .map(|i| {
-                    return if i.try_extract::<f64>().is_ok() {
-                      K::Float(i.try_extract::<f64>().unwrap())
-                    } else if i.is_nested_null() {
-                      K::Float(f64::NAN)
-                    } else {
-                      panic!("oops")
-                    };
-                  })
-                  .collect(),
-              )),
-            ))
-          } else {
-            Err("length")
-          }
-        }
-        K::CharArray(v) => {
-          if s.len() == v.len() {
-            Ok(K::Dictionary(
-              Box::new(K::SymbolArray(s)),
-              Box::new(K::List(
-                v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect(),
-              )),
-            ))
-          } else {
-            Err("length")
-          }
-        }
-        _ => Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s)),
-          Box::new(r),
-        )),
+        _ => Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(r))),
       }
     }
     K::Symbol(s) => match r {
