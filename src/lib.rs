@@ -56,6 +56,7 @@ impl K {
       IntArray(a) => a.len(),
       FloatArray(a) => a.len(),
       CharArray(a) => a.len(),
+      Dictionary(k, _v) => k.len(),
       _ => 1,
     }
   }
@@ -68,6 +69,56 @@ macro_rules! arr {
   };
 }
 
+pub fn enlist(k: K) -> Result<K, &'static str> {
+  match k {
+    K::List(v) => Ok(K::List(v)),
+    // TODO: reduce this repetition with a macro
+    K::BoolArray(a) => Ok(K::List(
+      a.iter()
+        .map(|i| {
+          return if i.try_extract::<u8>().is_ok() {
+            K::Bool(i.try_extract::<u8>().unwrap())
+          } else {
+            panic!("oops")
+          };
+        })
+        .collect(),
+    )),
+    K::IntArray(v) => Ok(K::List(
+      v.iter()
+        .map(|i| {
+          return if i.try_extract::<i64>().is_ok() {
+            K::Int(Some(i.try_extract::<i64>().unwrap()))
+          } else if i.is_nested_null() {
+            K::Int(None)
+          } else {
+            panic!("oops")
+          };
+        })
+        .collect(),
+    )),
+    K::FloatArray(v) => Ok(K::List(
+      v.iter()
+        .map(|i| {
+          return if i.try_extract::<f64>().is_ok() {
+            K::Float(i.try_extract::<f64>().unwrap())
+          } else if i.is_nested_null() {
+            K::Float(f64::NAN)
+          } else {
+            panic!("oops")
+          };
+        })
+        .collect(),
+    )),
+    K::CharArray(v) => {
+      Ok(K::List(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect()))
+    }
+    K::SymbolArray(_v) => {
+      todo!("enlist(SymbolArray(...))")
+    }
+    _ => Err("todo"),
+  }
+}
 pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
   if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_)))) {
     let v: Vec<u8> = nouns
@@ -258,103 +309,44 @@ pub fn v_bang(r: K) -> Result<K, &'static str> {
   }
 }
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
-  match (l, r) {
-    (K::SymbolArray(s), K::List(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
-      } else if v.len() == 1 {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s.clone())),
-          Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
-        ))
-      } else {
-        Err("length")
+  match l {
+    K::SymbolArray(s) => match r {
+      K::List(v) => {
+        if s.len() == v.len() {
+          Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
+        } else if v.len() == 1 {
+          Ok(K::Dictionary(
+            Box::new(K::SymbolArray(s.clone())),
+            Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
+          ))
+        } else {
+          Err("length")
+        }
       }
-    }
-    // TODO: reduce this repetition with a macro
-    (K::SymbolArray(s), K::BoolArray(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s)),
-          Box::new(K::List(
-            v.iter()
-              .map(|i| {
-                return if i.try_extract::<u8>().is_ok() {
-                  K::Bool(i.try_extract::<u8>().unwrap())
-                } else {
-                  panic!("oops")
-                }
-              })
-              .collect(),
-          )),
-        ))
-      } else {
-        Err("length")
+      K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
+        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(enlist(r).unwrap())))
       }
-    }
-    (K::SymbolArray(s), K::IntArray(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s)),
-          Box::new(K::List(
-            v.iter()
-              .map(|i| {
-                return if i.try_extract::<i64>().is_ok() {
-                  K::Int(Some(i.try_extract::<i64>().unwrap()))
-                } else if i.is_nested_null() {
-                  K::Int(None)
-                } else {
-                  panic!("oops")
-                }
-              })
-              .collect(),
-          )),
-        ))
-      } else {
-        Err("length")
+      _ => {
+        if s.len() == 0 {
+          Err("length")
+        } else if s.len() == 1 {
+          Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(r)))
+        } else {
+          Ok(K::Dictionary(
+            Box::new(K::SymbolArray(s.clone())),
+            Box::new(K::List(std::iter::repeat(r).take(s.len()).collect())),
+          ))
+        }
       }
-    }
-    (K::SymbolArray(s), K::FloatArray(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s)),
-          Box::new(K::List(
-            v.iter()
-              .map(|i| {
-                return if i.try_extract::<f64>().is_ok() {
-                  K::Float(i.try_extract::<f64>().unwrap())
-                } else if i.is_nested_null() {
-                  K::Float(f64::NAN)
-                } else {
-                  panic!("oops")
-                }
-              })
-              .collect(),
-          )),
-        ))
-      } else {
-        Err("length")
-      }
-    }
-    (K::SymbolArray(s), K::CharArray(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s)),
-          Box::new(K::List(
-            v.u8().unwrap().into_iter()
-              .map(|c| {
-                  K::Char(c.unwrap() as char)
-              })
-              .collect(),
-          )),
-        ))
-      } else {
-        Err("length")
-      }
-    }
+    },
+    K::Symbol(s) => match r {
+      _ => Ok(K::Dictionary(
+        Box::new(K::SymbolArray(Series::new("a", [s]).cast(&DataType::Categorical(None)).unwrap())),
+        Box::new(r),
+      )),
+    },
     _ => {
       todo!("modulo")
-      // len_ok(&l, &r).and_then(|_| Ok(l % r))
     }
   }
 }
