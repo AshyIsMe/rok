@@ -259,103 +259,112 @@ pub fn v_bang(r: K) -> Result<K, &'static str> {
   }
 }
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
-  match (l, r) {
-    (K::SymbolArray(s), K::List(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
-      } else if v.len() == 1 {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s.clone())),
-          Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
-        ))
-      } else {
-        Err("length")
-      }
-    }
-    // TODO: reduce this repetition with a macro
-    (K::SymbolArray(s), K::BoolArray(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(
+  match l {
+    K::SymbolArray(s) => {
+      match r {
+        K::List(v) => {
+          if s.len() == v.len() {
+            Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
+          } else if v.len() == 1 {
+            Ok(K::Dictionary(
+              Box::new(K::SymbolArray(s.clone())),
+              Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
+            ))
+          } else {
+            Err("length")
+          }
+        }
+        // TODO: reduce this repetition with a macro
+        K::BoolArray(v) => {
+          if s.len() == v.len() {
+            Ok(K::Dictionary(
+              Box::new(K::SymbolArray(s)),
+              Box::new(K::List(
+                v.iter()
+                  .map(|i| {
+                    return if i.try_extract::<u8>().is_ok() {
+                      K::Bool(i.try_extract::<u8>().unwrap())
+                    } else {
+                      panic!("oops")
+                    };
+                  })
+                  .collect(),
+              )),
+            ))
+          } else {
+            Err("length")
+          }
+        }
+        K::IntArray(v) => {
+          if s.len() == v.len() {
+            Ok(K::Dictionary(
+              Box::new(K::SymbolArray(s)),
+              Box::new(K::List(
+                v.iter()
+                  .map(|i| {
+                    return if i.try_extract::<i64>().is_ok() {
+                      K::Int(Some(i.try_extract::<i64>().unwrap()))
+                    } else if i.is_nested_null() {
+                      K::Int(None)
+                    } else {
+                      panic!("oops")
+                    };
+                  })
+                  .collect(),
+              )),
+            ))
+          } else {
+            Err("length")
+          }
+        }
+        K::FloatArray(v) => {
+          if s.len() == v.len() {
+            Ok(K::Dictionary(
+              Box::new(K::SymbolArray(s)),
+              Box::new(K::List(
+                v.iter()
+                  .map(|i| {
+                    return if i.try_extract::<f64>().is_ok() {
+                      K::Float(i.try_extract::<f64>().unwrap())
+                    } else if i.is_nested_null() {
+                      K::Float(f64::NAN)
+                    } else {
+                      panic!("oops")
+                    };
+                  })
+                  .collect(),
+              )),
+            ))
+          } else {
+            Err("length")
+          }
+        }
+        K::CharArray(v) => {
+          if s.len() == v.len() {
+            Ok(K::Dictionary(
+              Box::new(K::SymbolArray(s)),
+              Box::new(K::List(
+                v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect(),
+              )),
+            ))
+          } else {
+            Err("length")
+          }
+        }
+        _ => Ok(K::Dictionary(
           Box::new(K::SymbolArray(s)),
-          Box::new(K::List(
-            v.iter()
-              .map(|i| {
-                return if i.try_extract::<u8>().is_ok() {
-                  K::Bool(i.try_extract::<u8>().unwrap())
-                } else {
-                  panic!("oops")
-                }
-              })
-              .collect(),
-          )),
-        ))
-      } else {
-        Err("length")
+          Box::new(r),
+        )),
       }
     }
-    (K::SymbolArray(s), K::IntArray(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s)),
-          Box::new(K::List(
-            v.iter()
-              .map(|i| {
-                return if i.try_extract::<i64>().is_ok() {
-                  K::Int(Some(i.try_extract::<i64>().unwrap()))
-                } else if i.is_nested_null() {
-                  K::Int(None)
-                } else {
-                  panic!("oops")
-                }
-              })
-              .collect(),
-          )),
-        ))
-      } else {
-        Err("length")
-      }
-    }
-    (K::SymbolArray(s), K::FloatArray(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s)),
-          Box::new(K::List(
-            v.iter()
-              .map(|i| {
-                return if i.try_extract::<f64>().is_ok() {
-                  K::Float(i.try_extract::<f64>().unwrap())
-                } else if i.is_nested_null() {
-                  K::Float(f64::NAN)
-                } else {
-                  panic!("oops")
-                }
-              })
-              .collect(),
-          )),
-        ))
-      } else {
-        Err("length")
-      }
-    }
-    (K::SymbolArray(s), K::CharArray(v)) => {
-      if s.len() == v.len() {
-        Ok(K::Dictionary(
-          Box::new(K::SymbolArray(s)),
-          Box::new(K::List(
-            v.u8().unwrap().into_iter()
-              .map(|c| {
-                  K::Char(c.unwrap() as char)
-              })
-              .collect(),
-          )),
-        ))
-      } else {
-        Err("length")
-      }
-    }
+    K::Symbol(s) => match r {
+      _ => Ok(K::Dictionary(
+        Box::new(K::SymbolArray(Series::new("a", [s]).cast(&DataType::Categorical(None)).unwrap())),
+        Box::new(r),
+      )),
+    },
     _ => {
       todo!("modulo")
-      // len_ok(&l, &r).and_then(|_| Ok(l % r))
     }
   }
 }

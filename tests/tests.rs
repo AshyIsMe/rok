@@ -316,8 +316,7 @@ fn test_dict() {
   let d2 = v_d_bang(k, v);
   println!("{:?}", d2);
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Char('a'), K::Int(Some(42))]);
   let d1 = v_d_bang(k, v).unwrap();
   assert_eq!(
@@ -325,8 +324,7 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Int(Some(1)), K::Int(Some(2))]);
   let d1 = v_d_bang(k, v).unwrap();
   assert_eq!(
@@ -334,17 +332,15 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Int(Some(1)), K::Int(None)]);
   let d1 = v_d_bang(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b!1 0N").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
   );
-  
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+
+  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Float(1.5), K::Float(2.5)]);
   let d1 = v_d_bang(k, v).unwrap();
   assert_eq!(
@@ -352,8 +348,7 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Char('a'), K::Char('b')]);
   let d1 = v_d_bang(k, v).unwrap();
   assert_eq!(
@@ -361,8 +356,7 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Bool(1), K::Bool(0)]);
   let d1 = v_d_bang(k, v).unwrap();
   assert_eq!(
@@ -370,12 +364,8 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a"]).cast(&DataType::Categorical(None)).unwrap());
-  let v = K::List(vec![K::Bool(1)]);
+  let k = K::SymbolArray(Series::new("a", ["a"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::Bool(1);
   let d1 = v_d_bang(k, v).unwrap();
-  assert_eq!(
-    format!("{:?}", eval(scan("`a!1").unwrap()).unwrap()),
-    format!("{:?}", KW::Noun(d1))
-  );
+  assert_eq!(format!("{:?}", eval(scan("`a!1").unwrap()).unwrap()), format!("{:?}", KW::Noun(d1)));
 }
