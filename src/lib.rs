@@ -300,14 +300,14 @@ fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
 }
 pub fn v_flip(x: K) -> Result<K, &'static str> {
   match x {
-    K::Dictionary(k, v) => match *v {
-      K::List(v) => {
+    K::Dictionary(k, v) => match (*k, *v) {
+      (K::SymbolArray(k), K::List(v)) => {
         if v.first().unwrap().len() > 1 && v.iter().map(|k| k.len()).all_equal() {
-          // TODO: zip(k.iter(), v.iter()) and put the field name in each Series
-          let s: Vec<Series> = v
-            .iter()
-            .map(|k| match k {
-              K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) | K::CharArray(s) => s.clone(),
+          let s: Vec<Series> = std::iter::zip(k.iter(), v.iter())
+            .map(|(k, v)| match v {
+              K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) | K::CharArray(s) => {
+                Series::new(&k.to_string(), s.clone())
+              }
               _ => panic!("impossible"),
             })
             .collect();
@@ -316,16 +316,11 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
           todo!("table - mismatched lens")
         }
       }
-      K::IntArray(v) => {
-        match *k {
-          K::SymbolArray(k) => {
-            let s= k.iter().nth(0).unwrap();
-            Ok(K::Table(DataFrame::new(vec![Series::new(&s.to_string(), v)]).unwrap()))
-          }
-          _ => panic!("impossible")
-        }
+      (K::SymbolArray(k), K::IntArray(v)) => {
+        let s = k.iter().nth(0).unwrap();
+        Ok(K::Table(DataFrame::new(vec![Series::new(&s.to_string(), v)]).unwrap()))
       }
-      _ => {
+      (_, _) => {
         todo!("table - other cases")
       }
     },
