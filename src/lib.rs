@@ -26,9 +26,9 @@ pub enum K {
   CharArray(Series),
   Nil, // Is Nil a noun?
   List(Vec<K>),
-  Dictionary(Box<K>, Box<K>), // Dictionary(SymbolArray, List)
-                              //Table{ DataFrame },
-                              //Quote(Box<K>) // Is Quote a noun?
+  Dictionary(Box<K>, Box<K>),
+  Table(DataFrame),
+  //Quote(Box<K>) // Is Quote a noun?
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
@@ -183,7 +183,8 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
   match v {
     "+" => match (l, r) {
       (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
-      _ => todo!("monad +"),
+      (None, KW::Noun(r)) => v_flip(r).and_then(|n| Ok(KW::Noun(n))),
+      _ => panic!("wat"),
     },
     "-" => match (l, r) {
       (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
@@ -295,6 +296,35 @@ fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
     Ok(true)
   } else {
     Err("length")
+  }
+}
+pub fn v_flip(x: K) -> Result<K, &'static str> {
+  match x {
+    K::Dictionary(k, v) => match (*k, *v) {
+      (K::SymbolArray(k), K::List(v)) => {
+        if v.first().unwrap().len() > 1 && v.iter().map(|k| k.len()).all_equal() {
+          let s: Vec<Series> = std::iter::zip(k.iter(), v.iter())
+            .map(|(k, v)| match v {
+              K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) | K::CharArray(s) => {
+                Series::new(&k.to_string(), s.clone())
+              }
+              _ => panic!("impossible"),
+            })
+            .collect();
+          Ok(K::Table(DataFrame::new(s).unwrap()))
+        } else {
+          todo!("table - mismatched lens")
+        }
+      }
+      (K::SymbolArray(k), K::IntArray(v)) => {
+        let s = k.iter().nth(0).unwrap();
+        Ok(K::Table(DataFrame::new(vec![Series::new(&s.to_string(), v)]).unwrap()))
+      }
+      (_, _) => {
+        todo!("table - other cases")
+      }
+    },
+    _ => todo!("flip the rest"),
   }
 }
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l + r)) }

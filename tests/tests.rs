@@ -378,3 +378,24 @@ fn test_dict() {
   );
 
 }
+
+#[test]
+fn test_table() {
+  let t1 = K::Table(DataFrame::new(vec![Series::new("\"a\"", [1, 2, 3i64])]).unwrap());
+  let t2 = eval(scan("+ `a!1 2 3").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(
+    format!("{:?}", t2),
+    format!("{:?}", KW::Noun(t1))
+  );
+
+  let t1 = K::Table(DataFrame::new(vec![Series::new("\"a\"", [1, 2, 3i64]), Series::new("\"b\"", [4, 5, 6i64])]).unwrap());
+  let t2 = eval(scan("+ `a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(
+    format!("{:?}", t2),
+    format!("{:?}", KW::Noun(t1))
+  );
+}
