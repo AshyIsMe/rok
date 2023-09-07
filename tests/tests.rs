@@ -1,3 +1,5 @@
+use std::fs::{File, self};
+
 use polars::prelude::*;
 use rok::*;
 
@@ -369,14 +371,14 @@ fn test_dict() {
   let d1 = v_d_bang(k, v).unwrap();
   assert_eq!(format!("{:?}", eval(scan("`a!1").unwrap()).unwrap()), format!("{:?}", KW::Noun(d1)));
 
-  let k = K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Bool(1), K::Bool(1), K::Bool(1)]);
   let d1 = v_d_bang(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b`c!1").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
   );
-
 }
 
 #[test]
@@ -385,36 +387,42 @@ fn test_table() {
   let t2 = eval(scan("+ `a!1 2 3").unwrap()).unwrap();
   println!("{:?}", t1);
   println!("{:?}", t2);
-  assert_eq!(
-    format!("{:?}", t2),
-    format!("{:?}", KW::Noun(t1))
-  );
+  assert_eq!(format!("{:?}", t2), format!("{:?}", KW::Noun(t1)));
 
-  let t1 = K::Table(DataFrame::new(vec![Series::new("\"a\"", [1, 2, 3i64]), Series::new("\"b\"", [4, 5, 6i64])]).unwrap());
+  let t1 = K::Table(
+    DataFrame::new(vec![Series::new("\"a\"", [1, 2, 3i64]), Series::new("\"b\"", [4, 5, 6i64])])
+      .unwrap(),
+  );
   let t2 = eval(scan("+ `a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
   println!("{:?}", t1);
   println!("{:?}", t2);
-  assert_eq!(
-    format!("{:?}", t2),
-    format!("{:?}", KW::Noun(t1))
-  );
+  assert_eq!(format!("{:?}", t2), format!("{:?}", KW::Noun(t1)));
 }
 
-// #[test]
-// fn test_table_reader() {
+#[test]
+fn test_table_reader() {
+  let mut df =
+    DataFrame::new(vec![Series::new("a", [1, 2, 3i64]), Series::new("b", [4, 5, 6i64])])
+      .unwrap();
+  let mut file = File::create("test.csv").expect("could not create file");
+  let _ = CsvWriter::new(&mut file).has_header(true).with_delimiter(b',').finish(&mut df);
 
-//   let df = DataFrame::new(vec![Series::new("\"a\"", [1, 2, 3i64]), Series::new("\"b\"", [4, 5, 6i64])]).unwrap();
-//   // CsvWriter::new("test.csv").has_header(true).finish();
-//   let df1 = CsvReader::from_path("iris.csv").unwrap()
-//             .has_header(true)
-//             .finish();
-//   let t1 = K::Table(df);
+  let t1 = K::Table(df.clone());
+  let t2 = eval(scan("2:`test.csv").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(format!("{:?}", t2), format!("{:?}", KW::Noun(t1.clone())));
+  fs::remove_file("test.csv").unwrap();
+  
 
-//   let t2 = eval(scan("2:`test.csv").unwrap()).unwrap();
-//   println!("{:?}", t1);
-//   println!("{:?}", t2);
-//   assert_eq!(
-//     format!("{:?}", t2),
-//     format!("{:?}", KW::Noun(t1))
-//   );
-// }
+  
+  let file = File::create("test.parquet").expect("could not create file");
+  let _ = ParquetWriter::new(file)
+      .finish(&mut df);
+  let t2 = eval(scan("2:`test.parquet").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(format!("{:?}", t2), format!("{:?}", KW::Noun(t1)));
+  fs::remove_file("test.parquet").unwrap();
+  
+}

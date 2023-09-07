@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
+use std::fs::File;
 use std::path::Path;
 use std::{collections::VecDeque, iter::repeat, ops};
 
@@ -387,7 +388,7 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_colon(r: K) -> Result<K, &'static str> { todo!(": monad") }
+pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
 pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
   println!("l: {:?}, r: {:?}", l, r);
   match l {
@@ -400,8 +401,8 @@ pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
               if e == "csv" {
                 Ok(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap()))
               } else if e == "parquet" {
-                let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
-                Ok(K::Table(lf1.collect().unwrap()))
+                // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
+                Ok(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap()))
               } else {
                 todo!("other file types")
               }
