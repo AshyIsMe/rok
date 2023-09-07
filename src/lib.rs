@@ -1,6 +1,8 @@
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
+use std::fs::File;
+use std::path::Path;
 use std::{collections::VecDeque, iter::repeat, ops};
 
 // oK.js is 1k lines of javascript in one file for a k6 interpreter.
@@ -203,6 +205,11 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
       (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_bang(l, r).unwrap())),
       _ => todo!("wat"),
     },
+    ":" => match (l, r) {
+      (None, KW::Noun(r)) => Ok(KW::Noun(v_colon(r).unwrap())),
+      (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_colon(l, r).unwrap())),
+      _ => todo!("wat"),
+    },
     _ => Err("invalid primitive"),
   }
 }
@@ -381,6 +388,37 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
+pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
+pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
+  println!("l: {:?}, r: {:?}", l, r);
+  match l {
+    K::Int(Some(2i64)) => match r {
+      K::Symbol(s) => {
+        let p = Path::new(&s);
+        if p.exists() {
+          match Path::new(&s).extension() {
+            Some(e) => {
+              if e == "csv" {
+                Ok(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap()))
+              } else if e == "parquet" {
+                // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
+                Ok(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap()))
+              } else {
+                todo!("other file types")
+              }
+            }
+            _ => todo!("no extension"),
+          }
+        } else {
+          Err("path does not exist")
+        }
+      }
+      _ => todo!("todo: inner case"),
+    },
+    _ => todo!("todo: other case"),
+  }
+}
+
 pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
   let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
   let mut stack: VecDeque<KW> = VecDeque::new();
@@ -484,7 +522,7 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
       | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
       ' ' | '\t' | '\n' => continue,
-      _ => return Err("TODO"),
+      _ => return Err("TODO: scan()"),
     };
   }
   Ok(words)
@@ -559,13 +597,13 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
 pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
   // read a Symbol or SymbolArray
   //
-  // read until first char outside [a-z0-9`]
+  // read until first char outside [a-z0-9._`]
   // split on ` or space`
   //
   // a SymbolArray *potentially* extends until the first symbol character
-  let sentence = match code
-    .find(|c: char| !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['`'].contains(&c)))
-  {
+  let sentence = match code.find(|c: char| {
+    !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '_', '`'].contains(&c))
+  }) {
     Some(c) => &code[..c],
     None => code,
   };
