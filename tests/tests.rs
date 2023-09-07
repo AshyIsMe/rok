@@ -399,3 +399,22 @@ fn test_table() {
     format!("{:?}", KW::Noun(t1))
   );
 }
+
+// #[test]
+// fn test_table_reader() {
+
+//   let df = DataFrame::new(vec![Series::new("\"a\"", [1, 2, 3i64]), Series::new("\"b\"", [4, 5, 6i64])]).unwrap();
+//   // CsvWriter::new("test.csv").has_header(true).finish();
+//   let df1 = CsvReader::from_path("iris.csv").unwrap()
+//             .has_header(true)
+//             .finish();
+//   let t1 = K::Table(df);
+
+//   let t2 = eval(scan("2:`test.csv").unwrap()).unwrap();
+//   println!("{:?}", t1);
+//   println!("{:?}", t2);
+//   assert_eq!(
+//     format!("{:?}", t2),
+//     format!("{:?}", KW::Noun(t1))
+//   );
+// }
