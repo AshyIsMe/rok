@@ -382,6 +382,31 @@ fn test_dict() {
 }
 
 #[test]
+fn test_dict_maths() {
+
+  // let k = K::SymbolArray(Series::new("a", ["a"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::Symbol("a".into());
+  let v = K::IntArray(arr!([2, 3i64]));
+  let d1 = v_d_bang(k, v).unwrap();
+  let d2 = eval(scan("1 2 + `a!1").unwrap()).unwrap();
+  assert_eq!(
+    format!("{:?}", Noun(d1)),
+    format!("{:?}", d2)
+  );
+
+  // TODO
+  // let k =
+  //   K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  // let v = K::List( vec![K::IntArray(arr!([1, 2])), K::IntArray(arr!([2, 3])) ] );
+  // let d1 = v_d_bang(k, v).unwrap();
+  // let d2 = eval(scan("1 2 + `a`b!(0;1)").unwrap()).unwrap();
+  // assert_eq!(
+  //   format!("{:?}", d1),
+  //   format!("{:?}", d2)
+  // );
+}
+
+#[test]
 fn test_table() {
   let t1 = K::Table(DataFrame::new(vec![Series::new("\"a\"", [1, 2, 3i64])]).unwrap());
   let t2 = eval(scan("+ `a!1 2 3").unwrap()).unwrap();

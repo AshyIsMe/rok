@@ -230,7 +230,8 @@ pub fn b2i(b: K) -> K {
     _ => panic!("not bool"),
   }
 }
-
+// AA TODO: promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
+// similar to promote_num()
 macro_rules! impl_op {
     ($op:tt, $opf:ident, $self:ident, $r:ident) => {
         match ($self.clone(), $r) {
@@ -270,6 +271,26 @@ macro_rules! impl_op {
             (K::IntArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
             (K::IntArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
+            (K::IntArray(l), K::Dictionary(k,v)) => {
+              match *v {
+                K::Bool(v) => K::Dictionary(k, Box::new(K::IntArray(l $op v))),
+                // K::Int(Some(v)) => K::Dictionary(k, Box::new(l $op v)),
+                // K::Int(None) => K::Dictionary(k, Box::new(K::Int(None))),
+                // K::Float(v) => K::Dictionary(k, Box::new(l $op v)),
+                // K::Char(v) => K::Dictionary(k, Box::new(l $op v)),
+                // K::BoolArray(v) => K::Dictionary(k, Box::new(l $op v)),
+                // K::IntArray(v) => K::Dictionary(k, Box::new(l $op v)),
+                // K::FloatArray(v) => K::Dictionary(k, Box::new(l $op v)),
+                // K::CharArray(v) => K::Dictionary(k, Box::new(l $op v)),
+                // K::Nil => K::Dictionary(k, Box::new(l $op v)),
+                K::List(_v) => todo!("list"), //K::Dictionary(k, Box::new(K::List(v.iter().map(|s| l $op s).collect()))),
+                K::Dictionary(_k, _v) => todo!("dict"),
+                K::Table(_v) => todo!("table"),
+                K::Symbol(_v) => todo!("type error"),
+                K::SymbolArray(_v) => todo!("type error"),
+                _ => todo!("other cases")
+              }
+            }
             (K::FloatArray(l), K::Bool(r)) => K::FloatArray(l $op r as f64),
             (K::FloatArray(l), K::Int(Some(r))) => K::FloatArray(l $op r as f64),
             (K::FloatArray(l), K::Float(r)) => K::FloatArray(l $op r),
