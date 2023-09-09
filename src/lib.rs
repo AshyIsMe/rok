@@ -224,8 +224,10 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
 
     (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
-    (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64 ), r),
-    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
+    (K::Int(Some(l)), K::BoolArray(r)) => {
+      (K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap()))
+    }
     (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(arr!([*l])), r),
     (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
     (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
@@ -236,14 +238,24 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
-    (K::Float(l), K::BoolArray(r)) => (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
-    (K::Float(l), K::IntArray(r)) => (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+    (K::Float(l), K::BoolArray(r)) => {
+      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
+    }
+    (K::Float(l), K::IntArray(r)) => {
+      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
+    }
     (K::Float(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l])), r),
 
     (K::BoolArray(_), K::Bool(r)) => (l, K::BoolArray(arr!([*r]))),
-    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r]))),
-    (K::BoolArray(l), K::Int(None)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>]))),
-    (K::BoolArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r]))),
+    (K::BoolArray(l), K::Int(Some(r))) => {
+      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))
+    }
+    (K::BoolArray(l), K::Int(None)) => {
+      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))
+    }
+    (K::BoolArray(l), K::Float(r)) => {
+      (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))
+    }
     (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
@@ -270,32 +282,32 @@ macro_rules! impl_op {
         match promote_nouns($self, $r) {
             (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
             (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
-            (K::Int(None), K::Int(Some(_))) => K::Int(None),
+            (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None))=> K::Int(None),
             (K::Float(l), K::Float(r)) => K::Float(l $op r),
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
             (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
-            (K::IntArray(l), K::Dictionary(k,v)) => {
-              match *v {
-                K::Bool(v) => K::Dictionary(k, Box::new(K::IntArray(l $op v))),
-                // K::Int(Some(v)) => K::Dictionary(k, Box::new(l $op v)),
-                // K::Int(None) => K::Dictionary(k, Box::new(K::Int(None))),
-                // K::Float(v) => K::Dictionary(k, Box::new(l $op v)),
+            (l, K::Dictionary(k,v)) => {
+              // TODO: should these cases be handled directly in add() or v_plus() etc?
+              match promote_nouns(l, *v) {
+                (K::Bool(l), K::Bool(r)) => K::Dictionary(k, Box::new(K::Int(Some(l as i64 $op r as i64)))),
+                (K::Int(Some(l)), K::Int(Some(r))) => K::Dictionary(k, Box::new(K::Int(Some(l $op r)))),
+                (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => K::Dictionary(k, Box::new(K::Int(None))),
+                (K::Float(l), K::Float(r)) => K::Dictionary(k, Box::new(K::Float(l $op r))),
+                (K::BoolArray(l), K::BoolArray(r)) => K::Dictionary(k, Box::new(K::IntArray(l $op r))),
+                (K::IntArray(l), K::IntArray(r)) => K::Dictionary(k, Box::new(K::IntArray(l $op r))),
+                (K::FloatArray(l), K::FloatArray(r)) => K::Dictionary(k, Box::new(K::FloatArray(l $op r))),
                 // K::Char(v) => K::Dictionary(k, Box::new(l $op v)),
-                // K::BoolArray(v) => K::Dictionary(k, Box::new(l $op v)),
-                // K::IntArray(v) => K::Dictionary(k, Box::new(l $op v)),
-                // K::FloatArray(v) => K::Dictionary(k, Box::new(l $op v)),
                 // K::CharArray(v) => K::Dictionary(k, Box::new(l $op v)),
                 // K::Nil => K::Dictionary(k, Box::new(l $op v)),
-                K::List(_v) => todo!("list"), //K::Dictionary(k, Box::new(K::List(v.iter().map(|s| l $op s).collect()))),
-                K::Dictionary(_k, _v) => todo!("dict"),
-                K::Table(_v) => todo!("table"),
-                K::Symbol(_v) => todo!("type error"),
-                K::SymbolArray(_v) => todo!("type error"),
+                (_, K::List(_v)) => todo!("list"), 
+                (_, K::Dictionary(_k, _v)) => todo!("dict"),
+                (_, K::Table(_v) )=> todo!("table"),
+                (_, K::Symbol(_v)) => todo!("type error"),
+                (_, K::SymbolArray(_v)) => todo!("type error"),
                 _ => todo!("other cases")
               }
             }
-            (_, K::Dictionary(_,_)) => todo!("dict"),
             (K::Dictionary(_,_), _) => todo!("dict"),
             (_, K::Table(_)) => todo!("table"),
             (K::Table(_), _) => todo!("table"),
