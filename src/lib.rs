@@ -214,63 +214,67 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
   }
 }
 
-pub fn b2i(b: K) -> K {
-  match b {
-    K::BoolArray(b) => K::IntArray(
-      b.bool()
-        .expect("bool")
-        .into_iter()
-        .map(|b| match b {
-          Some(true) => Some(1),
-          Some(false) => Some(0),
-          _ => None,
-        })
-        .collect::<Series>(),
-    ),
-    _ => panic!("not bool"),
+// promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
+// Similar to promote_num() can we combine these somehow and be more concise?
+fn promote_nouns(l: K, r: K) -> (K, K) {
+  match (&l, &r) {
+    (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
+    (K::Bool(l), K::Float(_)) => (K::Float(*l as f64), r),
+    (K::Bool(l), K::IntArray(_)) => (K::IntArray(arr!([*l as i64])), r),
+    (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
+
+    (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
+    (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64 ), r),
+    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(arr!([*l])), r),
+    (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
+    (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
+    (K::Int(None), K::BoolArray(_)) => (K::IntArray(arr!([None::<i64>])), r),
+    (K::Int(None), K::IntArray(_)) => (K::IntArray(arr!([None::<i64>])), r),
+    (K::Int(None), K::FloatArray(_)) => (K::FloatArray(arr!([f64::NAN])), r),
+
+    (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
+    (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
+    (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
+    (K::Float(l), K::BoolArray(r)) => (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+    (K::Float(l), K::IntArray(r)) => (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l])), r),
+
+    (K::BoolArray(_), K::Bool(r)) => (l, K::BoolArray(arr!([*r]))),
+    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r]))),
+    (K::BoolArray(l), K::Int(None)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>]))),
+    (K::BoolArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r]))),
+    (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
+    (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
+
+    (K::IntArray(_), K::Bool(r)) => (l, K::IntArray(arr!([*r as i64]))),
+    (K::IntArray(_), K::Int(Some(r))) => (l, K::IntArray(arr!([*r as i64]))),
+    (K::IntArray(_), K::Int(None)) => (l, K::IntArray(arr!([None::<i64>]))),
+    (K::IntArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
+
+    (K::FloatArray(_), K::Bool(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::FloatArray(_), K::Int(Some(r))) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::FloatArray(_), K::Int(None)) => (l, K::FloatArray(arr!([f64::NAN]))),
+    (K::FloatArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
+    (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+
+    _ => (l, r),
   }
 }
-// AA TODO: promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
-// similar to promote_num()
+
 macro_rules! impl_op {
     ($op:tt, $opf:ident, $self:ident, $r:ident) => {
-        match ($self.clone(), $r) {
+        match promote_nouns($self, $r) {
             (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
-            (K::Bool(l), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
-            (K::Bool(l), K::Float(r)) => K::Float(l as f64 $op r),
-            (K::Bool(l), K::BoolArray(r)) => K::IntArray(polars::prelude::LhsNumOps::$opf(l as i64, &r)),
-            (K::Bool(l), K::IntArray(r)) => K::IntArray(polars::prelude::LhsNumOps::$opf(l as i64, &r)),
-            (K::Bool(l), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l as f64, &r)),
-            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
             (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
-            (K::Int(Some(l)), K::Float(r)) => K::Float(l as f64 $op r),
-            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(polars::prelude::LhsNumOps::$opf(l as i64, &r)),
-            (K::Int(Some(l)), K::IntArray(r)) => K::IntArray(polars::prelude::LhsNumOps::$opf(l as i64, &r)),
-            (K::Int(Some(l)), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l as f64, &r)),
-            (K::Int(None), K::Bool(_)) => K::Int(None),
             (K::Int(None), K::Int(Some(_))) => K::Int(None),
-            (K::Int(None), K::Float(_)) => K::Float(f64::NAN),
-            (K::Int(None), K::BoolArray(r)) => K::IntArray(Series::new_null("",r.len())), // not sure about this
-            (K::Int(None), K::IntArray(r)) => K::IntArray(Series::new_null("",r.len())),
-            (K::Int(None), K::FloatArray(r)) => K::FloatArray(Series::new_null("",r.len())),
-            (K::Float(l), K::Bool(r)) => K::Float(l $op r as f64),
-            (K::Float(l), K::Int(Some(r))) => K::Float(l $op r as f64),
             (K::Float(l), K::Float(r)) => K::Float(l $op r),
-            (K::Float(l), K::BoolArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l, &r)),
-            (K::Float(l), K::IntArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l, &r.cast(&DataType::Float64).unwrap())),
-            (K::Float(l), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l, &r)),
-            (K::BoolArray(l), K::Bool(r)) => K::IntArray(l $op r),
-            (K::BoolArray(_l), K::Int(Some(r))) => match b2i($self) { K::IntArray(l) => K::IntArray(l $op r), _ => panic!("impossible"), },
-            (K::BoolArray(l), K::Float(r)) => K::FloatArray(l $op r),
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
-            (K::BoolArray(l), K::IntArray(r)) => K::IntArray(l $op r),
-            (K::BoolArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
-            (K::IntArray(l), K::Bool(r)) => K::IntArray(l $op r),
-            (K::IntArray(l), K::Int(Some(r))) => K::IntArray(l $op r),
-            (K::IntArray(l), K::Float(r)) => K::FloatArray(l $op r),
-            (K::IntArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
-            (K::IntArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
+            (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
             (K::IntArray(l), K::Dictionary(k,v)) => {
               match *v {
                 K::Bool(v) => K::Dictionary(k, Box::new(K::IntArray(l $op v))),
@@ -291,12 +295,10 @@ macro_rules! impl_op {
                 _ => todo!("other cases")
               }
             }
-            (K::FloatArray(l), K::Bool(r)) => K::FloatArray(l $op r as f64),
-            (K::FloatArray(l), K::Int(Some(r))) => K::FloatArray(l $op r as f64),
-            (K::FloatArray(l), K::Float(r)) => K::FloatArray(l $op r),
-            (K::FloatArray(l), K::BoolArray(r)) => K::FloatArray(l $op r),
-            (K::FloatArray(l), K::IntArray(r)) => K::FloatArray(l $op r),
-            (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
+            (_, K::Dictionary(_,_)) => todo!("dict"),
+            (K::Dictionary(_,_), _) => todo!("dict"),
+            (_, K::Table(_)) => todo!("table"),
+            (K::Table(_), _) => todo!("table"),
             _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc"),
         }
     };
