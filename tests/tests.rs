@@ -394,6 +394,24 @@ fn test_dict_maths() {
     format!("{:?}", d2)
   );
 
+  let k = K::Symbol("a".into());
+  let v = K::FloatArray(arr!([2.0, 3.0f64]));
+  let d1 = v_d_bang(k, v).unwrap();
+  let d2 = eval(scan("1.0 2.0 + `a!1").unwrap()).unwrap();
+  assert_eq!(
+    format!("{:?}", Noun(d1)),
+    format!("{:?}", d2)
+  );
+
+  let k = K::Symbol("a".into());
+  let v = K::IntArray(arr!([2, 1, 2i64]));
+  let d1 = v_d_bang(k, v).unwrap();
+  let d2 = eval(scan("1 0 1 + `a!1").unwrap()).unwrap();
+  assert_eq!(
+    format!("{:?}", Noun(d1)),
+    format!("{:?}", d2)
+  );
+
   // TODO
   // let k =
   //   K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
