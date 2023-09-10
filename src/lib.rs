@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 use std::{collections::VecDeque, iter::repeat, ops};
@@ -181,8 +182,55 @@ pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
   }
 }
 
+type V1 = fn(K) -> Result<K, &'static str>;
+type V2 = fn(K, K) -> Result<K, &'static str>;
+type V3 = fn(K, K, K) -> Result<K, &'static str>;
+type V4 = fn(K, K, K, K) -> Result<K, &'static str>;
+
+pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
+pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
+pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
+pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
+
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
+  let verbs: HashMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = HashMap::from([
+    // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
+    //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
+    // ":" : [ident,     ident,      rident,     rident,     rident,     rident,     null,    null  ],
+    // "+" : [flip,      flip,       ad(plus),   ad(plus),   ad(plus),   ad(plus),   null,    null  ],
+    // "-" : [am(negate),am(negate), ad(minus),  ad(minus),  ad(minus),  ad(minus),  null,    null  ],
+    // "*" : [first,     first,      ad(times),  ad(times),  ad(times),  ad(times),  null,    null  ],
+    // "%" : [am(sqrt),  am(sqrt),   ad(divide), ad(divide), ad(divide), ad(divide), null,    null  ],
+    // "!" : [iota,      odometer,   mod,        null,       ar(mod),    md,         null,    null  ],
+    // "&" : [where,     where,      ad(min),    ad(min),    ad(min),    ad(min),    null,    null  ],
+    // "|" : [rev,       rev,        ad(max),    ad(max),    ad(max),    ad(max),    null,    null  ],
+    // "<" : [asc,       asc,        ad(less),   ad(less),   ad(less),   ad(less),   null,    null  ],
+    // ">" : [desc,      desc,       ad(more),   ad(more),   ad(more),   ad(more),   null,    null  ],
+    // "=" : [imat,      group,      ad(equal),  ad(equal),  ad(equal),  ad(equal),  null,    null  ],
+    // "~" : [am(not),   am(not),    match,      match,      match,      match,      null,    null  ],
+    // "," : [enlist,    enlist,     cat,        cat,        cat,        cat,        null,    null  ],
+    // "^" : [pisnull,   am(pisnull),ad(fill),   except,     ad(fill),   except,     null,    null  ],
+    // "#" : [count,     count,      take,       reshape,    take,       reshape,    null,    null  ],
+    // "_" : [am(floor), am(floor),  drop,       ddrop,      drop,       cut,        null,    null  ],
+    // "$" : [kfmt,      as(kfmt),   dfmt,       dfmt,       dfmt,       dfmt,       null,    null  ],
+    // "?" : [real,      unique,     rnd,        pfind,      rnd,        ar(pfind),  splice,  null  ],
+    // "@" : [type,      type,       atx,        atx,        atx,        atx,        amend4,  amend4],
+    // "." : [keval,     keval,      call,       call,       call,       call,       dmend3,  dmend4],
+    // "'" : [null,      null,       null,       bin,        null,       ar(bin),    null,    null  ],
+    // "/" : [null,      null,       null,       null,       pack,       pack,       null,    null  ],
+    // "\\": [null,      null,       null,       unpack,     split,      null,       null,    null  ],
+    // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
+    (":", (v_ident as V1, v_ident as V1, v_rident as V2, v_rident as V2, v_rident as V2, v_rident as V2, v_none3 as V3, v_none4 as V4)),
+    ("+", (v_flip, v_flip, v_plus, v_plus, v_plus, v_plus, v_none3, v_none4)),
+    ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
+    ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
+    ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
+    ("!", (v_iota, v_odometer, v_mod, v_none2, v_mod, v_makedict, v_none3, v_none4)),
+  ]);
+
   match (&l, &r) {
+    // TODO: need a concept of rank.  Maths verbs are rank 0 0 so they need this logic.
+    // the ! verb is rank inf inf.
     (Some(KW::Noun(K::Dictionary(_lk, _lv))), KW::Noun(_r)) => todo!("dict lhs"),
     (Some(KW::Noun(_l)), KW::Noun(K::Dictionary(rk, rv))) => {
       if let KW::Noun(n) = apply_primitive(v, l, KW::Noun(*rv.clone())).unwrap() {
@@ -197,9 +245,12 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
     (None, KW::Noun(K::Table(_))) => todo!("table monad"),
     (Some(KW::Noun(K::List(_v))), KW::Noun(_r)) => todo!("list lhs"),
     (Some(KW::Noun(l)), KW::Noun(K::List(vec))) => Ok(KW::Noun(K::List(
-      vec.iter()
+      vec
+        .iter()
         .map(|k| {
-          if let KW::Noun(n) = apply_primitive(v, Some(KW::Noun(l.clone())), KW::Noun(k.clone())).unwrap() {
+          if let KW::Noun(n) =
+            apply_primitive(v, Some(KW::Noun(l.clone())), KW::Noun(k.clone())).unwrap()
+          {
             n
           } else {
             todo!("type")
@@ -227,8 +278,8 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
         _ => todo!("monad %"),
       },
       "!" => match (l, r) {
-        (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
-        (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_bang(l, r).unwrap())),
+        (None, KW::Noun(r)) => Ok(KW::Noun(v_iota(r).unwrap())),
+        (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_makedict(l, r).unwrap())),
         _ => todo!("wat"),
       },
       ":" => match (l, r) {
@@ -367,6 +418,8 @@ fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
     Err("length")
   }
 }
+pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
+pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
 pub fn v_flip(x: K) -> Result<K, &'static str> {
   match x {
     K::Dictionary(k, v) => match (*k, *v) {
@@ -397,17 +450,24 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
   }
 }
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l + r)) }
+pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
 pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l - r)) }
+pub fn v_first(x: K) -> Result<K, &'static str> { todo!("implement first") }
 pub fn v_times(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l * r)) }
+pub fn v_sqrt(x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l / r)) }
-pub fn v_bang(r: K) -> Result<K, &'static str> {
-  debug!("v_bang");
+pub fn v_odometer(r: K) -> Result<K, &'static str> { todo!("implement odometer") }
+pub fn v_mod(l: K, r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
+pub fn v_iota(r: K) -> Result<K, &'static str> {
+  debug!("v_iota");
   match r {
     K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
-    _ => todo!("v_bang variants"),
+    _ => todo!("v_iota variants"),
   }
 }
-pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
+  debug!("v_makedict() l: {:?}", l);
+  debug!("v_makedict() r: {:?}", r);
   match l {
     K::SymbolArray(s) => match r {
       K::List(v) => {

@@ -309,18 +309,18 @@ fn test_dict() {
   let k =
     K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Bool(1u8), K::Int(Some(42)), K::Float(3.14)]);
-  let d1 = v_d_bang(k, v);
+  let d1 = v_makedict(k, v);
   println!("{:?}", d1);
 
   let k =
     K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Bool(1u8)]);
-  let d2 = v_d_bang(k, v);
+  let d2 = v_makedict(k, v);
   println!("{:?}", d2);
 
   let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Char('a'), K::Int(Some(42))]);
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b!(\"a\";42)").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
@@ -328,7 +328,7 @@ fn test_dict() {
 
   let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Int(Some(1)), K::Int(Some(2))]);
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b!1 2").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
@@ -336,7 +336,7 @@ fn test_dict() {
 
   let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Int(Some(1)), K::Int(None)]);
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b!1 0N").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
@@ -344,7 +344,7 @@ fn test_dict() {
 
   let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Float(1.5), K::Float(2.5)]);
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b!1.5 2.5").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
@@ -352,7 +352,7 @@ fn test_dict() {
 
   let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Char('a'), K::Char('b')]);
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b!\"ab\"").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
@@ -360,7 +360,7 @@ fn test_dict() {
 
   let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Bool(1), K::Bool(0)]);
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b!1 0").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
@@ -368,13 +368,13 @@ fn test_dict() {
 
   let k = K::SymbolArray(Series::new("a", ["a"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::Bool(1);
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   assert_eq!(format!("{:?}", eval(scan("`a!1").unwrap()).unwrap()), format!("{:?}", KW::Noun(d1)));
 
   let k =
     K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
   let v = K::List(vec![K::Bool(1), K::Bool(1), K::Bool(1)]);
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
     format!("{:?}", eval(scan("`a`b`c!1").unwrap()).unwrap()),
     format!("{:?}", KW::Noun(d1))
@@ -387,7 +387,7 @@ fn test_dict_maths() {
   // let k = K::SymbolArray(Series::new("a", ["a"]).cast(&DataType::Categorical(None)).unwrap());
   let k = K::Symbol("a".into());
   let v = K::IntArray(arr!([2, 3i64]));
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   let d2 = eval(scan("1 2 + `a!1").unwrap()).unwrap();
   assert_eq!(
     format!("{:?}", Noun(d1)),
@@ -396,7 +396,7 @@ fn test_dict_maths() {
 
   let k = K::Symbol("a".into());
   let v = K::FloatArray(arr!([2.0, 3.0f64]));
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   let d2 = eval(scan("1.0 2.0 + `a!1").unwrap()).unwrap();
   assert_eq!(
     format!("{:?}", Noun(d1)),
@@ -405,7 +405,7 @@ fn test_dict_maths() {
 
   let k = K::Symbol("a".into());
   let v = K::IntArray(arr!([2, 1, 2i64]));
-  let d1 = v_d_bang(k, v).unwrap();
+  let d1 = v_makedict(k, v).unwrap();
   let d2 = eval(scan("1 0 1 + `a!1").unwrap()).unwrap();
   assert_eq!(
     format!("{:?}", Noun(d1)),
