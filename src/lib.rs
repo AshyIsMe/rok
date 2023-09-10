@@ -193,7 +193,6 @@ pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
 
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
-  let verbs: HashMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = HashMap::from([
     // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
     //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
     // ":" : [ident,     ident,      rident,     rident,     rident,     rident,     null,    null  ],
@@ -220,6 +219,7 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
     // "/" : [null,      null,       null,       null,       pack,       pack,       null,    null  ],
     // "\\": [null,      null,       null,       unpack,     split,      null,       null,    null  ],
     // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
+  let verbs: HashMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = HashMap::from([
     (":", (v_ident as V1, v_ident as V1, v_rident as V2, v_rident as V2, v_rident as V2, v_rident as V2, v_none3 as V3, v_none4 as V4)),
     ("+", (v_flip, v_flip, v_plus, v_plus, v_plus, v_plus, v_none3, v_none4)),
     ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
@@ -228,68 +228,98 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
     ("!", (v_iota, v_odometer, v_mod, v_none2, v_mod, v_makedict, v_none3, v_none4)),
   ]);
 
-  match (&l, &r) {
-    // TODO: need a concept of rank.  Maths verbs are rank 0 0 so they need this logic.
-    // the ! verb is rank inf inf.
-    (Some(KW::Noun(K::Dictionary(_lk, _lv))), KW::Noun(_r)) => todo!("dict lhs"),
-    (Some(KW::Noun(_l)), KW::Noun(K::Dictionary(rk, rv))) => {
-      if let KW::Noun(n) = apply_primitive(v, l, KW::Noun(*rv.clone())).unwrap() {
-        Ok(KW::Noun(K::Dictionary(rk.clone(), Box::new(n))))
-      } else {
-        Err("type")
+  match verbs.get(v){
+    Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => {
+      match (l, r) {
+        (Some(KW::Noun(l)), KW::Noun(r)) => if l.len() > 1 {
+          if r.len() > 1 {
+            d_l_l(l, r).and_then(|n| Ok(KW::Noun(n)))
+          } else {
+            d_l_a(l, r).and_then(|n| Ok(KW::Noun(n)))
+          }
+        } else {
+          if r.len() > 1 {
+            d_a_l(l, r).and_then(|n| Ok(KW::Noun(n)))
+          } else {
+            d_a_a(l, r).and_then(|n| Ok(KW::Noun(n)))
+          }
+        }
+        (None, KW::Noun(r)) => if r.len() > 1 {
+          m_l(r).and_then(|n| Ok(KW::Noun(n)))
+        } else {
+          m_a(r).and_then(|n| Ok(KW::Noun(n)))
+        }
+        _ => {
+          panic!("impossible")
+        }
       }
     }
-    (None, KW::Noun(K::Dictionary(_rk, _rv))) => todo!("dict monad"),
-    (Some(KW::Noun(K::Table(_))), KW::Noun(_r)) => todo!("table lhs"),
-    (Some(KW::Noun(_l)), KW::Noun(K::Table(_))) => todo!("table rhs"),
-    (None, KW::Noun(K::Table(_))) => todo!("table monad"),
-    (Some(KW::Noun(K::List(_v))), KW::Noun(_r)) => todo!("list lhs"),
-    (Some(KW::Noun(l)), KW::Noun(K::List(vec))) => Ok(KW::Noun(K::List(
-      vec
-        .iter()
-        .map(|k| {
-          if let KW::Noun(n) =
-            apply_primitive(v, Some(KW::Noun(l.clone())), KW::Noun(k.clone())).unwrap()
-          {
-            n
-          } else {
-            todo!("type")
-          }
-        })
-        .collect(),
-    ))),
-    (None, KW::Noun(K::List(_v))) => todo!("list monad"),
-    _ => match v {
-      "+" => match (l, r) {
-        (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
-        (None, KW::Noun(r)) => v_flip(r).and_then(|n| Ok(KW::Noun(n))),
-        _ => panic!("wat"),
-      },
-      "-" => match (l, r) {
-        (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
-        _ => todo!("monad -"),
-      },
-      "*" => match (l, r) {
-        (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
-        _ => todo!("monad *"),
-      },
-      "%" => match (l, r) {
-        (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
-        _ => todo!("monad %"),
-      },
-      "!" => match (l, r) {
-        (None, KW::Noun(r)) => Ok(KW::Noun(v_iota(r).unwrap())),
-        (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_makedict(l, r).unwrap())),
-        _ => todo!("wat"),
-      },
-      ":" => match (l, r) {
-        (None, KW::Noun(r)) => Ok(KW::Noun(v_colon(r).unwrap())),
-        (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_colon(l, r).unwrap())),
-        _ => todo!("wat"),
-      },
-      _ => Err("invalid primitive"),
-    },
+    None => todo!("NotYetImplemented {}", v),
   }
+
+  // match (&l, &r) {
+  //   // TODO: do some macros within each verb similar to ok.js' am(f) ad(f) atomicmonad, atomicdyad.
+  //   // // TODO: need a concept of rank.  Maths verbs are rank 0 0 so they need this logic.
+  //   // // the ! verb is rank inf inf.
+  //   // (Some(KW::Noun(K::Dictionary(_lk, _lv))), KW::Noun(_r)) => todo!("dict lhs"),
+  //   // (Some(KW::Noun(_l)), KW::Noun(K::Dictionary(rk, rv))) => {
+  //   //   if let KW::Noun(n) = apply_primitive(v, l, KW::Noun(*rv.clone())).unwrap() {
+  //   //     Ok(KW::Noun(K::Dictionary(rk.clone(), Box::new(n))))
+  //   //   } else {
+  //   //     Err("type")
+  //   //   }
+  //   // }
+  //   // (None, KW::Noun(K::Dictionary(_rk, _rv))) => todo!("dict monad"),
+  //   // (Some(KW::Noun(K::Table(_))), KW::Noun(_r)) => todo!("table lhs"),
+  //   // (Some(KW::Noun(_l)), KW::Noun(K::Table(_))) => todo!("table rhs"),
+  //   // (None, KW::Noun(K::Table(_))) => todo!("table monad"),
+  //   // (Some(KW::Noun(K::List(_v))), KW::Noun(_r)) => todo!("list lhs"),
+  //   // (Some(KW::Noun(l)), KW::Noun(K::List(vec))) => Ok(KW::Noun(K::List(
+  //   //   vec
+  //   //     .iter()
+  //   //     .map(|k| {
+  //   //       if let KW::Noun(n) =
+  //   //         apply_primitive(v, Some(KW::Noun(l.clone())), KW::Noun(k.clone())).unwrap()
+  //   //       {
+  //   //         n
+  //   //       } else {
+  //   //         todo!("type")
+  //   //       }
+  //   //     })
+  //   //     .collect(),
+  //   // ))),
+  //   // (None, KW::Noun(K::List(_v))) => todo!("list monad"),
+  //   _ => match v {
+  //     "+" => match (l, r) {
+  //       (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
+  //       (None, KW::Noun(r)) => v_flip(r).and_then(|n| Ok(KW::Noun(n))),
+  //       _ => panic!("wat"),
+  //     },
+  //     "-" => match (l, r) {
+  //       (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
+  //       _ => todo!("monad -"),
+  //     },
+  //     "*" => match (l, r) {
+  //       (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
+  //       _ => todo!("monad *"),
+  //     },
+  //     "%" => match (l, r) {
+  //       (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
+  //       _ => todo!("monad %"),
+  //     },
+  //     "!" => match (l, r) {
+  //       (None, KW::Noun(r)) => Ok(KW::Noun(v_iota(r).unwrap())),
+  //       (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_makedict(l, r).unwrap())),
+  //       _ => todo!("wat"),
+  //     },
+  //     ":" => match (l, r) {
+  //       (None, KW::Noun(r)) => Ok(KW::Noun(v_colon(r).unwrap())),
+  //       (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_colon(l, r).unwrap())),
+  //       _ => todo!("wat"),
+  //     },
+  //     _ => Err("invalid primitive"),
+  //   },
+  // }
 }
 
 // promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
@@ -365,27 +395,7 @@ macro_rules! impl_op {
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
             (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
-            // (l, K::Dictionary(k,v)) => {
-            //   // TODO: should these cases be handled directly in add() or v_plus() etc?
-            //   match promote_nouns(l, *v) {
-            //     (K::Bool(l), K::Bool(r)) => K::Dictionary(k, Box::new(K::Int(Some(l as i64 $op r as i64)))),
-            //     (K::Int(Some(l)), K::Int(Some(r))) => K::Dictionary(k, Box::new(K::Int(Some(l $op r)))),
-            //     (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => K::Dictionary(k, Box::new(K::Int(None))),
-            //     (K::Float(l), K::Float(r)) => K::Dictionary(k, Box::new(K::Float(l $op r))),
-            //     (K::BoolArray(l), K::BoolArray(r)) => K::Dictionary(k, Box::new(K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()))),
-            //     (K::IntArray(l), K::IntArray(r)) => K::Dictionary(k, Box::new(K::IntArray(l $op r))),
-            //     (K::FloatArray(l), K::FloatArray(r)) => K::Dictionary(k, Box::new(K::FloatArray(l $op r))),
-            //     // K::Char(v) => K::Dictionary(k, Box::new(l $op v)),
-            //     // K::CharArray(v) => K::Dictionary(k, Box::new(l $op v)),
-            //     // K::Nil => K::Dictionary(k, Box::new(l $op v)),
-            //     (_, K::List(_v)) => todo!("list"),
-            //     (_, K::Dictionary(_k, _v)) => todo!("dict"),
-            //     (_, K::Table(_v) )=> todo!("table"),
-            //     (_, K::Symbol(_v)) => todo!("type error"),
-            //     (_, K::SymbolArray(_v)) => todo!("type error"),
-            //     _ => todo!("other cases")
-            //   }
-            // }
+            (_, K::Dictionary(_,_)) => todo!("dict"),
             (K::Dictionary(_,_), _) => todo!("dict"),
             (_, K::Table(_)) => todo!("table"),
             (K::Table(_), _) => todo!("table"),
@@ -452,12 +462,12 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l + r)) }
 pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
 pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l - r)) }
-pub fn v_first(x: K) -> Result<K, &'static str> { todo!("implement first") }
+pub fn v_first(_x: K) -> Result<K, &'static str> { todo!("implement first") }
 pub fn v_times(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l * r)) }
-pub fn v_sqrt(x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
+pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l / r)) }
-pub fn v_odometer(r: K) -> Result<K, &'static str> { todo!("implement odometer") }
-pub fn v_mod(l: K, r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
+pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
+pub fn v_mod(_l: K, _r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
 pub fn v_iota(r: K) -> Result<K, &'static str> {
   debug!("v_iota");
   match r {
