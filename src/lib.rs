@@ -182,35 +182,62 @@ pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
 }
 
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
-  match v {
-    "+" => match (l, r) {
-      (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
-      (None, KW::Noun(r)) => v_flip(r).and_then(|n| Ok(KW::Noun(n))),
-      _ => panic!("wat"),
+  match (&l, &r) {
+    (Some(KW::Noun(K::Dictionary(_lk, _lv))), KW::Noun(_r)) => todo!("dict lhs"),
+    (Some(KW::Noun(_l)), KW::Noun(K::Dictionary(rk, rv))) => {
+      if let KW::Noun(n) = apply_primitive(v, l, KW::Noun(*rv.clone())).unwrap() {
+        Ok(KW::Noun(K::Dictionary(rk.clone(), Box::new(n))))
+      } else {
+        Err("type")
+      }
+    }
+    (None, KW::Noun(K::Dictionary(_rk, _rv))) => todo!("dict monad"),
+    (Some(KW::Noun(K::Table(_))), KW::Noun(_r)) => todo!("table lhs"),
+    (Some(KW::Noun(_l)), KW::Noun(K::Table(_))) => todo!("table rhs"),
+    (None, KW::Noun(K::Table(_))) => todo!("table monad"),
+    (Some(KW::Noun(K::List(_v))), KW::Noun(_r)) => todo!("list lhs"),
+    (Some(KW::Noun(l)), KW::Noun(K::List(vec))) => Ok(KW::Noun(K::List(
+      vec.iter()
+        .map(|k| {
+          if let KW::Noun(n) = apply_primitive(v, Some(KW::Noun(l.clone())), KW::Noun(k.clone())).unwrap() {
+            n
+          } else {
+            todo!("type")
+          }
+        })
+        .collect(),
+    ))),
+    (None, KW::Noun(K::List(_v))) => todo!("list monad"),
+    _ => match v {
+      "+" => match (l, r) {
+        (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
+        (None, KW::Noun(r)) => v_flip(r).and_then(|n| Ok(KW::Noun(n))),
+        _ => panic!("wat"),
+      },
+      "-" => match (l, r) {
+        (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
+        _ => todo!("monad -"),
+      },
+      "*" => match (l, r) {
+        (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
+        _ => todo!("monad *"),
+      },
+      "%" => match (l, r) {
+        (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
+        _ => todo!("monad %"),
+      },
+      "!" => match (l, r) {
+        (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
+        (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_bang(l, r).unwrap())),
+        _ => todo!("wat"),
+      },
+      ":" => match (l, r) {
+        (None, KW::Noun(r)) => Ok(KW::Noun(v_colon(r).unwrap())),
+        (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_colon(l, r).unwrap())),
+        _ => todo!("wat"),
+      },
+      _ => Err("invalid primitive"),
     },
-    "-" => match (l, r) {
-      (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
-      _ => todo!("monad -"),
-    },
-    "*" => match (l, r) {
-      (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
-      _ => todo!("monad *"),
-    },
-    "%" => match (l, r) {
-      (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
-      _ => todo!("monad %"),
-    },
-    "!" => match (l, r) {
-      (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
-      (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_bang(l, r).unwrap())),
-      _ => todo!("wat"),
-    },
-    ":" => match (l, r) {
-      (None, KW::Noun(r)) => Ok(KW::Noun(v_colon(r).unwrap())),
-      (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_colon(l, r).unwrap())),
-      _ => todo!("wat"),
-    },
-    _ => Err("invalid primitive"),
   }
 }
 
@@ -287,27 +314,27 @@ macro_rules! impl_op {
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
             (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
-            (l, K::Dictionary(k,v)) => {
-              // TODO: should these cases be handled directly in add() or v_plus() etc?
-              match promote_nouns(l, *v) {
-                (K::Bool(l), K::Bool(r)) => K::Dictionary(k, Box::new(K::Int(Some(l as i64 $op r as i64)))),
-                (K::Int(Some(l)), K::Int(Some(r))) => K::Dictionary(k, Box::new(K::Int(Some(l $op r)))),
-                (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => K::Dictionary(k, Box::new(K::Int(None))),
-                (K::Float(l), K::Float(r)) => K::Dictionary(k, Box::new(K::Float(l $op r))),
-                (K::BoolArray(l), K::BoolArray(r)) => K::Dictionary(k, Box::new(K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()))),
-                (K::IntArray(l), K::IntArray(r)) => K::Dictionary(k, Box::new(K::IntArray(l $op r))),
-                (K::FloatArray(l), K::FloatArray(r)) => K::Dictionary(k, Box::new(K::FloatArray(l $op r))),
-                // K::Char(v) => K::Dictionary(k, Box::new(l $op v)),
-                // K::CharArray(v) => K::Dictionary(k, Box::new(l $op v)),
-                // K::Nil => K::Dictionary(k, Box::new(l $op v)),
-                (_, K::List(_v)) => todo!("list"),
-                (_, K::Dictionary(_k, _v)) => todo!("dict"),
-                (_, K::Table(_v) )=> todo!("table"),
-                (_, K::Symbol(_v)) => todo!("type error"),
-                (_, K::SymbolArray(_v)) => todo!("type error"),
-                _ => todo!("other cases")
-              }
-            }
+            // (l, K::Dictionary(k,v)) => {
+            //   // TODO: should these cases be handled directly in add() or v_plus() etc?
+            //   match promote_nouns(l, *v) {
+            //     (K::Bool(l), K::Bool(r)) => K::Dictionary(k, Box::new(K::Int(Some(l as i64 $op r as i64)))),
+            //     (K::Int(Some(l)), K::Int(Some(r))) => K::Dictionary(k, Box::new(K::Int(Some(l $op r)))),
+            //     (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => K::Dictionary(k, Box::new(K::Int(None))),
+            //     (K::Float(l), K::Float(r)) => K::Dictionary(k, Box::new(K::Float(l $op r))),
+            //     (K::BoolArray(l), K::BoolArray(r)) => K::Dictionary(k, Box::new(K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()))),
+            //     (K::IntArray(l), K::IntArray(r)) => K::Dictionary(k, Box::new(K::IntArray(l $op r))),
+            //     (K::FloatArray(l), K::FloatArray(r)) => K::Dictionary(k, Box::new(K::FloatArray(l $op r))),
+            //     // K::Char(v) => K::Dictionary(k, Box::new(l $op v)),
+            //     // K::CharArray(v) => K::Dictionary(k, Box::new(l $op v)),
+            //     // K::Nil => K::Dictionary(k, Box::new(l $op v)),
+            //     (_, K::List(_v)) => todo!("list"),
+            //     (_, K::Dictionary(_k, _v)) => todo!("dict"),
+            //     (_, K::Table(_v) )=> todo!("table"),
+            //     (_, K::Symbol(_v)) => todo!("type error"),
+            //     (_, K::SymbolArray(_v)) => todo!("type error"),
+            //     _ => todo!("other cases")
+            //   }
+            // }
             (K::Dictionary(_,_), _) => todo!("dict"),
             (_, K::Table(_)) => todo!("table"),
             (K::Table(_), _) => todo!("table"),
