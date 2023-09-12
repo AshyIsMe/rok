@@ -305,6 +305,17 @@ fn test_lists() {
 }
 
 #[test]
+fn test_list_maths() {
+  assert_eq!(
+    format!("{:?}", eval(scan("1 + (1 2; 3 4)").unwrap()).unwrap()),
+    format!(
+      "{:?}",
+      Noun(K::List(vec![K::IntArray(arr!([2, 3i64])), K::IntArray(arr!([4, 5i64]))]))
+    )
+  );
+}
+
+#[test]
 fn test_dict() {
   let k =
     K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());

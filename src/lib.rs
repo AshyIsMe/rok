@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use std::iter::zip;
 use log::debug;
 use polars::prelude::*;
 use std::collections::HashMap;
@@ -225,7 +226,7 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
     ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
-    ("!", (v_iota, v_odometer, v_mod, v_none2, v_mod, v_makedict, v_none3, v_none4)),
+    ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
   ]);
 
   match verbs.get(v){
@@ -435,7 +436,7 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
     K::Dictionary(k, v) => match (*k, *v) {
       (K::SymbolArray(k), K::List(v)) => {
         if v.first().unwrap().len() > 1 && v.iter().map(|k| k.len()).all_equal() {
-          let s: Vec<Series> = std::iter::zip(k.iter(), v.iter())
+          let s: Vec<Series> = zip(k.iter(), v.iter())
             .map(|(k, v)| match v {
               K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) | K::CharArray(s) => {
                 Series::new(&k.to_string(), s.clone())
@@ -459,7 +460,26 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
     _ => todo!("flip the rest"),
   }
 }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l + r)) }
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { 
+  // TODO put this logic into an atomicdyad! macro (like oK.js ad())
+  match (&l, &r) {
+    (K::Dictionary(lk,lv), K::Dictionary(rk, rv)) => todo!("dict dict"),
+    (K::Dictionary(lk,lv), _) => todo!("dict _"),
+    (_, K::Dictionary(lk,lv)) => todo!("_ dict"),
+
+    (K::List(lv), K::List(rv)) => {
+      Ok(K::List(zip(lv, rv).map(|(x,y)| v_plus(x.clone(), y.clone()).unwrap()).collect()))
+    }
+    (K::List(lv), r) => {
+      Ok(K::List(lv.iter().map(|x| v_plus(x.clone(), r.clone()).unwrap()).collect()))
+    }
+    (l, K::List(rv)) => {
+      Ok(K::List(rv.iter().map(|y| v_plus(l.clone(), y.clone()).unwrap()).collect()))
+    }
+
+    _ => len_ok(&l, &r).and_then(|_| Ok(l + r)) 
+  }
+}
 pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
 pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l - r)) }
 pub fn v_first(_x: K) -> Result<K, &'static str> { todo!("implement first") }
@@ -475,6 +495,14 @@ pub fn v_iota(r: K) -> Result<K, &'static str> {
     _ => todo!("v_iota variants"),
   }
 }
+
+pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::SymbolArray(_) | K::Symbol(_) => v_makedict(l, r),
+    _ => v_mod(l, r)
+  }
+}
+
 pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
   debug!("v_makedict() l: {:?}", l);
   debug!("v_makedict() r: {:?}", r);
