@@ -1,9 +1,9 @@
 use itertools::Itertools;
-use std::iter::zip;
 use log::debug;
 use polars::prelude::*;
 use std::collections::HashMap;
 use std::fs::File;
+use std::iter::zip;
 use std::path::Path;
 use std::{collections::VecDeque, iter::repeat, ops};
 
@@ -194,34 +194,46 @@ pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
 
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
-    // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
-    //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
-    // ":" : [ident,     ident,      rident,     rident,     rident,     rident,     null,    null  ],
-    // "+" : [flip,      flip,       ad(plus),   ad(plus),   ad(plus),   ad(plus),   null,    null  ],
-    // "-" : [am(negate),am(negate), ad(minus),  ad(minus),  ad(minus),  ad(minus),  null,    null  ],
-    // "*" : [first,     first,      ad(times),  ad(times),  ad(times),  ad(times),  null,    null  ],
-    // "%" : [am(sqrt),  am(sqrt),   ad(divide), ad(divide), ad(divide), ad(divide), null,    null  ],
-    // "!" : [iota,      odometer,   mod,        null,       ar(mod),    md,         null,    null  ],
-    // "&" : [where,     where,      ad(min),    ad(min),    ad(min),    ad(min),    null,    null  ],
-    // "|" : [rev,       rev,        ad(max),    ad(max),    ad(max),    ad(max),    null,    null  ],
-    // "<" : [asc,       asc,        ad(less),   ad(less),   ad(less),   ad(less),   null,    null  ],
-    // ">" : [desc,      desc,       ad(more),   ad(more),   ad(more),   ad(more),   null,    null  ],
-    // "=" : [imat,      group,      ad(equal),  ad(equal),  ad(equal),  ad(equal),  null,    null  ],
-    // "~" : [am(not),   am(not),    match,      match,      match,      match,      null,    null  ],
-    // "," : [enlist,    enlist,     cat,        cat,        cat,        cat,        null,    null  ],
-    // "^" : [pisnull,   am(pisnull),ad(fill),   except,     ad(fill),   except,     null,    null  ],
-    // "#" : [count,     count,      take,       reshape,    take,       reshape,    null,    null  ],
-    // "_" : [am(floor), am(floor),  drop,       ddrop,      drop,       cut,        null,    null  ],
-    // "$" : [kfmt,      as(kfmt),   dfmt,       dfmt,       dfmt,       dfmt,       null,    null  ],
-    // "?" : [real,      unique,     rnd,        pfind,      rnd,        ar(pfind),  splice,  null  ],
-    // "@" : [type,      type,       atx,        atx,        atx,        atx,        amend4,  amend4],
-    // "." : [keval,     keval,      call,       call,       call,       call,       dmend3,  dmend4],
-    // "'" : [null,      null,       null,       bin,        null,       ar(bin),    null,    null  ],
-    // "/" : [null,      null,       null,       null,       pack,       pack,       null,    null  ],
-    // "\\": [null,      null,       null,       unpack,     split,      null,       null,    null  ],
-    // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
+  // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
+  //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
+  // ":" : [ident,     ident,      rident,     rident,     rident,     rident,     null,    null  ],
+  // "+" : [flip,      flip,       ad(plus),   ad(plus),   ad(plus),   ad(plus),   null,    null  ],
+  // "-" : [am(negate),am(negate), ad(minus),  ad(minus),  ad(minus),  ad(minus),  null,    null  ],
+  // "*" : [first,     first,      ad(times),  ad(times),  ad(times),  ad(times),  null,    null  ],
+  // "%" : [am(sqrt),  am(sqrt),   ad(divide), ad(divide), ad(divide), ad(divide), null,    null  ],
+  // "!" : [iota,      odometer,   mod,        null,       ar(mod),    md,         null,    null  ],
+  // "&" : [where,     where,      ad(min),    ad(min),    ad(min),    ad(min),    null,    null  ],
+  // "|" : [rev,       rev,        ad(max),    ad(max),    ad(max),    ad(max),    null,    null  ],
+  // "<" : [asc,       asc,        ad(less),   ad(less),   ad(less),   ad(less),   null,    null  ],
+  // ">" : [desc,      desc,       ad(more),   ad(more),   ad(more),   ad(more),   null,    null  ],
+  // "=" : [imat,      group,      ad(equal),  ad(equal),  ad(equal),  ad(equal),  null,    null  ],
+  // "~" : [am(not),   am(not),    match,      match,      match,      match,      null,    null  ],
+  // "," : [enlist,    enlist,     cat,        cat,        cat,        cat,        null,    null  ],
+  // "^" : [pisnull,   am(pisnull),ad(fill),   except,     ad(fill),   except,     null,    null  ],
+  // "#" : [count,     count,      take,       reshape,    take,       reshape,    null,    null  ],
+  // "_" : [am(floor), am(floor),  drop,       ddrop,      drop,       cut,        null,    null  ],
+  // "$" : [kfmt,      as(kfmt),   dfmt,       dfmt,       dfmt,       dfmt,       null,    null  ],
+  // "?" : [real,      unique,     rnd,        pfind,      rnd,        ar(pfind),  splice,  null  ],
+  // "@" : [type,      type,       atx,        atx,        atx,        atx,        amend4,  amend4],
+  // "." : [keval,     keval,      call,       call,       call,       call,       dmend3,  dmend4],
+  // "'" : [null,      null,       null,       bin,        null,       ar(bin),    null,    null  ],
+  // "/" : [null,      null,       null,       null,       pack,       pack,       null,    null  ],
+  // "\\": [null,      null,       null,       unpack,     split,      null,       null,    null  ],
+  // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
   let verbs: HashMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = HashMap::from([
-    (":", (v_ident as V1, v_ident as V1, v_rident as V2, v_rident as V2, v_rident as V2, v_rident as V2, v_none3 as V3, v_none4 as V4)),
+    (
+      ":",
+      (
+        v_ident as V1,
+        v_ident as V1,
+        v_d_colon as V2,
+        v_d_colon as V2,
+        v_d_colon as V2,
+        v_d_colon as V2,
+        v_none3 as V3,
+        v_none4 as V4,
+      ),
+    ),
     ("+", (v_flip, v_flip, v_plus, v_plus, v_plus, v_plus, v_none3, v_none4)),
     ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
@@ -229,10 +241,10 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
   ]);
 
-  match verbs.get(v){
-    Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => {
-      match (l, r) {
-        (Some(KW::Noun(l)), KW::Noun(r)) => if l.len() > 1 {
+  match verbs.get(v) {
+    Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => match (l, r) {
+      (Some(KW::Noun(l)), KW::Noun(r)) => {
+        if l.len() > 1 {
           if r.len() > 1 {
             d_l_l(l, r).and_then(|n| Ok(KW::Noun(n)))
           } else {
@@ -245,82 +257,20 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
             d_a_a(l, r).and_then(|n| Ok(KW::Noun(n)))
           }
         }
-        (None, KW::Noun(r)) => if r.len() > 1 {
+      }
+      (None, KW::Noun(r)) => {
+        if r.len() > 1 {
           m_l(r).and_then(|n| Ok(KW::Noun(n)))
         } else {
           m_a(r).and_then(|n| Ok(KW::Noun(n)))
         }
-        _ => {
-          panic!("impossible")
-        }
       }
-    }
+      _ => {
+        panic!("impossible")
+      }
+    },
     None => todo!("NotYetImplemented {}", v),
   }
-
-  // match (&l, &r) {
-  //   // TODO: do some macros within each verb similar to ok.js' am(f) ad(f) atomicmonad, atomicdyad.
-  //   // // TODO: need a concept of rank.  Maths verbs are rank 0 0 so they need this logic.
-  //   // // the ! verb is rank inf inf.
-  //   // (Some(KW::Noun(K::Dictionary(_lk, _lv))), KW::Noun(_r)) => todo!("dict lhs"),
-  //   // (Some(KW::Noun(_l)), KW::Noun(K::Dictionary(rk, rv))) => {
-  //   //   if let KW::Noun(n) = apply_primitive(v, l, KW::Noun(*rv.clone())).unwrap() {
-  //   //     Ok(KW::Noun(K::Dictionary(rk.clone(), Box::new(n))))
-  //   //   } else {
-  //   //     Err("type")
-  //   //   }
-  //   // }
-  //   // (None, KW::Noun(K::Dictionary(_rk, _rv))) => todo!("dict monad"),
-  //   // (Some(KW::Noun(K::Table(_))), KW::Noun(_r)) => todo!("table lhs"),
-  //   // (Some(KW::Noun(_l)), KW::Noun(K::Table(_))) => todo!("table rhs"),
-  //   // (None, KW::Noun(K::Table(_))) => todo!("table monad"),
-  //   // (Some(KW::Noun(K::List(_v))), KW::Noun(_r)) => todo!("list lhs"),
-  //   // (Some(KW::Noun(l)), KW::Noun(K::List(vec))) => Ok(KW::Noun(K::List(
-  //   //   vec
-  //   //     .iter()
-  //   //     .map(|k| {
-  //   //       if let KW::Noun(n) =
-  //   //         apply_primitive(v, Some(KW::Noun(l.clone())), KW::Noun(k.clone())).unwrap()
-  //   //       {
-  //   //         n
-  //   //       } else {
-  //   //         todo!("type")
-  //   //       }
-  //   //     })
-  //   //     .collect(),
-  //   // ))),
-  //   // (None, KW::Noun(K::List(_v))) => todo!("list monad"),
-  //   _ => match v {
-  //     "+" => match (l, r) {
-  //       (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
-  //       (None, KW::Noun(r)) => v_flip(r).and_then(|n| Ok(KW::Noun(n))),
-  //       _ => panic!("wat"),
-  //     },
-  //     "-" => match (l, r) {
-  //       (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
-  //       _ => todo!("monad -"),
-  //     },
-  //     "*" => match (l, r) {
-  //       (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
-  //       _ => todo!("monad *"),
-  //     },
-  //     "%" => match (l, r) {
-  //       (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
-  //       _ => todo!("monad %"),
-  //     },
-  //     "!" => match (l, r) {
-  //       (None, KW::Noun(r)) => Ok(KW::Noun(v_iota(r).unwrap())),
-  //       (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_makedict(l, r).unwrap())),
-  //       _ => todo!("wat"),
-  //     },
-  //     ":" => match (l, r) {
-  //       (None, KW::Noun(r)) => Ok(KW::Noun(v_colon(r).unwrap())),
-  //       (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_colon(l, r).unwrap())),
-  //       _ => todo!("wat"),
-  //     },
-  //     _ => Err("invalid primitive"),
-  //   },
-  // }
 }
 
 // promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
@@ -460,15 +410,19 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
     _ => todo!("flip the rest"),
   }
 }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { 
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
   // TODO put this logic into an atomicdyad! macro (like oK.js ad())
   match (&l, &r) {
-    (K::Dictionary(lk,lv), K::Dictionary(rk, rv)) => todo!("dict dict"),
-    (K::Dictionary(lk,lv), _) => todo!("dict _"),
-    (_, K::Dictionary(lk,lv)) => todo!("_ dict"),
+    (K::Dictionary(lk, lv), K::Dictionary(rk, rv)) => todo!("dict dict"),
+    (K::Dictionary(lk, lv), r) => {
+      Ok(K::Dictionary(lk.clone(), Box::new(v_plus(*lv.clone(), r.clone()).unwrap())))
+    }
+    (l, K::Dictionary(rk, rv)) => {
+      Ok(K::Dictionary(rk.clone(), Box::new(v_plus(l.clone(), *rv.clone()).unwrap())))
+    }
 
     (K::List(lv), K::List(rv)) => {
-      Ok(K::List(zip(lv, rv).map(|(x,y)| v_plus(x.clone(), y.clone()).unwrap()).collect()))
+      Ok(K::List(zip(lv, rv).map(|(x, y)| v_plus(x.clone(), y.clone()).unwrap()).collect()))
     }
     (K::List(lv), r) => {
       Ok(K::List(lv.iter().map(|x| v_plus(x.clone(), r.clone()).unwrap()).collect()))
@@ -477,7 +431,7 @@ pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
       Ok(K::List(rv.iter().map(|y| v_plus(l.clone(), y.clone()).unwrap()).collect()))
     }
 
-    _ => len_ok(&l, &r).and_then(|_| Ok(l + r)) 
+    _ => len_ok(&l, &r).and_then(|_| Ok(l + r)),
   }
 }
 pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
@@ -499,7 +453,7 @@ pub fn v_iota(r: K) -> Result<K, &'static str> {
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   match l {
     K::SymbolArray(_) | K::Symbol(_) => v_makedict(l, r),
-    _ => v_mod(l, r)
+    _ => v_mod(l, r),
   }
 }
 
@@ -551,31 +505,28 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
 pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
 pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
   println!("l: {:?}, r: {:?}", l, r);
-  match l {
-    K::Int(Some(2i64)) => match r {
-      K::Symbol(s) => {
-        let p = Path::new(&s);
-        if p.exists() {
-          match Path::new(&s).extension() {
-            Some(e) => {
-              if e == "csv" {
-                Ok(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap()))
-              } else if e == "parquet" {
-                // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
-                Ok(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap()))
-              } else {
-                todo!("other file types")
-              }
+  match (&l, &r) {
+    (K::Int(Some(2i64)), K::Symbol(s)) => {
+      let p = Path::new(&s);
+      if p.exists() {
+        match Path::new(&s).extension() {
+          Some(e) => {
+            if e == "csv" {
+              Ok(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap()))
+            } else if e == "parquet" {
+              // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
+              Ok(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap()))
+            } else {
+              todo!("other file types")
             }
-            _ => todo!("no extension"),
           }
-        } else {
-          Err("path does not exist")
+          _ => todo!("no extension"),
         }
+      } else {
+        Err("path does not exist")
       }
-      _ => todo!("todo: inner case"),
-    },
-    _ => todo!("todo: other case"),
+    }
+    _ => v_rident(l, r),
   }
 }
 
