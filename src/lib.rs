@@ -410,36 +410,36 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
     _ => todo!("flip the rest"),
   }
 }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> {
-  // TODO put this logic into an atomicdyad! macro (like oK.js ad())
-  match (&l, &r) {
-    (K::Dictionary(lk, lv), K::Dictionary(rk, rv)) => todo!("dict dict"),
-    (K::Dictionary(lk, lv), r) => {
-      Ok(K::Dictionary(lk.clone(), Box::new(v_plus(*lv.clone(), r.clone()).unwrap())))
+macro_rules! atomicdyad {
+  ($op:tt, $v:ident, $l:ident, $r:ident) => {
+    match ($l, $r) {
+      (K::Dictionary(_lk, _lv), K::Dictionary(_rk, _rv)) => todo!("dict dict"),
+      (K::Dictionary(lk, lv), r) => {
+        Ok(K::Dictionary(lk.clone(), Box::new($v(*lv.clone(), r.clone()).unwrap())))
+      }
+      (l, K::Dictionary(rk, rv)) => {
+        Ok(K::Dictionary(rk.clone(), Box::new($v(l.clone(), *rv.clone()).unwrap())))
+      }
+      (K::List(lv), K::List(rv)) => {
+        Ok(K::List(zip(lv, rv).map(|(x, y)| $v(x.clone(), y.clone()).unwrap()).collect()))
+      }
+      (K::List(lv), r) => {
+        Ok(K::List(lv.iter().map(|x| $v(x.clone(), r.clone()).unwrap()).collect()))
+      }
+      (l, K::List(rv)) => {
+        Ok(K::List(rv.iter().map(|y| $v(l.clone(), y.clone()).unwrap()).collect()))
+      }
+      (l,r) => len_ok(&l, &r).and_then(|_| Ok(l $op r)),
     }
-    (l, K::Dictionary(rk, rv)) => {
-      Ok(K::Dictionary(rk.clone(), Box::new(v_plus(l.clone(), *rv.clone()).unwrap())))
-    }
-
-    (K::List(lv), K::List(rv)) => {
-      Ok(K::List(zip(lv, rv).map(|(x, y)| v_plus(x.clone(), y.clone()).unwrap()).collect()))
-    }
-    (K::List(lv), r) => {
-      Ok(K::List(lv.iter().map(|x| v_plus(x.clone(), r.clone()).unwrap()).collect()))
-    }
-    (l, K::List(rv)) => {
-      Ok(K::List(rv.iter().map(|y| v_plus(l.clone(), y.clone()).unwrap()).collect()))
-    }
-
-    _ => len_ok(&l, &r).and_then(|_| Ok(l + r)),
-  }
+  };
 }
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, l, r) }
 pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
-pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l - r)) }
+pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, l, r) }
 pub fn v_first(_x: K) -> Result<K, &'static str> { todo!("implement first") }
-pub fn v_times(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l * r)) }
+pub fn v_times(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(*, v_times, l, r) }
 pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
-pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l / r)) }
+pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide,l, r) }
 pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
 pub fn v_mod(_l: K, _r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
 pub fn v_iota(r: K) -> Result<K, &'static str> {
