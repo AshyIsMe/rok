@@ -30,7 +30,7 @@ pub enum K {
   CharArray(Series),
   Nil, // Is Nil a noun?
   List(Vec<K>),
-  Dictionary(Box<K>, Box<K>),
+  Dictionary(HashMap<String, K>), // TODO use indexmap instead to keep key order. https://docs.rs/indexmap/latest/indexmap/
   Table(DataFrame),
   //Quote(Box<K>) // Is Quote a noun?
 }
@@ -60,7 +60,7 @@ impl K {
       IntArray(a) => a.len(),
       FloatArray(a) => a.len(),
       CharArray(a) => a.len(),
-      Dictionary(k, _v) => k.len(),
+      Dictionary(d) => d.len(),
       _ => 1,
     }
   }
@@ -73,11 +73,12 @@ macro_rules! arr {
   };
 }
 
-pub fn enlist(k: K) -> Result<K, &'static str> {
+// pub fn enlist(k: K) -> Result<K, &'static str> {
+pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
   match k {
-    K::List(v) => Ok(K::List(v)),
+    K::List(v) => Ok(v),
     // TODO: reduce this repetition with a macro
-    K::BoolArray(a) => Ok(K::List(
+    K::BoolArray(a) => Ok(
       a.iter()
         .map(|i| {
           return if i.try_extract::<u8>().is_ok() {
@@ -87,8 +88,8 @@ pub fn enlist(k: K) -> Result<K, &'static str> {
           };
         })
         .collect(),
-    )),
-    K::IntArray(v) => Ok(K::List(
+    ),
+    K::IntArray(v) => Ok(
       v.iter()
         .map(|i| {
           return if i.try_extract::<i64>().is_ok() {
@@ -100,8 +101,8 @@ pub fn enlist(k: K) -> Result<K, &'static str> {
           };
         })
         .collect(),
-    )),
-    K::FloatArray(v) => Ok(K::List(
+    ),
+    K::FloatArray(v) => Ok(
       v.iter()
         .map(|i| {
           return if i.try_extract::<f64>().is_ok() {
@@ -113,9 +114,9 @@ pub fn enlist(k: K) -> Result<K, &'static str> {
           };
         })
         .collect(),
-    )),
+    ),
     K::CharArray(v) => {
-      Ok(K::List(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect()))
+      Ok(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect())
     }
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
@@ -346,8 +347,8 @@ macro_rules! impl_op {
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
             (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
-            (_, K::Dictionary(_,_)) => todo!("dict"),
-            (K::Dictionary(_,_), _) => todo!("dict"),
+            (_, K::Dictionary(_)) => todo!("dict"),
+            (K::Dictionary(_), _) => todo!("dict"),
             (_, K::Table(_)) => todo!("table"),
             (K::Table(_), _) => todo!("table"),
             _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc"),
@@ -383,42 +384,41 @@ pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
 pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
 pub fn v_flip(x: K) -> Result<K, &'static str> {
   match x {
-    K::Dictionary(k, v) => match (*k, *v) {
-      (K::SymbolArray(k), K::List(v)) => {
-        if v.first().unwrap().len() > 1 && v.iter().map(|k| k.len()).all_equal() {
-          let s: Vec<Series> = zip(k.iter(), v.iter())
-            .map(|(k, v)| match v {
-              K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) | K::CharArray(s) => {
-                Series::new(&k.to_string(), s.clone())
-              }
-              _ => panic!("impossible"),
-            })
-            .collect();
-          Ok(K::Table(DataFrame::new(s).unwrap()))
-        } else {
-          todo!("table - mismatched lens")
-        }
+    K::Dictionary(d) => {
+      if d.iter().map(|(_k, v)| v.len()).all_equal() {
+        let cols: Vec<Series> = d
+          .iter()
+          .map(|(k, v)| match v {
+            K::SymbolArray(s)
+            | K::BoolArray(s)
+            | K::IntArray(s)
+            | K::FloatArray(s)
+            | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
+            _ => todo!("handle atoms"),
+          })
+          .collect();
+        Ok(K::Table(DataFrame::new(cols).unwrap()))
+      } else {
+        Err("length")
       }
-      (K::SymbolArray(k), K::IntArray(v)) => {
-        let s = k.iter().nth(0).unwrap();
-        Ok(K::Table(DataFrame::new(vec![Series::new(&s.to_string(), v)]).unwrap()))
-      }
-      (_, _) => {
-        todo!("table - other cases")
-      }
-    },
+    }
     _ => todo!("flip the rest"),
   }
 }
 macro_rules! atomicdyad {
   ($op:tt, $v:ident, $l:ident, $r:ident) => {
     match ($l, $r) {
-      (K::Dictionary(_lk, _lv), K::Dictionary(_rk, _rv)) => todo!("dict dict"),
-      (K::Dictionary(lk, lv), r) => {
-        Ok(K::Dictionary(lk.clone(), Box::new($v(*lv.clone(), r.clone()).unwrap())))
+        // var r=md(k(3,[]),k(3,[])); kmap(unique(cat(x.k,y.k)), function(k) {
+        //   var a=dget(x,k), b=dget(y,k); dset(r,k,a==NA?b:b==NA?a:recur(a,b,env));
+        // }); return r;
+      (K::Dictionary(_ld), K::Dictionary(_rd)) => todo!("dict dict"),
+      (K::Dictionary(ld), r) => {
+        // Ok(K::Dictionary(lk.clone(), Box::new($v(*lv.clone(), r.clone()).unwrap())))
+        Ok(K::Dictionary(HashMap::from_iter(ld.iter().map(|(k,v)| (k.clone(), $v(v.clone(), r.clone()).unwrap())))))
       }
-      (l, K::Dictionary(rk, rv)) => {
-        Ok(K::Dictionary(rk.clone(), Box::new($v(l.clone(), *rv.clone()).unwrap())))
+      (l, K::Dictionary(rd)) => {
+        // Ok(K::Dictionary(rk.clone(), Box::new($v(l.clone(), *rv.clone()).unwrap())))
+        Ok(K::Dictionary(HashMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
       }
       (K::List(lv), K::List(rv)) => {
         Ok(K::List(zip(lv, rv).map(|(x, y)| $v(x.clone(), y.clone()).unwrap()).collect()))
@@ -457,6 +457,13 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
+fn strip_quotes(s: String) -> String {
+  if s.starts_with("\"") && s.ends_with("\"") {
+    s[1..s.len() - 1].into()
+  } else {
+    s
+  }
+}
 pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
   debug!("v_makedict() l: {:?}", l);
   debug!("v_makedict() r: {:?}", r);
@@ -464,37 +471,44 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
     K::SymbolArray(s) => match r {
       K::List(v) => {
         if s.len() == v.len() {
-          Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
+          Ok(K::Dictionary(HashMap::from_iter(zip(
+            s.iter().map(|s| strip_quotes(s.to_string())),
+            v.iter().cloned(),
+          ))))
         } else if v.len() == 1 {
-          Ok(K::Dictionary(
-            Box::new(K::SymbolArray(s.clone())),
-            Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
-          ))
+          Ok(K::Dictionary(HashMap::from_iter(zip(
+            s.iter().map(|s| strip_quotes(s.to_string())),
+            repeat(v[0].clone()),
+          ))))
         } else {
           Err("length")
         }
       }
       K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
-        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(enlist(r).unwrap())))
+        // Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(enlist(r).unwrap())))
+        // `a`b`c!1 2 3 => `a`b`c!(1;2;3)
+        Ok(K::Dictionary(HashMap::from_iter(zip(
+          s.iter().map(|s| strip_quotes(s.to_string())),
+          k_to_vec(r).unwrap().iter().cloned(),
+        ))))
       }
       _ => {
         if s.len() == 0 {
           Err("length")
         } else if s.len() == 1 {
-          Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(r)))
+          Ok(K::Dictionary(HashMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
         } else {
-          Ok(K::Dictionary(
-            Box::new(K::SymbolArray(s.clone())),
-            Box::new(K::List(std::iter::repeat(r).take(s.len()).collect())),
-          ))
+          // Ok(K::Dictionary(
+          //   Box::new(K::SymbolArray(s.clone())),
+          //   Box::new(K::List(std::iter::repeat(r).take(s.len()).collect())),
+          // ))
+          Ok(K::Dictionary(HashMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), repeat(r)))))
         }
       }
     },
     K::Symbol(s) => match r {
-      _ => Ok(K::Dictionary(
-        Box::new(K::SymbolArray(Series::new("a", [s]).cast(&DataType::Categorical(None)).unwrap())),
-        Box::new(r),
-      )),
+      // _ => Ok(K::Dictionary( Box::new(K::SymbolArray(Series::new("a", [s]).cast(&DataType::Categorical(None)).unwrap())), Box::new(r),)),
+      _ => Ok(K::Dictionary(HashMap::from([(s, r)]))),
     },
     _ => {
       todo!("modulo")
