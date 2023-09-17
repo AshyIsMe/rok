@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::fs::File;
 use std::iter::zip;
 use std::path::Path;
@@ -30,7 +30,7 @@ pub enum K {
   CharArray(Series),
   Nil, // Is Nil a noun?
   List(Vec<K>),
-  Dictionary(HashMap<String, K>), // TODO use indexmap instead to keep key order. https://docs.rs/indexmap/latest/indexmap/
+  Dictionary(IndexMap<String, K>), // TODO use indexmap instead to keep key order. https://docs.rs/indexmap/latest/indexmap/
   Table(DataFrame),
   //Quote(Box<K>) // Is Quote a noun?
 }
@@ -221,7 +221,7 @@ pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str
   // "/" : [null,      null,       null,       null,       pack,       pack,       null,    null  ],
   // "\\": [null,      null,       null,       unpack,     split,      null,       null,    null  ],
   // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
-  let verbs: HashMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = HashMap::from([
+  let verbs: IndexMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = IndexMap::from([
     (
       ":",
       (
@@ -414,11 +414,11 @@ macro_rules! atomicdyad {
       (K::Dictionary(_ld), K::Dictionary(_rd)) => todo!("dict dict"),
       (K::Dictionary(ld), r) => {
         // Ok(K::Dictionary(lk.clone(), Box::new($v(*lv.clone(), r.clone()).unwrap())))
-        Ok(K::Dictionary(HashMap::from_iter(ld.iter().map(|(k,v)| (k.clone(), $v(v.clone(), r.clone()).unwrap())))))
+        Ok(K::Dictionary(IndexMap::from_iter(ld.iter().map(|(k,v)| (k.clone(), $v(v.clone(), r.clone()).unwrap())))))
       }
       (l, K::Dictionary(rd)) => {
         // Ok(K::Dictionary(rk.clone(), Box::new($v(l.clone(), *rv.clone()).unwrap())))
-        Ok(K::Dictionary(HashMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
+        Ok(K::Dictionary(IndexMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
       }
       (K::List(lv), K::List(rv)) => {
         Ok(K::List(zip(lv, rv).map(|(x, y)| $v(x.clone(), y.clone()).unwrap()).collect()))
@@ -471,12 +471,12 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
     K::SymbolArray(s) => match r {
       K::List(v) => {
         if s.len() == v.len() {
-          Ok(K::Dictionary(HashMap::from_iter(zip(
+          Ok(K::Dictionary(IndexMap::from_iter(zip(
             s.iter().map(|s| strip_quotes(s.to_string())),
             v.iter().cloned(),
           ))))
         } else if v.len() == 1 {
-          Ok(K::Dictionary(HashMap::from_iter(zip(
+          Ok(K::Dictionary(IndexMap::from_iter(zip(
             s.iter().map(|s| strip_quotes(s.to_string())),
             repeat(v[0].clone()),
           ))))
@@ -487,7 +487,7 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
       K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
         // Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(enlist(r).unwrap())))
         // `a`b`c!1 2 3 => `a`b`c!(1;2;3)
-        Ok(K::Dictionary(HashMap::from_iter(zip(
+        Ok(K::Dictionary(IndexMap::from_iter(zip(
           s.iter().map(|s| strip_quotes(s.to_string())),
           k_to_vec(r).unwrap().iter().cloned(),
         ))))
@@ -496,19 +496,19 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         if s.len() == 0 {
           Err("length")
         } else if s.len() == 1 {
-          Ok(K::Dictionary(HashMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
+          Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
         } else {
           // Ok(K::Dictionary(
           //   Box::new(K::SymbolArray(s.clone())),
           //   Box::new(K::List(std::iter::repeat(r).take(s.len()).collect())),
           // ))
-          Ok(K::Dictionary(HashMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), repeat(r)))))
+          Ok(K::Dictionary(IndexMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), repeat(r)))))
         }
       }
     },
     K::Symbol(s) => match r {
       // _ => Ok(K::Dictionary( Box::new(K::SymbolArray(Series::new("a", [s]).cast(&DataType::Categorical(None)).unwrap())), Box::new(r),)),
-      _ => Ok(K::Dictionary(HashMap::from([(s, r)]))),
+      _ => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
     },
     _ => {
       todo!("modulo")
