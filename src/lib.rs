@@ -1,7 +1,9 @@
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
+use indexmap::IndexMap;
 use std::fs::File;
+use std::iter::zip;
 use std::path::Path;
 use std::{collections::VecDeque, iter::repeat, ops};
 
@@ -28,7 +30,7 @@ pub enum K {
   CharArray(Series),
   Nil, // Is Nil a noun?
   List(Vec<K>),
-  Dictionary(Box<K>, Box<K>),
+  Dictionary(IndexMap<String, K>), // TODO use indexmap instead to keep key order. https://docs.rs/indexmap/latest/indexmap/
   Table(DataFrame),
   //Quote(Box<K>) // Is Quote a noun?
 }
@@ -58,7 +60,7 @@ impl K {
       IntArray(a) => a.len(),
       FloatArray(a) => a.len(),
       CharArray(a) => a.len(),
-      Dictionary(k, _v) => k.len(),
+      Dictionary(d) => d.len(),
       _ => 1,
     }
   }
@@ -71,11 +73,12 @@ macro_rules! arr {
   };
 }
 
-pub fn enlist(k: K) -> Result<K, &'static str> {
+// pub fn enlist(k: K) -> Result<K, &'static str> {
+pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
   match k {
-    K::List(v) => Ok(K::List(v)),
+    K::List(v) => Ok(v),
     // TODO: reduce this repetition with a macro
-    K::BoolArray(a) => Ok(K::List(
+    K::BoolArray(a) => Ok(
       a.iter()
         .map(|i| {
           return if i.try_extract::<u8>().is_ok() {
@@ -85,8 +88,8 @@ pub fn enlist(k: K) -> Result<K, &'static str> {
           };
         })
         .collect(),
-    )),
-    K::IntArray(v) => Ok(K::List(
+    ),
+    K::IntArray(v) => Ok(
       v.iter()
         .map(|i| {
           return if i.try_extract::<i64>().is_ok() {
@@ -98,8 +101,8 @@ pub fn enlist(k: K) -> Result<K, &'static str> {
           };
         })
         .collect(),
-    )),
-    K::FloatArray(v) => Ok(K::List(
+    ),
+    K::FloatArray(v) => Ok(
       v.iter()
         .map(|i| {
           return if i.try_extract::<f64>().is_ok() {
@@ -111,9 +114,9 @@ pub fn enlist(k: K) -> Result<K, &'static str> {
           };
         })
         .collect(),
-    )),
+    ),
     K::CharArray(v) => {
-      Ok(K::List(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect()))
+      Ok(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect())
     }
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
@@ -181,101 +184,173 @@ pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
   }
 }
 
+type V1 = fn(K) -> Result<K, &'static str>;
+type V2 = fn(K, K) -> Result<K, &'static str>;
+type V3 = fn(K, K, K) -> Result<K, &'static str>;
+type V4 = fn(K, K, K, K) -> Result<K, &'static str>;
+
+pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
+pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
+pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
+pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
+
 pub fn apply_primitive(v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
-  match v {
-    "+" => match (l, r) {
-      (Some(KW::Noun(l)), KW::Noun(r)) => v_plus(l, r).and_then(|n| Ok(KW::Noun(n))),
-      (None, KW::Noun(r)) => v_flip(r).and_then(|n| Ok(KW::Noun(n))),
-      _ => panic!("wat"),
+  // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
+  //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
+  // ":" : [ident,     ident,      rident,     rident,     rident,     rident,     null,    null  ],
+  // "+" : [flip,      flip,       ad(plus),   ad(plus),   ad(plus),   ad(plus),   null,    null  ],
+  // "-" : [am(negate),am(negate), ad(minus),  ad(minus),  ad(minus),  ad(minus),  null,    null  ],
+  // "*" : [first,     first,      ad(times),  ad(times),  ad(times),  ad(times),  null,    null  ],
+  // "%" : [am(sqrt),  am(sqrt),   ad(divide), ad(divide), ad(divide), ad(divide), null,    null  ],
+  // "!" : [iota,      odometer,   mod,        null,       ar(mod),    md,         null,    null  ],
+  // "&" : [where,     where,      ad(min),    ad(min),    ad(min),    ad(min),    null,    null  ],
+  // "|" : [rev,       rev,        ad(max),    ad(max),    ad(max),    ad(max),    null,    null  ],
+  // "<" : [asc,       asc,        ad(less),   ad(less),   ad(less),   ad(less),   null,    null  ],
+  // ">" : [desc,      desc,       ad(more),   ad(more),   ad(more),   ad(more),   null,    null  ],
+  // "=" : [imat,      group,      ad(equal),  ad(equal),  ad(equal),  ad(equal),  null,    null  ],
+  // "~" : [am(not),   am(not),    match,      match,      match,      match,      null,    null  ],
+  // "," : [enlist,    enlist,     cat,        cat,        cat,        cat,        null,    null  ],
+  // "^" : [pisnull,   am(pisnull),ad(fill),   except,     ad(fill),   except,     null,    null  ],
+  // "#" : [count,     count,      take,       reshape,    take,       reshape,    null,    null  ],
+  // "_" : [am(floor), am(floor),  drop,       ddrop,      drop,       cut,        null,    null  ],
+  // "$" : [kfmt,      as(kfmt),   dfmt,       dfmt,       dfmt,       dfmt,       null,    null  ],
+  // "?" : [real,      unique,     rnd,        pfind,      rnd,        ar(pfind),  splice,  null  ],
+  // "@" : [type,      type,       atx,        atx,        atx,        atx,        amend4,  amend4],
+  // "." : [keval,     keval,      call,       call,       call,       call,       dmend3,  dmend4],
+  // "'" : [null,      null,       null,       bin,        null,       ar(bin),    null,    null  ],
+  // "/" : [null,      null,       null,       null,       pack,       pack,       null,    null  ],
+  // "\\": [null,      null,       null,       unpack,     split,      null,       null,    null  ],
+  // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
+  let verbs: IndexMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = IndexMap::from([
+    (
+      ":",
+      (
+        v_ident as V1,
+        v_ident as V1,
+        v_d_colon as V2,
+        v_d_colon as V2,
+        v_d_colon as V2,
+        v_d_colon as V2,
+        v_none3 as V3,
+        v_none4 as V4,
+      ),
+    ),
+    ("+", (v_flip, v_flip, v_plus, v_plus, v_plus, v_plus, v_none3, v_none4)),
+    ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
+    ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
+    ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
+    ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
+  ]);
+
+  match verbs.get(v) {
+    Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => match (l, r) {
+      (Some(KW::Noun(l)), KW::Noun(r)) => {
+        if l.len() > 1 {
+          if r.len() > 1 {
+            d_l_l(l, r).and_then(|n| Ok(KW::Noun(n)))
+          } else {
+            d_l_a(l, r).and_then(|n| Ok(KW::Noun(n)))
+          }
+        } else {
+          if r.len() > 1 {
+            d_a_l(l, r).and_then(|n| Ok(KW::Noun(n)))
+          } else {
+            d_a_a(l, r).and_then(|n| Ok(KW::Noun(n)))
+          }
+        }
+      }
+      (None, KW::Noun(r)) => {
+        if r.len() > 1 {
+          m_l(r).and_then(|n| Ok(KW::Noun(n)))
+        } else {
+          m_a(r).and_then(|n| Ok(KW::Noun(n)))
+        }
+      }
+      _ => {
+        panic!("impossible")
+      }
     },
-    "-" => match (l, r) {
-      (Some(KW::Noun(l)), KW::Noun(r)) => v_minus(l, r).and_then(|n| Ok(KW::Noun(n))),
-      _ => todo!("monad -"),
-    },
-    "*" => match (l, r) {
-      (Some(KW::Noun(l)), KW::Noun(r)) => v_times(l, r).and_then(|n| Ok(KW::Noun(n))),
-      _ => todo!("monad *"),
-    },
-    "%" => match (l, r) {
-      (Some(KW::Noun(l)), KW::Noun(r)) => v_divide(l, r).and_then(|n| Ok(KW::Noun(n))),
-      _ => todo!("monad %"),
-    },
-    "!" => match (l, r) {
-      (None, KW::Noun(r)) => Ok(KW::Noun(v_bang(r).unwrap())),
-      (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_bang(l, r).unwrap())),
-      _ => todo!("wat"),
-    },
-    ":" => match (l, r) {
-      (None, KW::Noun(r)) => Ok(KW::Noun(v_colon(r).unwrap())),
-      (Some(KW::Noun(l)), KW::Noun(r)) => Ok(KW::Noun(v_d_colon(l, r).unwrap())),
-      _ => todo!("wat"),
-    },
-    _ => Err("invalid primitive"),
+    None => todo!("NotYetImplemented {}", v),
   }
 }
 
-pub fn b2i(b: K) -> K {
-  match b {
-    K::BoolArray(b) => K::IntArray(
-      b.bool()
-        .expect("bool")
-        .into_iter()
-        .map(|b| match b {
-          Some(true) => Some(1),
-          Some(false) => Some(0),
-          _ => None,
-        })
-        .collect::<Series>(),
-    ),
-    _ => panic!("not bool"),
+// promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
+// Similar to promote_num() can we combine these somehow and be more concise?
+fn promote_nouns(l: K, r: K) -> (K, K) {
+  match (&l, &r) {
+    (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
+    (K::Bool(l), K::Float(_)) => (K::Float(*l as f64), r),
+    (K::Bool(l), K::IntArray(_)) => (K::IntArray(arr!([*l as i64])), r),
+    (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
+
+    (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
+    (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
+    (K::Int(Some(l)), K::BoolArray(r)) => {
+      (K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap()))
+    }
+    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(arr!([*l])), r),
+    (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
+    (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
+    (K::Int(None), K::BoolArray(_)) => (K::IntArray(arr!([None::<i64>])), r),
+    (K::Int(None), K::IntArray(_)) => (K::IntArray(arr!([None::<i64>])), r),
+    (K::Int(None), K::FloatArray(_)) => (K::FloatArray(arr!([f64::NAN])), r),
+
+    (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
+    (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
+    (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
+    (K::Float(l), K::BoolArray(r)) => {
+      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
+    }
+    (K::Float(l), K::IntArray(r)) => {
+      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
+    }
+    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l])), r),
+
+    (K::BoolArray(_), K::Bool(r)) => (l, K::BoolArray(arr!([*r]))),
+    (K::BoolArray(l), K::Int(Some(r))) => {
+      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))
+    }
+    (K::BoolArray(l), K::Int(None)) => {
+      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))
+    }
+    (K::BoolArray(l), K::Float(r)) => {
+      (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))
+    }
+    (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
+    (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
+
+    (K::IntArray(_), K::Bool(r)) => (l, K::IntArray(arr!([*r as i64]))),
+    (K::IntArray(_), K::Int(Some(r))) => (l, K::IntArray(arr!([*r as i64]))),
+    (K::IntArray(_), K::Int(None)) => (l, K::IntArray(arr!([None::<i64>]))),
+    (K::IntArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
+
+    (K::FloatArray(_), K::Bool(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::FloatArray(_), K::Int(Some(r))) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::FloatArray(_), K::Int(None)) => (l, K::FloatArray(arr!([f64::NAN]))),
+    (K::FloatArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
+    (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+
+    _ => (l, r),
   }
 }
 
 macro_rules! impl_op {
     ($op:tt, $opf:ident, $self:ident, $r:ident) => {
-        match ($self.clone(), $r) {
+        match promote_nouns($self, $r) {
             (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
-            (K::Bool(l), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
-            (K::Bool(l), K::Float(r)) => K::Float(l as f64 $op r),
-            (K::Bool(l), K::BoolArray(r)) => K::IntArray(polars::prelude::LhsNumOps::$opf(l as i64, &r)),
-            (K::Bool(l), K::IntArray(r)) => K::IntArray(polars::prelude::LhsNumOps::$opf(l as i64, &r)),
-            (K::Bool(l), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l as f64, &r)),
-            (K::Int(Some(l)), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
             (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
-            (K::Int(Some(l)), K::Float(r)) => K::Float(l as f64 $op r),
-            (K::Int(Some(l)), K::BoolArray(r)) => K::IntArray(polars::prelude::LhsNumOps::$opf(l as i64, &r)),
-            (K::Int(Some(l)), K::IntArray(r)) => K::IntArray(polars::prelude::LhsNumOps::$opf(l as i64, &r)),
-            (K::Int(Some(l)), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l as f64, &r)),
-            (K::Int(None), K::Bool(_)) => K::Int(None),
-            (K::Int(None), K::Int(Some(_))) => K::Int(None),
-            (K::Int(None), K::Float(_)) => K::Float(f64::NAN),
-            (K::Int(None), K::BoolArray(r)) => K::IntArray(Series::new_null("",r.len())), // not sure about this
-            (K::Int(None), K::IntArray(r)) => K::IntArray(Series::new_null("",r.len())),
-            (K::Int(None), K::FloatArray(r)) => K::FloatArray(Series::new_null("",r.len())),
-            (K::Float(l), K::Bool(r)) => K::Float(l $op r as f64),
-            (K::Float(l), K::Int(Some(r))) => K::Float(l $op r as f64),
+            (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None))=> K::Int(None),
             (K::Float(l), K::Float(r)) => K::Float(l $op r),
-            (K::Float(l), K::BoolArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l, &r)),
-            (K::Float(l), K::IntArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l, &r.cast(&DataType::Float64).unwrap())),
-            (K::Float(l), K::FloatArray(r)) => K::FloatArray(polars::prelude::LhsNumOps::$opf(l, &r)),
-            (K::BoolArray(l), K::Bool(r)) => K::IntArray(l $op r),
-            (K::BoolArray(_l), K::Int(Some(r))) => match b2i($self) { K::IntArray(l) => K::IntArray(l $op r), _ => panic!("impossible"), },
-            (K::BoolArray(l), K::Float(r)) => K::FloatArray(l $op r),
-            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
-            (K::BoolArray(l), K::IntArray(r)) => K::IntArray(l $op r),
-            (K::BoolArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
-            (K::IntArray(l), K::Bool(r)) => K::IntArray(l $op r),
-            (K::IntArray(l), K::Int(Some(r))) => K::IntArray(l $op r),
-            (K::IntArray(l), K::Float(r)) => K::FloatArray(l $op r),
-            (K::IntArray(l), K::BoolArray(r)) => K::IntArray(l $op r),
+            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
-            (K::IntArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
-            (K::FloatArray(l), K::Bool(r)) => K::FloatArray(l $op r as f64),
-            (K::FloatArray(l), K::Int(Some(r))) => K::FloatArray(l $op r as f64),
-            (K::FloatArray(l), K::Float(r)) => K::FloatArray(l $op r),
-            (K::FloatArray(l), K::BoolArray(r)) => K::FloatArray(l $op r),
-            (K::FloatArray(l), K::IntArray(r)) => K::FloatArray(l $op r),
             (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
+            (_, K::Dictionary(_)) => todo!("dict"),
+            (K::Dictionary(_), _) => todo!("dict"),
+            (_, K::Table(_)) => todo!("table"),
+            (K::Table(_), _) => todo!("table"),
             _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc"),
         }
     };
@@ -305,82 +380,135 @@ fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
     Err("length")
   }
 }
+pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
+pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
 pub fn v_flip(x: K) -> Result<K, &'static str> {
   match x {
-    K::Dictionary(k, v) => match (*k, *v) {
-      (K::SymbolArray(k), K::List(v)) => {
-        if v.first().unwrap().len() > 1 && v.iter().map(|k| k.len()).all_equal() {
-          let s: Vec<Series> = std::iter::zip(k.iter(), v.iter())
-            .map(|(k, v)| match v {
-              K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) | K::CharArray(s) => {
-                Series::new(&k.to_string(), s.clone())
-              }
-              _ => panic!("impossible"),
-            })
-            .collect();
-          Ok(K::Table(DataFrame::new(s).unwrap()))
-        } else {
-          todo!("table - mismatched lens")
-        }
+    K::Dictionary(d) => {
+      if d.iter().map(|(_k, v)| v.len()).all_equal() {
+        let cols: Vec<Series> = d
+          .iter()
+          .map(|(k, v)| match v {
+            K::SymbolArray(s)
+            | K::BoolArray(s)
+            | K::IntArray(s)
+            | K::FloatArray(s)
+            | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
+            _ => todo!("handle atoms"),
+          })
+          .collect();
+        Ok(K::Table(DataFrame::new(cols).unwrap()))
+      } else {
+        Err("length")
       }
-      (K::SymbolArray(k), K::IntArray(v)) => {
-        let s = k.iter().nth(0).unwrap();
-        Ok(K::Table(DataFrame::new(vec![Series::new(&s.to_string(), v)]).unwrap()))
-      }
-      (_, _) => {
-        todo!("table - other cases")
-      }
-    },
+    }
     _ => todo!("flip the rest"),
   }
 }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l + r)) }
-pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l - r)) }
-pub fn v_times(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l * r)) }
-pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { len_ok(&l, &r).and_then(|_| Ok(l / r)) }
-pub fn v_bang(r: K) -> Result<K, &'static str> {
-  debug!("v_bang");
+macro_rules! atomicdyad {
+  ($op:tt, $v:ident, $l:ident, $r:ident) => {
+    match ($l, $r) {
+      (K::Dictionary(ld), K::Dictionary(rd)) => {
+        Ok(K::Dictionary(IndexMap::from_iter(ld.keys().chain(rd.keys()).unique().map(|k| {
+          let a = ld.get(k);
+          let b = rd.get(k);
+          match (a, b) {
+            (None, Some(b)) => (k.clone(), b.clone()),
+            (Some(a), None) => (k.clone(), a.clone()),
+            (Some(a), Some(b)) => (k.clone(), $v(a.clone(), b.clone()).unwrap()),
+            (None, None) => panic!("impossible")
+          }
+        }))))
+      }
+      (K::Dictionary(ld), r) => {
+        Ok(K::Dictionary(IndexMap::from_iter(ld.iter().map(|(k,v)| (k.clone(), $v(v.clone(), r.clone()).unwrap())))))
+      }
+      (l, K::Dictionary(rd)) => {
+        Ok(K::Dictionary(IndexMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
+      }
+      (K::List(lv), K::List(rv)) => {
+        Ok(K::List(zip(lv, rv).map(|(x, y)| $v(x.clone(), y.clone()).unwrap()).collect()))
+      }
+      (K::List(lv), r) => {
+        Ok(K::List(lv.iter().map(|x| $v(x.clone(), r.clone()).unwrap()).collect()))
+      }
+      (l, K::List(rv)) => {
+        Ok(K::List(rv.iter().map(|y| $v(l.clone(), y.clone()).unwrap()).collect()))
+      }
+      (l,r) => len_ok(&l, &r).and_then(|_| Ok(l $op r)),
+    }
+  };
+}
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, l, r) }
+pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
+pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, l, r) }
+pub fn v_first(_x: K) -> Result<K, &'static str> { todo!("implement first") }
+pub fn v_times(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(*, v_times, l, r) }
+pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
+pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide,l, r) }
+pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
+pub fn v_mod(_l: K, _r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
+pub fn v_iota(r: K) -> Result<K, &'static str> {
+  debug!("v_iota");
   match r {
     K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
-    _ => todo!("v_bang variants"),
+    _ => todo!("v_iota variants"),
   }
 }
+
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::SymbolArray(_) | K::Symbol(_) => v_makedict(l, r),
+    _ => v_mod(l, r),
+  }
+}
+
+fn strip_quotes(s: String) -> String {
+  if s.starts_with("\"") && s.ends_with("\"") {
+    s[1..s.len() - 1].into()
+  } else {
+    s
+  }
+}
+pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
+  debug!("v_makedict() l: {:?}", l);
+  debug!("v_makedict() r: {:?}", r);
   match l {
     K::SymbolArray(s) => match r {
       K::List(v) => {
         if s.len() == v.len() {
-          Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(K::List(v))))
+          Ok(K::Dictionary(IndexMap::from_iter(zip(
+            s.iter().map(|s| strip_quotes(s.to_string())),
+            v.iter().cloned(),
+          ))))
         } else if v.len() == 1 {
-          Ok(K::Dictionary(
-            Box::new(K::SymbolArray(s.clone())),
-            Box::new(K::List(std::iter::repeat(v[0].clone()).take(s.len()).collect())),
-          ))
+          Ok(K::Dictionary(IndexMap::from_iter(zip(
+            s.iter().map(|s| strip_quotes(s.to_string())),
+            repeat(v[0].clone()),
+          ))))
         } else {
           Err("length")
         }
       }
       K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
-        Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(enlist(r).unwrap())))
+        // `a`b`c!1 2 3 => `a`b`c!(1;2;3)
+        Ok(K::Dictionary(IndexMap::from_iter(zip(
+          s.iter().map(|s| strip_quotes(s.to_string())),
+          k_to_vec(r).unwrap().iter().cloned(),
+        ))))
       }
       _ => {
         if s.len() == 0 {
           Err("length")
         } else if s.len() == 1 {
-          Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(r)))
+          Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
         } else {
-          Ok(K::Dictionary(
-            Box::new(K::SymbolArray(s.clone())),
-            Box::new(K::List(std::iter::repeat(r).take(s.len()).collect())),
-          ))
+          Ok(K::Dictionary(IndexMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), repeat(r)))))
         }
       }
     },
     K::Symbol(s) => match r {
-      _ => Ok(K::Dictionary(
-        Box::new(K::SymbolArray(Series::new("a", [s]).cast(&DataType::Categorical(None)).unwrap())),
-        Box::new(r),
-      )),
+      _ => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
     },
     _ => {
       todo!("modulo")
@@ -391,31 +519,28 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
 pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
 pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
   println!("l: {:?}, r: {:?}", l, r);
-  match l {
-    K::Int(Some(2i64)) => match r {
-      K::Symbol(s) => {
-        let p = Path::new(&s);
-        if p.exists() {
-          match Path::new(&s).extension() {
-            Some(e) => {
-              if e == "csv" {
-                Ok(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap()))
-              } else if e == "parquet" {
-                // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
-                Ok(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap()))
-              } else {
-                todo!("other file types")
-              }
+  match (&l, &r) {
+    (K::Int(Some(2i64)), K::Symbol(s)) => {
+      let p = Path::new(&s);
+      if p.exists() {
+        match Path::new(&s).extension() {
+          Some(e) => {
+            if e == "csv" {
+              Ok(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap()))
+            } else if e == "parquet" {
+              // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
+              Ok(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap()))
+            } else {
+              todo!("other file types")
             }
-            _ => todo!("no extension"),
           }
-        } else {
-          Err("path does not exist")
+          _ => todo!("no extension"),
         }
+      } else {
+        Err("path does not exist")
       }
-      _ => todo!("todo: inner case"),
-    },
-    _ => todo!("todo: other case"),
+    }
+    _ => v_rident(l, r),
   }
 }
 
