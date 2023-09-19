@@ -408,16 +408,22 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
 macro_rules! atomicdyad {
   ($op:tt, $v:ident, $l:ident, $r:ident) => {
     match ($l, $r) {
-        // var r=md(k(3,[]),k(3,[])); kmap(unique(cat(x.k,y.k)), function(k) {
-        //   var a=dget(x,k), b=dget(y,k); dset(r,k,a==NA?b:b==NA?a:recur(a,b,env));
-        // }); return r;
-      (K::Dictionary(_ld), K::Dictionary(_rd)) => todo!("dict dict"),
+      (K::Dictionary(ld), K::Dictionary(rd)) => {
+        Ok(K::Dictionary(IndexMap::from_iter(ld.keys().chain(rd.keys()).unique().map(|k| {
+          let a = ld.get(k);
+          let b = rd.get(k);
+          match (a, b) {
+            (None, Some(b)) => (k.clone(), b.clone()),
+            (Some(a), None) => (k.clone(), a.clone()),
+            (Some(a), Some(b)) => (k.clone(), $v(a.clone(), b.clone()).unwrap()),
+            (None, None) => panic!("impossible")
+          }
+        }))))
+      }
       (K::Dictionary(ld), r) => {
-        // Ok(K::Dictionary(lk.clone(), Box::new($v(*lv.clone(), r.clone()).unwrap())))
         Ok(K::Dictionary(IndexMap::from_iter(ld.iter().map(|(k,v)| (k.clone(), $v(v.clone(), r.clone()).unwrap())))))
       }
       (l, K::Dictionary(rd)) => {
-        // Ok(K::Dictionary(rk.clone(), Box::new($v(l.clone(), *rv.clone()).unwrap())))
         Ok(K::Dictionary(IndexMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
       }
       (K::List(lv), K::List(rv)) => {
@@ -485,7 +491,6 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         }
       }
       K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
-        // Ok(K::Dictionary(Box::new(K::SymbolArray(s)), Box::new(enlist(r).unwrap())))
         // `a`b`c!1 2 3 => `a`b`c!(1;2;3)
         Ok(K::Dictionary(IndexMap::from_iter(zip(
           s.iter().map(|s| strip_quotes(s.to_string())),
@@ -498,16 +503,11 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         } else if s.len() == 1 {
           Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
         } else {
-          // Ok(K::Dictionary(
-          //   Box::new(K::SymbolArray(s.clone())),
-          //   Box::new(K::List(std::iter::repeat(r).take(s.len()).collect())),
-          // ))
           Ok(K::Dictionary(IndexMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), repeat(r)))))
         }
       }
     },
     K::Symbol(s) => match r {
-      // _ => Ok(K::Dictionary( Box::new(K::SymbolArray(Series::new("a", [s]).cast(&DataType::Categorical(None)).unwrap())), Box::new(r),)),
       _ => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
     },
     _ => {

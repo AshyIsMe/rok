@@ -423,16 +423,35 @@ fn test_dict_maths() {
     format!("{:?}", d2)
   );
 
-  // TODO
-  // let k =
-  //   K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
-  // let v = K::List( vec![K::IntArray(arr!([1, 2])), K::IntArray(arr!([2, 3])) ] );
-  // let d1 = v_d_bang(k, v).unwrap();
-  // let d2 = eval(scan("1 2 + `a`b!(0;1)").unwrap()).unwrap();
-  // assert_eq!(
-  //   format!("{:?}", d1),
-  //   format!("{:?}", d2)
-  // );
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List( vec![K::IntArray(arr!([1, 2i64])), K::IntArray(arr!([2, 3i64])) ] );
+  let d1 = v_d_bang(k, v).unwrap();
+  let d2 = eval(scan("1 2 + `a`b!(0;1)").unwrap()).unwrap();
+  assert_eq!(
+    format!("{:?}", KW::Noun(d1)),
+    format!("{:?}", d2)
+  );
+
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::IntArray(arr!([2, 4, 3i64]));
+  let d1 = v_d_bang(k, v).unwrap();
+  let d2 = eval(scan("(`a`b!1 2) + `a`b`c!1 2 3").unwrap()).unwrap();
+  assert_eq!(
+    format!("{:?}", KW::Noun(d1)),
+    format!("{:?}", d2)
+  );
+
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b", "c", "d"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::IntArray(arr!([2, 4, 3, 4i64]));
+  let d1 = v_d_bang(k, v).unwrap();
+  let d2 = eval(scan("(`a`b`c!1 2 3) + `a`b`d!1 2 4").unwrap()).unwrap();
+  assert_eq!(
+    format!("{:?}", KW::Noun(d1)),
+    format!("{:?}", d2)
+  );
 }
 
 #[test]
