@@ -33,13 +33,13 @@ pub enum K {
   Dictionary(IndexMap<String, K>),
   Table(DataFrame),
   //Quote(Box<K>) // Is Quote a noun?
+  Name(String),
 }
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
   Noun(K),
   // Function{ body, args, curry, env }
   // View{ value, r, cache, depends->val }
-  Name(String),
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   // Adverb { name, l(?), verb, r }
@@ -562,8 +562,8 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
         // 1 monad
         apply_primitive(&name, None, x.clone()).and_then(|r| Ok(vec![w, v, r]))
       }
-      (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_)) => {
-        // 2 dyad
+      (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb{..}) => {
+        // 2 dyad (including assignment)
         apply_primitive(&name, Some(x.clone()), y.clone()).and_then(|r| Ok(vec![any, r]))
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
@@ -795,7 +795,7 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
     Some(c) => &code[..c],
     None => code,
   };
-  return Ok((sentence.len(), KW::Name(sentence.into())))
+  return Ok((sentence.len(), KW::Noun(K::Name(sentence.into()))))
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {

@@ -502,6 +502,6 @@ fn test_table_reader() {
 #[test]
 fn test_names() {
   let n1 = scan("abc def foo.bar").unwrap();
-  let n2 = vec![KW::Name("abc".into()),  KW::Name("def".into()), KW::Name("foo.bar".into())];
+  let n2 = vec![KW::Noun(K::Name("abc".into())),  KW::Noun(K::Name("def".into())), KW::Noun(K::Name("foo.bar".into()))];
   assert_eq!(format!("{:?}", n1), format!("{:?}", n2));
 }
