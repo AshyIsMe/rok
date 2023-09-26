@@ -239,7 +239,6 @@ fn test_symbols() {
       ))
     )
   );
-  assert!(scan("`a ` abc").is_err());
 }
 
 #[test]
@@ -498,4 +497,11 @@ fn test_table_reader() {
   assert_eq!(format!("{:?}", t2), format!("{:?}", KW::Noun(t1)));
   fs::remove_file("test.parquet").unwrap();
   
+}
+
+#[test]
+fn test_names() {
+  let n1 = scan("abc def foo.bar").unwrap();
+  let n2 = vec![KW::Name("abc".into()),  KW::Name("def".into()), KW::Name("foo.bar".into())];
+  assert_eq!(format!("{:?}", n1), format!("{:?}", n2));
 }

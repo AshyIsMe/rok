@@ -30,7 +30,7 @@ pub enum K {
   CharArray(Series),
   Nil, // Is Nil a noun?
   List(Vec<K>),
-  Dictionary(IndexMap<String, K>), // TODO use indexmap instead to keep key order. https://docs.rs/indexmap/latest/indexmap/
+  Dictionary(IndexMap<String, K>),
   Table(DataFrame),
   //Quote(Box<K>) // Is Quote a noun?
 }
@@ -39,7 +39,7 @@ pub enum KW /* KWords */ {
   Noun(K),
   // Function{ body, args, curry, env }
   // View{ value, r, cache, depends->val }
-  // NameRef { name, l(index?), r(assignment), global? }
+  Name(String),
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   // Adverb { name, l(?), verb, r }
@@ -647,6 +647,11 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
       | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
       ' ' | '\t' | '\n' => continue,
+      'a'..='z' | 'A'..='Z' => {
+        let (j, k) = scan_name(&code[i..]).unwrap();
+        words.push(k);
+        skip = j;
+    }
       _ => return Err("TODO: scan()"),
     };
   }
@@ -780,6 +785,17 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
       }
     }
   }
+}
+pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
+  // read a single Name
+  // a Name extends until the first symbol character or space
+  let sentence = match code.find(|c: char| {
+    !(c.is_ascii_alphanumeric() || ['.'].contains(&c))
+  }) {
+    Some(c) => &code[..c],
+    None => code,
+  };
+  return Ok((sentence.len(), KW::Name(sentence.into())))
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
