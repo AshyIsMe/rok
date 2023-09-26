@@ -545,6 +545,8 @@ pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
 }
 
 pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
+  // TODO: pass in a mut Environment struct to hold Name references
+  //
   let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
   let mut stack: VecDeque<KW> = VecDeque::new();
 
@@ -553,6 +555,7 @@ pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
     // debug!("stack: {stack:?}");
     // let fragment: Vec<KW> = stack.drain(..4).collect();
     let fragment = get_fragment(&mut stack);
+    // TODO: let fragment = resolve_names(fragment);  // Resolve names (on the RHS of assignment only)
     let result: Result<Vec<KW>, &'static str> = match fragment {
       (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad
