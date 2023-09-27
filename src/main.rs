@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -21,6 +22,8 @@ fn main() {
     rl.load_history(&hf).unwrap();
   }
 
+  let mut env = Env { names: HashMap::new(), parent: None };
+
   loop {
     let readline = rl.readline(" ");
     match readline {
@@ -37,7 +40,7 @@ fn main() {
           let r = scan(&line[2..]).unwrap();
           println!("{r:?}\n");
         } else {
-          let r = eval(scan(&line).unwrap());
+          let r = eval(&mut env, scan(&line).unwrap());
           println!("{r:?}\n");
         }
       }

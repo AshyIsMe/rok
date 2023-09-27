@@ -2,6 +2,7 @@ use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
 use indexmap::IndexMap;
+use std::collections::HashMap;
 use std::fs::File;
 use std::iter::zip;
 use std::path::Path;
@@ -544,9 +545,17 @@ pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn eval(sentence: Vec<KW>) -> Result<KW, &'static str> {
+pub struct Env {
+  pub names: HashMap<String, K>,
+  pub parent: Option<Box<Env>>
+}
+
+pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
   // TODO: pass in a mut Environment struct to hold Name references
   //
+  // TODO: fix
+  env.names.extend([("foo".into(), K::Bool(1u8))]);
+
   let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
   let mut stack: VecDeque<KW> = VecDeque::new();
 
