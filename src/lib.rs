@@ -252,25 +252,13 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
         Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => match (l, r) {
           (Some(KW::Noun(l)), KW::Noun(r)) => {
             if l.len() > 1 {
-              if r.len() > 1 {
-                d_l_l(env, l, r).and_then(|n| Ok(KW::Noun(n)))
-              } else {
-                d_l_a(env, l, r).and_then(|n| Ok(KW::Noun(n)))
-              }
+              (if r.len() > 1 { d_l_l } else { d_l_a })(env, l, r).and_then(|n| Ok(KW::Noun(n)))
             } else {
-              if r.len() > 1 {
-                d_a_l(env, l, r).and_then(|n| Ok(KW::Noun(n)))
-              } else {
-                d_a_a(env, l, r).and_then(|n| Ok(KW::Noun(n)))
-              }
+              (if r.len() > 1 { d_a_l } else { d_a_a })(env, l, r).and_then(|n| Ok(KW::Noun(n)))
             }
           }
           (None, KW::Noun(r)) => {
-            if r.len() > 1 {
-              m_l(r).and_then(|n| Ok(KW::Noun(n)))
-            } else {
-              m_a(r).and_then(|n| Ok(KW::Noun(n)))
-            }
+            (if r.len() > 1 { m_l } else { m_a })(r).and_then(|n| Ok(KW::Noun(n)))
           }
           _ => panic!("impossible"),
         },
@@ -282,25 +270,13 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => match (l, r) {
         (Some(KW::Noun(l)), KW::Noun(r)) => {
           if l.len() > 1 {
-            if r.len() > 1 {
-              d_l_l(l, r).and_then(|n| Ok(KW::Noun(n)))
-            } else {
-              d_l_a(l, r).and_then(|n| Ok(KW::Noun(n)))
-            }
+            (if r.len() > 1 { d_l_l } else { d_l_a })(l, r).and_then(|n| Ok(KW::Noun(n)))
           } else {
-            if r.len() > 1 {
-              d_a_l(l, r).and_then(|n| Ok(KW::Noun(n)))
-            } else {
-              d_a_a(l, r).and_then(|n| Ok(KW::Noun(n)))
-            }
+            (if r.len() > 1 { d_a_l } else { d_a_a })(l, r).and_then(|n| Ok(KW::Noun(n)))
           }
         }
         (None, KW::Noun(r)) => {
-          if r.len() > 1 {
-            m_l(r).and_then(|n| Ok(KW::Noun(n)))
-          } else {
-            m_a(r).and_then(|n| Ok(KW::Noun(n)))
-          }
+          (if r.len() > 1 { m_l } else { m_a })(r).and_then(|n| Ok(KW::Noun(n)))
         }
         _ => {
           panic!("impossible")
@@ -868,7 +844,7 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
     Some(c) => &code[..c],
     None => code,
   };
-  return Ok((sentence.len()-1, KW::Noun(K::Name(sentence.into()))));
+  return Ok((sentence.len() - 1, KW::Noun(K::Name(sentence.into()))));
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
