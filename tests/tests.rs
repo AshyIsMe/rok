@@ -517,7 +517,13 @@ fn test_table_reader() {
 
 #[test]
 fn test_names() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
   let n1 = scan("abc def foo.bar").unwrap();
   let n2 = vec![KW::Noun(K::Name("abc".into())),  KW::Noun(K::Name("def".into())), KW::Noun(K::Name("foo.bar".into()))];
   assert_eq!(format!("{:?}", n1), format!("{:?}", n2));
+
+  assert_eq!(eval(&mut env, scan("a:42").unwrap()).unwrap(), Noun(K::Int(Some(42))));
+  assert_eq!(eval(&mut env, scan("a+a").unwrap()).unwrap(), Noun(K::Int(Some(84))));
+  assert_eq!(eval(&mut env, scan("a:a+a:2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 }
