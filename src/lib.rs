@@ -1,7 +1,7 @@
+use indexmap::IndexMap;
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
-use indexmap::IndexMap;
 use std::collections::HashMap;
 use std::fs::File;
 use std::iter::zip;
@@ -504,7 +504,10 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         } else if s.len() == 1 {
           Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
         } else {
-          Ok(K::Dictionary(IndexMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), repeat(r)))))
+          Ok(K::Dictionary(IndexMap::from_iter(zip(
+            s.iter().map(|s| strip_quotes(s.to_string())),
+            repeat(r),
+          ))))
         }
       }
     },
@@ -518,8 +521,9 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
 }
 
 pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
+// pub fn v_d_colon(env: &mut Env, l: K, r: K) -> Result<K, &'static str> {
 pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
-  println!("l: {:?}, r: {:?}", l, r);
+  debug!("l: {:?}, r: {:?}", l, r);
   match (&l, &r) {
     (K::Int(Some(2i64)), K::Symbol(s)) => {
       let p = Path::new(&s);
@@ -541,20 +545,47 @@ pub fn v_d_colon(l: K, r: K) -> Result<K, &'static str> {
         Err("path does not exist")
       }
     }
+    (K::Name(n), r) => {
+      todo!("env.names.extend([(\"foo\".into(), K::Bool(1u8))]);");
+      Ok(r.clone())
+    }
     _ => v_rident(l, r),
   }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Env {
   pub names: HashMap<String, K>,
-  pub parent: Option<Box<Env>>
+  pub parent: Option<Box<Env>>,
+}
+
+fn resolve_names(env: Env, fragment: (KW, KW, KW, KW)) -> Result<(KW, KW, KW, KW), &'static str> {
+  //Resolve Names only on the RHS of assignment
+  let words = vec![fragment.0.clone(), fragment.1.clone(), fragment.2.clone(), fragment.3.clone()];
+  let mut resolved_words = Vec::new();
+  for w in words.iter().rev() {
+    match w {
+      KW::Verb { name } => match name.as_str() {
+        ":" => break,  // local assignment
+        "::" => break, // global assignment
+        _ => resolved_words.push(w.clone()),
+      },
+      KW::Noun(K::Name(n)) => resolved_words.push(
+        match env.names.get(n) {
+          Some(k) => KW::Noun(k.clone()),
+          None => w.clone(),
+        },
+      ),
+      _ => resolved_words.push(w.clone()),
+    }
+  }
+  resolved_words.reverse();
+  let l = words.len() - resolved_words.len();
+  let new_words = [&words[..l], &resolved_words[..]].concat();
+  Ok(new_words.iter().cloned().collect_tuple().unwrap())
 }
 
 pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
-  // TODO: pass in a mut Environment struct to hold Name references
-  //
-  // TODO: fix
-  env.names.extend([("foo".into(), K::Bool(1u8))]);
 
   let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
   let mut stack: VecDeque<KW> = VecDeque::new();
@@ -563,7 +594,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
   while !converged {
     // debug!("stack: {stack:?}");
     // let fragment: Vec<KW> = stack.drain(..4).collect();
-    let fragment = get_fragment(&mut stack);
+    let fragment = resolve_names(env.clone(), get_fragment(&mut stack)).unwrap();
     // TODO: let fragment = resolve_names(fragment);  // Resolve names (on the RHS of assignment only)
     let result: Result<Vec<KW>, &'static str> = match fragment {
       (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
@@ -574,7 +605,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         // 1 monad
         apply_primitive(&name, None, x.clone()).and_then(|r| Ok(vec![w, v, r]))
       }
-      (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb{..}) => {
+      (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb { .. }) => {
         // 2 dyad (including assignment)
         apply_primitive(&name, Some(x.clone()), y.clone()).and_then(|r| Ok(vec![any, r]))
       }
@@ -663,7 +694,7 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
         let (j, k) = scan_name(&code[i..]).unwrap();
         words.push(k);
         skip = j;
-    }
+      }
       _ => return Err("TODO: scan()"),
     };
   }
@@ -801,13 +832,11 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
 pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
   // read a single Name
   // a Name extends until the first symbol character or space
-  let sentence = match code.find(|c: char| {
-    !(c.is_ascii_alphanumeric() || ['.'].contains(&c))
-  }) {
+  let sentence = match code.find(|c: char| !(c.is_ascii_alphanumeric() || ['.'].contains(&c))) {
     Some(c) => &code[..c],
     None => code,
   };
-  return Ok((sentence.len(), KW::Noun(K::Name(sentence.into()))))
+  return Ok((sentence.len(), KW::Noun(K::Name(sentence.into()))));
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
