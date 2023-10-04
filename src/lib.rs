@@ -247,19 +247,12 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
     ":" => {
       // TODO Clean this up.  Had to special case v_d_colon() with the &mut Env arg to support assignment.
       let colon =
-        Some((v_ident, v_ident, v_d_colon, v_d_colon, v_d_colon, v_d_colon, v_none3, v_none4));
+        Some((v_ident, v_d_colon, v_none3, v_none4));
       match colon {
-        Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => match (l, r) {
-          (Some(KW::Noun(l)), KW::Noun(r)) => {
-            if l.len() > 1 {
-              (if r.len() > 1 { d_l_l } else { d_l_a })(env, l, r).and_then(|n| Ok(KW::Noun(n)))
-            } else {
-              (if r.len() > 1 { d_a_l } else { d_a_a })(env, l, r).and_then(|n| Ok(KW::Noun(n)))
-            }
-          }
-          (None, KW::Noun(r)) => {
-            (if r.len() > 1 { m_l } else { m_a })(r).and_then(|n| Ok(KW::Noun(n)))
-          }
+        Some((m,  d, _triad, _tetrad)) => match (l, r) {
+          (Some(KW::Noun(l)), KW::Noun(r)) => d(env, l, KW::Noun(r)).and_then(|n| Ok(n)),
+          (Some(KW::Noun(l)), r@KW::Verb{..}) => d(env, l, r).and_then(|n| Ok(n)),
+          (None, KW::Noun(r)) => m(r).and_then(|n| Ok(KW::Noun(n))),
           _ => panic!("impossible"),
         },
         _ => panic!("impossible"),
@@ -533,19 +526,19 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
 }
 
 pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
-pub fn v_d_colon(env: &mut Env, l: K, r: K) -> Result<K, &'static str> {
+pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
   debug!("l: {:?}, r: {:?}", l, r);
   match (&l, &r) {
-    (K::Int(Some(2i64)), K::Symbol(s)) => {
+    (K::Int(Some(2i64)), KW::Noun(K::Symbol(s))) => {
       let p = Path::new(&s);
       if p.exists() {
         match Path::new(&s).extension() {
           Some(e) => {
             if e == "csv" {
-              Ok(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap()))
+              Ok(KW::Noun(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap())))
             } else if e == "parquet" {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
-              Ok(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap()))
+              Ok(KW::Noun(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap())))
             } else {
               todo!("other file types")
             }
@@ -560,13 +553,14 @@ pub fn v_d_colon(env: &mut Env, l: K, r: K) -> Result<K, &'static str> {
       env.names.extend([(n.clone(), r.clone())]);
       Ok(r.clone())
     }
-    _ => v_rident(l, r),
+    (_, KW::Noun(r)) => Ok(KW::Noun(v_rident(l, r.clone()).unwrap())),
+    _ => panic!("impossible")
   }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Env {
-  pub names: HashMap<String, K>,
+  pub names: HashMap<String, KW>,
   pub parent: Option<Box<Env>>,
 }
 
@@ -582,7 +576,7 @@ fn resolve_names(env: Env, fragment: (KW, KW, KW, KW)) -> Result<(KW, KW, KW, KW
         _ => resolved_words.push(w.clone()),
       },
       KW::Noun(K::Name(n)) => resolved_words.push(match env.names.get(n) {
-        Some(k) => KW::Noun(k.clone()),
+        Some(k) => k.clone(),
         None => w.clone(),
       }),
       _ => resolved_words.push(w.clone()),

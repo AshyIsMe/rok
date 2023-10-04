@@ -527,3 +527,11 @@ fn test_names() {
   assert_eq!(eval(&mut env, scan("a+a").unwrap()).unwrap(), Noun(K::Int(Some(84))));
   assert_eq!(eval(&mut env, scan("a:a+a:2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 }
+
+#[test]
+fn test_named_verbs() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(eval(&mut env, scan("p:+").unwrap()).unwrap(), Verb{name: "+".into()});
+  assert_eq!(eval(&mut env, scan("2 p 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+}
