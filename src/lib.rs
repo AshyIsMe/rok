@@ -43,7 +43,7 @@ pub enum KW /* KWords */ {
   // View{ value, r, cache, depends->val }
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
-  // Adverb { name, l(?), verb, r }
+  Adverb { name: String },
   // Cond { body: Vec< Vec<K> > } //list of expressions...
   StartOfLine,
   Nothing,
@@ -241,17 +241,17 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
+    ("+/", (v_sum, v_sum, v_d_sum, v_d_sum, v_d_sum, v_d_sum, v_none3, v_none4)),
   ]);
 
   match v {
     ":" => {
       // TODO Clean this up.  Had to special case v_d_colon() with the &mut Env arg to support assignment.
-      let colon =
-        Some((v_ident, v_d_colon, v_none3, v_none4));
+      let colon = Some((v_ident, v_d_colon, v_none3, v_none4));
       match colon {
-        Some((m,  d, _triad, _tetrad)) => match (l, r) {
+        Some((m, d, _triad, _tetrad)) => match (l, r) {
           (Some(KW::Noun(l)), KW::Noun(r)) => d(env, l, KW::Noun(r)).and_then(|n| Ok(n)),
-          (Some(KW::Noun(l)), r@KW::Verb{..}) => d(env, l, r).and_then(|n| Ok(n)),
+          (Some(KW::Noun(l)), r @ KW::Verb { .. }) => d(env, l, r).and_then(|n| Ok(n)),
           (None, KW::Noun(r)) => m(r).and_then(|n| Ok(KW::Noun(n))),
           _ => panic!("impossible"),
         },
@@ -277,6 +277,18 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       },
       None => todo!("NotYetImplemented {}", v),
     },
+  }
+}
+pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
+  // Return a new Verb that implements the appropriate adverb behaviour
+  match l {
+    KW::Verb { name } => match a {
+      "\'" => Ok(KW::Verb { name: name + a }),
+      "/" => Ok(KW::Verb { name: name + a }),
+      "\\" => Ok(KW::Verb { name: name + a }),
+      _ => panic!("invalid adverb"),
+    },
+    _ => panic!("verb required"),
   }
 }
 
@@ -461,6 +473,15 @@ pub fn v_iota(r: K) -> Result<K, &'static str> {
     _ => todo!("v_iota variants"),
   }
 }
+pub fn v_sum(x: K) -> Result<K, &'static str> {
+  match x {
+    K::BoolArray(a) => Ok(K::Int(a.sum())),
+    K::IntArray(a) => Ok(K::Int(a.sum())),
+    K::FloatArray(a) => Ok(K::Float(a.sum().unwrap_or(f64::NAN))),
+    _ => todo!("other types of K"),
+  }
+}
+pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()) }
 
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   match l {
@@ -535,7 +556,9 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
         match Path::new(&s).extension() {
           Some(e) => {
             if e == "csv" {
-              Ok(KW::Noun(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap())))
+              Ok(KW::Noun(K::Table(
+                CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap(),
+              )))
             } else if e == "parquet" {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
               Ok(KW::Noun(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap())))
@@ -554,7 +577,7 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
       Ok(r.clone())
     }
     (_, KW::Noun(r)) => Ok(KW::Noun(v_rident(l, r.clone()).unwrap())),
-    _ => panic!("impossible")
+    _ => panic!("impossible"),
   }
 }
 
@@ -595,9 +618,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
   let mut converged: bool = false;
   while !converged {
     // debug!("stack: {stack:?}");
-    // let fragment: Vec<KW> = stack.drain(..4).collect();
     let fragment = resolve_names(env.clone(), get_fragment(&mut stack)).unwrap();
-    // TODO: let fragment = resolve_names(fragment);  // Resolve names (on the RHS of assignment only)
     let result: Result<Vec<KW>, &'static str> = match fragment {
       (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad
@@ -610,6 +631,10 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
       (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb { .. }) => {
         // 2 dyad (including assignment)
         apply_primitive(env, &name, Some(x.clone()), y.clone()).and_then(|r| Ok(vec![any, r]))
+      }
+      (any_l, x @ KW::Verb { .. }, KW::Adverb { name }, any_r) => {
+        // 3 adverb
+        apply_adverb(&name, x.clone()).and_then(|r| Ok(vec![any_l, r, any_r]))
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
       (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
@@ -690,7 +715,8 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
         skip = j;
       }
       ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
-      | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
+      | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }), // TODO forced monads +: -: etc
+      '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }), // TODO ': /: \:
       ' ' | '\t' | '\n' => continue,
       'a'..='z' | 'A'..='Z' => {
         let (j, k) = scan_name(&code[i..]).unwrap();
