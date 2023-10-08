@@ -67,6 +67,15 @@ impl K {
   }
 }
 
+impl KW {
+  pub fn unwrap_noun<'s>(&'s self) -> K {
+    match self {
+      KW::Noun(n) => n.clone(),
+      _ => panic!("not a noun"),
+    }
+  }
+}
+
 #[macro_export]
 macro_rules! arr {
   ($v:expr) => {
@@ -195,6 +204,9 @@ pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
 
+type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
+type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
+
 pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
   // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
   //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
@@ -244,6 +256,12 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
     ("+/", (v_sum, v_sum, v_d_sum, v_d_sum, v_d_sum, v_d_sum, v_none3, v_none4)),
   ]);
 
+  let adverbs: IndexMap<&str, (AV1, AV2)> = IndexMap::from([
+    ("'", (v_each as AV1, v_d_each as AV2)),
+    ("/", (v_fold, v_d_fold)),
+    ("\\", (v_scan, v_d_scan)),
+  ]);
+
   match v {
     ":" => {
       // TODO Clean this up.  Had to special case v_d_colon() with the &mut Env arg to support assignment.
@@ -275,7 +293,19 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
           panic!("impossible")
         }
       },
-      None => todo!("NotYetImplemented {}", v),
+      None => match adverbs.get(&v[v.len() - 1..]) {
+        Some((m_a, d_a)) => match (l, r) {
+          (Some(KW::Noun(l)), KW::Noun(r)) => {
+            d_a(env, KW::Verb { name: (&v[..v.len() - 1]).to_string() }, l, r)
+              .and_then(|n| Ok(KW::Noun(n)))
+          }
+          (None, KW::Noun(r)) => {
+            m_a(env, KW::Verb { name: (&v[..v.len() - 1]).to_string() }, r).and_then(|n| Ok(KW::Noun(n)))
+          }
+          _ => todo!("other adverb cases"),
+        },
+        None => todo!("NotYetImplemented {}", v),
+      },
     },
   }
 }
@@ -489,6 +519,30 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
     _ => v_mod(l, r),
   }
 }
+
+pub fn v_each(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("each") }
+pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
+pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  // split into list, then reduce
+  if let KW::Verb { name } = v {
+    k_to_vec(x).and_then(|v| {
+      let r = v.iter().reduce(|x, y| {
+        &apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
+          .unwrap()
+          .unwrap_noun()
+      });
+      match r {
+        Some(k) => Ok(k.clone()),
+        None => Err("TODO not sure what this error case is"),
+      }
+    })
+  } else {
+    Err("type")
+  }
+}
+pub fn v_d_fold(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("fold") }
+pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
+pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
 
 fn strip_quotes(s: String) -> String {
   if s.starts_with("\"") && s.ends_with("\"") {
