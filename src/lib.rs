@@ -526,8 +526,8 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce
   if let KW::Verb { name } = v {
     k_to_vec(x).and_then(|v| {
-      let r = v.iter().reduce(|x, y| {
-        &apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
+      let r = v.iter().cloned().reduce(|x, y| {
+        apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
           .unwrap()
           .unwrap_noun()
       });
