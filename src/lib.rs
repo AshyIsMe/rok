@@ -540,7 +540,14 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     Err("type")
   }
 }
-pub fn v_d_fold(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("fold") }
+pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> { 
+  if let KW::Verb { ref name } = v {
+    let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
+    Ok(apply_primitive(env, &name.clone(), Some(KW::Noun(x.clone())), KW::Noun(v_fold(&mut e, v, y).unwrap())).unwrap().unwrap_noun())
+  } else {
+    Err("type")
+  }
+}
 pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
 pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
 

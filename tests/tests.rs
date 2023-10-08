@@ -537,9 +537,15 @@ fn test_named_verbs() {
 }
 
 #[test]
-fn test_sums() {
+fn test_fold() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
   assert_eq!(eval(&mut env, scan("+/ 1 2 3").unwrap()).unwrap(), Noun(K::Int(Some(6))));
   assert_eq!(eval(&mut env, scan("2 +/ 1 2 3").unwrap()).unwrap(), Noun(K::Int(Some(8))));
+
+  assert_eq!(eval(&mut env, scan("+/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(10))));
+  assert_eq!(eval(&mut env, scan("*/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(24))));
+
+  assert_eq!(eval(&mut env, scan("2 +/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(12))));
+  assert_eq!(eval(&mut env, scan("2 */ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
 }
