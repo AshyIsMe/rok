@@ -11,6 +11,5 @@ env_logger = "0.10.0"
 indexmap = { version = "2.0.0", features = ["rayon"] }
 itertools = "0.11.0"
 log = "0.4.19"
-# TODO: turn on "simd" feature. Failing to build on 20230715
-polars = { version = "0.32.1", features = ["performant", "lazy", "parquet", "dtype-categorical"] }
+polars = { version = "0.32.1", features = ["performant", "simd", "lazy", "parquet", "dtype-categorical"] }
 rustyline = "12.0.0"

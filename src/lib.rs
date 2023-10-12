@@ -43,7 +43,7 @@ pub enum KW /* KWords */ {
   // View{ value, r, cache, depends->val }
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
-  // Adverb { name, l(?), verb, r }
+  Adverb { name: String },
   // Cond { body: Vec< Vec<K> > } //list of expressions...
   StartOfLine,
   Nothing,
@@ -53,7 +53,7 @@ pub enum KW /* KWords */ {
 }
 
 impl K {
-  pub fn len<'s>(&'s self) -> usize {
+  pub fn len(&self) -> usize {
     use K::*;
     match self {
       Nil => 0,
@@ -63,6 +63,15 @@ impl K {
       CharArray(a) => a.len(),
       Dictionary(d) => d.len(),
       _ => 1,
+    }
+  }
+}
+
+impl KW {
+  pub fn unwrap_noun(&self) -> K {
+    match self {
+      KW::Noun(n) => n.clone(),
+      _ => panic!("not a noun"),
     }
   }
 }
@@ -82,37 +91,37 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
     K::BoolArray(a) => Ok(
       a.iter()
         .map(|i| {
-          return if i.try_extract::<u8>().is_ok() {
+          if i.try_extract::<u8>().is_ok() {
             K::Bool(i.try_extract::<u8>().unwrap())
           } else {
             panic!("oops")
-          };
+          }
         })
         .collect(),
     ),
     K::IntArray(v) => Ok(
       v.iter()
         .map(|i| {
-          return if i.try_extract::<i64>().is_ok() {
+          if i.try_extract::<i64>().is_ok() {
             K::Int(Some(i.try_extract::<i64>().unwrap()))
           } else if i.is_nested_null() {
             K::Int(None)
           } else {
             panic!("oops")
-          };
+          }
         })
         .collect(),
     ),
     K::FloatArray(v) => Ok(
       v.iter()
         .map(|i| {
-          return if i.try_extract::<f64>().is_ok() {
+          if i.try_extract::<f64>().is_ok() {
             K::Float(i.try_extract::<f64>().unwrap())
           } else if i.is_nested_null() {
             K::Float(f64::NAN)
           } else {
             panic!("oops")
-          };
+          }
         })
         .collect(),
     ),
@@ -195,6 +204,9 @@ pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
 
+type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
+type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
+
 pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
   // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
   //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
@@ -241,18 +253,25 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
+    ("+/", (v_sum, v_sum, v_d_sum, v_d_sum, v_d_sum, v_d_sum, v_none3, v_none4)),
+    // ("*/", (v_product, v_product, v_d_product, v_d_product, v_d_product, v_d_product, v_none3, v_none4)), // TODO
+  ]);
+
+  let adverbs: IndexMap<&str, (AV1, AV2)> = IndexMap::from([
+    ("'", (v_each as AV1, v_d_each as AV2)),
+    ("/", (v_fold, v_d_fold)),
+    ("\\", (v_scan, v_d_scan)),
   ]);
 
   match v {
     ":" => {
       // TODO Clean this up.  Had to special case v_d_colon() with the &mut Env arg to support assignment.
-      let colon =
-        Some((v_ident, v_d_colon, v_none3, v_none4));
+      let colon = Some((v_ident, v_d_colon, v_none3, v_none4));
       match colon {
-        Some((m,  d, _triad, _tetrad)) => match (l, r) {
-          (Some(KW::Noun(l)), KW::Noun(r)) => d(env, l, KW::Noun(r)).and_then(|n| Ok(n)),
-          (Some(KW::Noun(l)), r@KW::Verb{..}) => d(env, l, r).and_then(|n| Ok(n)),
-          (None, KW::Noun(r)) => m(r).and_then(|n| Ok(KW::Noun(n))),
+        Some((m, d, _triad, _tetrad)) => match (l, r) {
+          (Some(KW::Noun(l)), KW::Noun(r)) => d(env, l, KW::Noun(r)),
+          (Some(KW::Noun(l)), r @ KW::Verb { .. }) => d(env, l, r),
+          (None, KW::Noun(r)) => m(r).map(KW::Noun),
           _ => panic!("impossible"),
         },
         _ => panic!("impossible"),
@@ -263,20 +282,43 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => match (l, r) {
         (Some(KW::Noun(l)), KW::Noun(r)) => {
           if l.len() > 1 {
-            (if r.len() > 1 { d_l_l } else { d_l_a })(l, r).and_then(|n| Ok(KW::Noun(n)))
+            (if r.len() > 1 { d_l_l } else { d_l_a })(l, r).map(KW::Noun)
           } else {
-            (if r.len() > 1 { d_a_l } else { d_a_a })(l, r).and_then(|n| Ok(KW::Noun(n)))
+            (if r.len() > 1 { d_a_l } else { d_a_a })(l, r).map(KW::Noun)
           }
         }
         (None, KW::Noun(r)) => {
-          (if r.len() > 1 { m_l } else { m_a })(r).and_then(|n| Ok(KW::Noun(n)))
+          (if r.len() > 1 { m_l } else { m_a })(r).map(KW::Noun)
         }
         _ => {
           panic!("impossible")
         }
       },
-      None => todo!("NotYetImplemented {}", v),
+      None => match adverbs.get(&v[v.len() - 1..]) {
+        Some((m_a, d_a)) => match (l, r) {
+          (Some(KW::Noun(l)), KW::Noun(r)) => {
+            d_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, l, r).map(KW::Noun)
+          }
+          (None, KW::Noun(r)) => {
+            m_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, r).map(KW::Noun)
+          }
+          _ => todo!("other adverb cases"),
+        },
+        None => todo!("NotYetImplemented {}", v),
+      },
     },
+  }
+}
+pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
+  // Return a new Verb that implements the appropriate adverb behaviour
+  match l {
+    KW::Verb { name } => match a {
+      "\'" => Ok(KW::Verb { name: name + a }),
+      "/" => Ok(KW::Verb { name: name + a }),
+      "\\" => Ok(KW::Verb { name: name + a }),
+      _ => panic!("invalid adverb"),
+    },
+    _ => panic!("verb required"),
   }
 }
 
@@ -326,16 +368,16 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
     (K::IntArray(_), K::Bool(r)) => (l, K::IntArray(arr!([*r as i64]))),
-    (K::IntArray(_), K::Int(Some(r))) => (l, K::IntArray(arr!([*r as i64]))),
+    (K::IntArray(_), K::Int(Some(r))) => (l, K::IntArray(arr!([*r]))),
     (K::IntArray(_), K::Int(None)) => (l, K::IntArray(arr!([None::<i64>]))),
-    (K::IntArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::IntArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r]))),
     (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
     (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
     (K::FloatArray(_), K::Bool(r)) => (l, K::FloatArray(arr!([*r as f64]))),
     (K::FloatArray(_), K::Int(Some(r))) => (l, K::FloatArray(arr!([*r as f64]))),
     (K::FloatArray(_), K::Int(None)) => (l, K::FloatArray(arr!([f64::NAN]))),
-    (K::FloatArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::FloatArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r]))),
     (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
     (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
 
@@ -461,6 +503,15 @@ pub fn v_iota(r: K) -> Result<K, &'static str> {
     _ => todo!("v_iota variants"),
   }
 }
+pub fn v_sum(x: K) -> Result<K, &'static str> {
+  match x {
+    K::BoolArray(a) => Ok(K::Int(a.sum())),
+    K::IntArray(a) => Ok(K::Int(a.sum())),
+    K::FloatArray(a) => Ok(K::Float(a.sum().unwrap_or(f64::NAN))),
+    _ => todo!("other types of K"),
+  }
+}
+pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()) }
 
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   match l {
@@ -469,8 +520,39 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
+pub fn v_each(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("each") }
+pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
+pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  // split into list, then reduce
+  if let KW::Verb { name } = v {
+    k_to_vec(x).and_then(|v| {
+      let r = v.iter().cloned().reduce(|x, y| {
+        apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
+          .unwrap()
+          .unwrap_noun()
+      });
+      match r {
+        Some(k) => Ok(k.clone()),
+        None => Err("TODO not sure what this error case is"),
+      }
+    })
+  } else {
+    Err("type")
+  }
+}
+pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> { 
+  if let KW::Verb { ref name } = v {
+    let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
+    Ok(apply_primitive(env, &name.clone(), Some(KW::Noun(x.clone())), KW::Noun(v_fold(&mut e, v, y).unwrap())).unwrap().unwrap_noun())
+  } else {
+    Err("type")
+  }
+}
+pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
+pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
+
 fn strip_quotes(s: String) -> String {
-  if s.starts_with("\"") && s.ends_with("\"") {
+  if s.starts_with('\"') && s.ends_with('\"') {
     s[1..s.len() - 1].into()
   } else {
     s
@@ -516,9 +598,7 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         }
       }
     },
-    K::Symbol(s) => match r {
-      _ => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
-    },
+    K::Symbol(s) => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
     _ => {
       todo!("modulo")
     }
@@ -535,7 +615,9 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
         match Path::new(&s).extension() {
           Some(e) => {
             if e == "csv" {
-              Ok(KW::Noun(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap())))
+              Ok(KW::Noun(K::Table(
+                CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap(),
+              )))
             } else if e == "parquet" {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
               Ok(KW::Noun(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap())))
@@ -554,7 +636,7 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
       Ok(r.clone())
     }
     (_, KW::Noun(r)) => Ok(KW::Noun(v_rident(l, r.clone()).unwrap())),
-    _ => panic!("impossible")
+    _ => panic!("impossible"),
   }
 }
 
@@ -595,21 +677,23 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
   let mut converged: bool = false;
   while !converged {
     // debug!("stack: {stack:?}");
-    // let fragment: Vec<KW> = stack.drain(..4).collect();
     let fragment = resolve_names(env.clone(), get_fragment(&mut stack)).unwrap();
-    // TODO: let fragment = resolve_names(fragment);  // Resolve names (on the RHS of assignment only)
     let result: Result<Vec<KW>, &'static str> = match fragment {
       (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad
-        apply_primitive(env, &name, None, x.clone()).and_then(|r| Ok(vec![w, r, any]))
+        apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, r, any])
       }
       (w, v @ KW::Verb { .. }, KW::Verb { name }, x @ KW::Noun(_)) => {
         // 1 monad
-        apply_primitive(env, &name, None, x.clone()).and_then(|r| Ok(vec![w, v, r]))
+        apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, v, r])
       }
       (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb { .. }) => {
         // 2 dyad (including assignment)
-        apply_primitive(env, &name, Some(x.clone()), y.clone()).and_then(|r| Ok(vec![any, r]))
+        apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
+      }
+      (any_l, x @ KW::Verb { .. }, KW::Adverb { name }, any_r) => {
+        // 3 adverb
+        apply_adverb(&name, x.clone()).map(|r| vec![any_l, r, any_r])
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
       (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
@@ -690,7 +774,8 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
         skip = j;
       }
       ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
-      | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
+      | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }), // TODO forced monads +: -: etc
+      '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }), // TODO ': /: \:
       ' ' | '\t' | '\n' => continue,
       'a'..='z' | 'A'..='Z' => {
         let (j, k) = scan_name(&code[i..]).unwrap();
@@ -738,7 +823,7 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
 
 pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
   // read string, accounting for C style escapes: \", \n, \t, etc
-  if code.chars().nth(0) != Some('"') {
+  if !code.starts_with('"') {
     panic!("called scan_string() on invalid input")
   } else {
     let mut i: usize = 1;
@@ -748,14 +833,14 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
       if code.chars().nth(i) == Some('"') {
         return Ok(match s.len() {
           // Does k really have char atoms?
-          1 => (i, KW::Noun(K::Char(s.chars().nth(0).unwrap()))),
+          1 => (i, KW::Noun(K::Char(s.chars().next().unwrap()))),
           _ => (i, KW::Noun(K::CharArray(Series::new("", &s)))),
         });
       } else if code.chars().nth(i) == Some('\\') {
         match code.chars().nth(i + 1) {
-          Some('\\') => s.push_str("\\"),
-          Some('t') => s.push_str("\t"),
-          Some('n') => s.push_str("\n"),
+          Some('\\') => s.push('\\'),
+          Some('t') => s.push('\t'),
+          Some('n') => s.push('\n'),
           // TODO: handle the rest
           _ => return Err("parse error: invalid string"),
         }
@@ -783,7 +868,7 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     None => code,
   };
 
-  if sentence.chars().nth(0) != Some('`') {
+  if !sentence.starts_with('`') {
     panic!("called scan_symbol() on invalid input")
   } else {
     let mut i: usize = 1;
@@ -804,24 +889,22 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
           s.clear();
         }
         b_in_sym = true;
+      } else if b_in_sym {
+        s.extend(sentence.chars().nth(i));
       } else {
-        if b_in_sym {
-          s.extend(sentence.chars().nth(i));
-        } else {
-          break;
-        }
+        break;
       }
       i += 1;
     }
-    if s.len() > 0 || sentence.chars().nth(sentence.len() - 1) == Some('`') {
+    if !s.is_empty() || sentence.chars().nth(sentence.len() - 1) == Some('`') {
       // catch trailing empty symbol eg: `a`b`c` (SymbolArray(["a","b","c",""]))
       ss.extend(vec![s.clone()]);
     }
     match ss.len() {
       0 => panic!("wat - invalid scansymbol()"),
-      1 => return Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
+      1 => Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
       _ => {
-        return Ok((
+        Ok((
           i - 1,
           KW::Noun(K::SymbolArray(
             Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap(),
@@ -838,7 +921,7 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
     Some(c) => &code[..c],
     None => code,
   };
-  return Ok((sentence.len() - 1, KW::Noun(K::Name(sentence.into()))));
+  Ok((sentence.len() - 1, KW::Noun(K::Name(sentence.into()))))
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
