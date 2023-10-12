@@ -254,6 +254,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
     ("+/", (v_sum, v_sum, v_d_sum, v_d_sum, v_d_sum, v_d_sum, v_none3, v_none4)),
+    // ("*/", (v_product, v_product, v_d_product, v_d_product, v_d_product, v_d_product, v_none3, v_none4)), // TODO
   ]);
 
   let adverbs: IndexMap<&str, (AV1, AV2)> = IndexMap::from([
