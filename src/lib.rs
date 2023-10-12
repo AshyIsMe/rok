@@ -53,7 +53,7 @@ pub enum KW /* KWords */ {
 }
 
 impl K {
-  pub fn len<'s>(&'s self) -> usize {
+  pub fn len(&self) -> usize {
     use K::*;
     match self {
       Nil => 0,
@@ -68,7 +68,7 @@ impl K {
 }
 
 impl KW {
-  pub fn unwrap_noun<'s>(&'s self) -> K {
+  pub fn unwrap_noun(&self) -> K {
     match self {
       KW::Noun(n) => n.clone(),
       _ => panic!("not a noun"),
@@ -91,37 +91,37 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
     K::BoolArray(a) => Ok(
       a.iter()
         .map(|i| {
-          return if i.try_extract::<u8>().is_ok() {
+          if i.try_extract::<u8>().is_ok() {
             K::Bool(i.try_extract::<u8>().unwrap())
           } else {
             panic!("oops")
-          };
+          }
         })
         .collect(),
     ),
     K::IntArray(v) => Ok(
       v.iter()
         .map(|i| {
-          return if i.try_extract::<i64>().is_ok() {
+          if i.try_extract::<i64>().is_ok() {
             K::Int(Some(i.try_extract::<i64>().unwrap()))
           } else if i.is_nested_null() {
             K::Int(None)
           } else {
             panic!("oops")
-          };
+          }
         })
         .collect(),
     ),
     K::FloatArray(v) => Ok(
       v.iter()
         .map(|i| {
-          return if i.try_extract::<f64>().is_ok() {
+          if i.try_extract::<f64>().is_ok() {
             K::Float(i.try_extract::<f64>().unwrap())
           } else if i.is_nested_null() {
             K::Float(f64::NAN)
           } else {
             panic!("oops")
-          };
+          }
         })
         .collect(),
     ),
@@ -268,9 +268,9 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       let colon = Some((v_ident, v_d_colon, v_none3, v_none4));
       match colon {
         Some((m, d, _triad, _tetrad)) => match (l, r) {
-          (Some(KW::Noun(l)), KW::Noun(r)) => d(env, l, KW::Noun(r)).and_then(|n| Ok(n)),
-          (Some(KW::Noun(l)), r @ KW::Verb { .. }) => d(env, l, r).and_then(|n| Ok(n)),
-          (None, KW::Noun(r)) => m(r).and_then(|n| Ok(KW::Noun(n))),
+          (Some(KW::Noun(l)), KW::Noun(r)) => d(env, l, KW::Noun(r)),
+          (Some(KW::Noun(l)), r @ KW::Verb { .. }) => d(env, l, r),
+          (None, KW::Noun(r)) => m(r).map(KW::Noun),
           _ => panic!("impossible"),
         },
         _ => panic!("impossible"),
@@ -281,13 +281,13 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => match (l, r) {
         (Some(KW::Noun(l)), KW::Noun(r)) => {
           if l.len() > 1 {
-            (if r.len() > 1 { d_l_l } else { d_l_a })(l, r).and_then(|n| Ok(KW::Noun(n)))
+            (if r.len() > 1 { d_l_l } else { d_l_a })(l, r).map(KW::Noun)
           } else {
-            (if r.len() > 1 { d_a_l } else { d_a_a })(l, r).and_then(|n| Ok(KW::Noun(n)))
+            (if r.len() > 1 { d_a_l } else { d_a_a })(l, r).map(KW::Noun)
           }
         }
         (None, KW::Noun(r)) => {
-          (if r.len() > 1 { m_l } else { m_a })(r).and_then(|n| Ok(KW::Noun(n)))
+          (if r.len() > 1 { m_l } else { m_a })(r).map(KW::Noun)
         }
         _ => {
           panic!("impossible")
@@ -296,11 +296,10 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       None => match adverbs.get(&v[v.len() - 1..]) {
         Some((m_a, d_a)) => match (l, r) {
           (Some(KW::Noun(l)), KW::Noun(r)) => {
-            d_a(env, KW::Verb { name: (&v[..v.len() - 1]).to_string() }, l, r)
-              .and_then(|n| Ok(KW::Noun(n)))
+            d_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, l, r).map(KW::Noun)
           }
           (None, KW::Noun(r)) => {
-            m_a(env, KW::Verb { name: (&v[..v.len() - 1]).to_string() }, r).and_then(|n| Ok(KW::Noun(n)))
+            m_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, r).map(KW::Noun)
           }
           _ => todo!("other adverb cases"),
         },
@@ -368,16 +367,16 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
     (K::IntArray(_), K::Bool(r)) => (l, K::IntArray(arr!([*r as i64]))),
-    (K::IntArray(_), K::Int(Some(r))) => (l, K::IntArray(arr!([*r as i64]))),
+    (K::IntArray(_), K::Int(Some(r))) => (l, K::IntArray(arr!([*r]))),
     (K::IntArray(_), K::Int(None)) => (l, K::IntArray(arr!([None::<i64>]))),
-    (K::IntArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::IntArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r]))),
     (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
     (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
     (K::FloatArray(_), K::Bool(r)) => (l, K::FloatArray(arr!([*r as f64]))),
     (K::FloatArray(_), K::Int(Some(r))) => (l, K::FloatArray(arr!([*r as f64]))),
     (K::FloatArray(_), K::Int(None)) => (l, K::FloatArray(arr!([f64::NAN]))),
-    (K::FloatArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r as f64]))),
+    (K::FloatArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r]))),
     (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
     (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
 
@@ -552,7 +551,7 @@ pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!(
 pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
 
 fn strip_quotes(s: String) -> String {
-  if s.starts_with("\"") && s.ends_with("\"") {
+  if s.starts_with('\"') && s.ends_with('\"') {
     s[1..s.len() - 1].into()
   } else {
     s
@@ -598,9 +597,7 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         }
       }
     },
-    K::Symbol(s) => match r {
-      _ => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
-    },
+    K::Symbol(s) => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
     _ => {
       todo!("modulo")
     }
@@ -683,19 +680,19 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
     let result: Result<Vec<KW>, &'static str> = match fragment {
       (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad
-        apply_primitive(env, &name, None, x.clone()).and_then(|r| Ok(vec![w, r, any]))
+        apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, r, any])
       }
       (w, v @ KW::Verb { .. }, KW::Verb { name }, x @ KW::Noun(_)) => {
         // 1 monad
-        apply_primitive(env, &name, None, x.clone()).and_then(|r| Ok(vec![w, v, r]))
+        apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, v, r])
       }
       (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb { .. }) => {
         // 2 dyad (including assignment)
-        apply_primitive(env, &name, Some(x.clone()), y.clone()).and_then(|r| Ok(vec![any, r]))
+        apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }
       (any_l, x @ KW::Verb { .. }, KW::Adverb { name }, any_r) => {
         // 3 adverb
-        apply_adverb(&name, x.clone()).and_then(|r| Ok(vec![any_l, r, any_r]))
+        apply_adverb(&name, x.clone()).map(|r| vec![any_l, r, any_r])
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
       (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
@@ -825,7 +822,7 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
 
 pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
   // read string, accounting for C style escapes: \", \n, \t, etc
-  if code.chars().nth(0) != Some('"') {
+  if !code.starts_with('"') {
     panic!("called scan_string() on invalid input")
   } else {
     let mut i: usize = 1;
@@ -835,14 +832,14 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
       if code.chars().nth(i) == Some('"') {
         return Ok(match s.len() {
           // Does k really have char atoms?
-          1 => (i, KW::Noun(K::Char(s.chars().nth(0).unwrap()))),
+          1 => (i, KW::Noun(K::Char(s.chars().next().unwrap()))),
           _ => (i, KW::Noun(K::CharArray(Series::new("", &s)))),
         });
       } else if code.chars().nth(i) == Some('\\') {
         match code.chars().nth(i + 1) {
-          Some('\\') => s.push_str("\\"),
-          Some('t') => s.push_str("\t"),
-          Some('n') => s.push_str("\n"),
+          Some('\\') => s.push('\\'),
+          Some('t') => s.push('\t'),
+          Some('n') => s.push('\n'),
           // TODO: handle the rest
           _ => return Err("parse error: invalid string"),
         }
@@ -870,7 +867,7 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     None => code,
   };
 
-  if sentence.chars().nth(0) != Some('`') {
+  if !sentence.starts_with('`') {
     panic!("called scan_symbol() on invalid input")
   } else {
     let mut i: usize = 1;
@@ -891,24 +888,22 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
           s.clear();
         }
         b_in_sym = true;
+      } else if b_in_sym {
+        s.extend(sentence.chars().nth(i));
       } else {
-        if b_in_sym {
-          s.extend(sentence.chars().nth(i));
-        } else {
-          break;
-        }
+        break;
       }
       i += 1;
     }
-    if s.len() > 0 || sentence.chars().nth(sentence.len() - 1) == Some('`') {
+    if !s.is_empty() || sentence.chars().nth(sentence.len() - 1) == Some('`') {
       // catch trailing empty symbol eg: `a`b`c` (SymbolArray(["a","b","c",""]))
       ss.extend(vec![s.clone()]);
     }
     match ss.len() {
       0 => panic!("wat - invalid scansymbol()"),
-      1 => return Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
+      1 => Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
       _ => {
-        return Ok((
+        Ok((
           i - 1,
           KW::Noun(K::SymbolArray(
             Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap(),
@@ -925,7 +920,7 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
     Some(c) => &code[..c],
     None => code,
   };
-  return Ok((sentence.len() - 1, KW::Noun(K::Name(sentence.into()))));
+  Ok((sentence.len() - 1, KW::Noun(K::Name(sentence.into()))))
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
