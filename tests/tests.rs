@@ -549,3 +549,27 @@ fn test_fold() {
   assert_eq!(eval(&mut env, scan("2 +/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(12))));
   assert_eq!(eval(&mut env, scan("2 */ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
 }
+
+#[test]
+fn test_functions() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(eval(&mut env, scan("{x+y}[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+
+  eval(&mut env, scan("f:{x+y}").unwrap()).unwrap();
+  assert_eq!(eval(&mut env, scan("f[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+}
+
+#[test]
+fn test_funcargs() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(eval(&mut env, scan("+[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+
+  eval(&mut env, scan("p:+").unwrap()).unwrap();
+  assert_eq!(eval(&mut env, scan("p[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+  
+  eval(&mut env, scan("f:{[x;y]x+y}").unwrap()).unwrap();
+  assert_eq!(eval(&mut env, scan("f[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+
+  eval(&mut env, scan("f:{[a;b;c]a+b+c}").unwrap()).unwrap();
+  assert_eq!(eval(&mut env, scan("f[2;2;2]").unwrap()).unwrap(), Noun(K::Int(Some(6))));
+}
