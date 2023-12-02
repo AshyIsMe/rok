@@ -44,11 +44,12 @@ pub enum KW /* KWords */ {
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   Adverb { name: String },
+  Exprs(Vec<KW>), // list of expressions: [e1;e2;e3]
   // Cond { body: Vec< Vec<K> > } //list of expressions...
   StartOfLine,
   Nothing,
-  LP,
-  RP,
+  LP, // (
+  RP, // )
   SC, // semicolon
 }
 
@@ -287,9 +288,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
             (if r.len() > 1 { d_a_l } else { d_a_a })(l, r).map(KW::Noun)
           }
         }
-        (None, KW::Noun(r)) => {
-          (if r.len() > 1 { m_l } else { m_a })(r).map(KW::Noun)
-        }
+        (None, KW::Noun(r)) => (if r.len() > 1 { m_l } else { m_a })(r).map(KW::Noun),
         _ => {
           panic!("impossible")
         }
@@ -540,10 +539,19 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     Err("type")
   }
 }
-pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> { 
+pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
   if let KW::Verb { ref name } = v {
     let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
-    Ok(apply_primitive(env, &name.clone(), Some(KW::Noun(x.clone())), KW::Noun(v_fold(&mut e, v, y).unwrap())).unwrap().unwrap_noun())
+    Ok(
+      apply_primitive(
+        env,
+        &name.clone(),
+        Some(KW::Noun(x.clone())),
+        KW::Noun(v_fold(&mut e, v, y).unwrap()),
+      )
+      .unwrap()
+      .unwrap_noun(),
+    )
   } else {
     Err("type")
   }
@@ -754,6 +762,11 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     match c {
       '(' => words.push(KW::LP),
       ')' => words.push(KW::RP),
+      '[' => {
+        let (j, k) = scan_exprs(&code[i..]).unwrap();
+        words.push(k);
+        skip = j;
+      }
       ';' => words.push(KW::SC),
       '0'..='9' | '-' => {
         if let Ok((j, k)) = scan_number(&code[i..]) {
@@ -903,14 +916,10 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     match ss.len() {
       0 => panic!("wat - invalid scansymbol()"),
       1 => Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
-      _ => {
-        Ok((
-          i - 1,
-          KW::Noun(K::SymbolArray(
-            Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap(),
-          )),
-        ))
-      }
+      _ => Ok((
+        i - 1,
+        KW::Noun(K::SymbolArray(Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap())),
+      )),
     }
   }
 }
@@ -922,6 +931,10 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
     None => code,
   };
   Ok((sentence.len() - 1, KW::Noun(K::Name(sentence.into()))))
+}
+
+pub fn scan_exprs(code: &str) -> Result<(usize, KW), &'static str> {
+  todo!("scan_exprs: v1[e1;e2;e3]")
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
