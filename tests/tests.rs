@@ -553,14 +553,14 @@ fn test_fold() {
 #[test]
 fn test_functions() {
   let mut env = Env { names: HashMap::new(), parent: None };
-  assert_eq!(eval(&mut env, scan("{x+y}[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+  assert_eq!(eval(&mut env, scan("{2 * x} 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 
-  eval(&mut env, scan("f:{x+y}").unwrap()).unwrap();
-  assert_eq!(eval(&mut env, scan("f[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+  eval(&mut env, scan("f:{2 * x}").unwrap()).unwrap();
+  assert_eq!(eval(&mut env, scan("f 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 }
 
 #[test]
-fn test_funcargs() {
+fn test_expr_funcargs() {
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("+[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 
