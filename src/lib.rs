@@ -36,10 +36,12 @@ pub enum K {
   //Quote(Box<K>) // Is Quote a noun?
   Name(String),
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
   Noun(K),
-  // Function{ body, args, curry, env }
+  // Function: {x + y}. args is Vec<K::Name>
+  Function { body: String, args: Vec<K> }, //, curry, env } // TODO currying and env closure?
   // View{ value, r, cache, depends->val }
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
@@ -48,9 +50,11 @@ pub enum KW /* KWords */ {
   // Cond { body: Vec< Vec<K> > } //list of expressions...
   StartOfLine,
   Nothing,
-  LP, // (
-  RP, // )
-  SC, // semicolon
+  LP,  // (
+  RP,  // )
+  LCB, // {
+  RCB, // }
+  SC,  // semicolon
 }
 
 impl K {
@@ -762,6 +766,8 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     match c {
       '(' => words.push(KW::LP),
       ')' => words.push(KW::RP),
+      '{' => words.push(KW::LCB),
+      '}' => words.push(KW::RCB),
       '[' => {
         let (j, k) = scan_exprs(&code[i..]).unwrap();
         words.push(k);
