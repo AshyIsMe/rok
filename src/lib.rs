@@ -41,7 +41,7 @@ pub enum K {
 pub enum KW /* KWords */ {
   Noun(K),
   // Function: {x + y}. args is Vec<K::Name>
-  Function { body: String, args: Vec<K> }, //, curry, env } // TODO currying and env closure?
+  Function { body: Vec<KW>, args: Vec<K> }, //, curry, env } // TODO currying and env closure?
   // View{ value, r, cache, depends->val }
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
@@ -724,6 +724,18 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
           Err("invalid list syntax")
         }
       }
+      (w1, w2, w3, KW::RCB) => {
+        queue.push_back(w1);
+        queue.push_back(w2);
+        queue.push_back(w3);
+        match parse_function_def(queue.clone()) {
+          Ok((q, f)) => {
+            queue = q;
+            Ok(vec![f])
+          }
+          Err(e) => Err(e)
+        }
+      },
       (w1, w2, w3, w4) => match queue.pop_back() {
         Some(v) => Ok(vec![v, w1.clone(), w2.clone(), w3.clone(), w4.clone()]),
         None => {
@@ -753,6 +765,12 @@ fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
     .chain(repeat(KW::Nothing))
     .next_tuple()
     .expect("infinite iterator can't be empty")
+}
+
+fn parse_function_def(_queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> { // Result<(queue, KW::Function{...})
+  // Parse a function definition off the back of the queue, Eg:
+  // parse_function_def([f: {x*2}]) => Ok(([f:], KW::Function{body:"x*2", args: vec![]}))
+  todo!("collect_function_def()")
 }
 
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
@@ -939,7 +957,7 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
   Ok((sentence.len() - 1, KW::Noun(K::Name(sentence.into()))))
 }
 
-pub fn scan_exprs(code: &str) -> Result<(usize, KW), &'static str> {
+pub fn scan_exprs(_code: &str) -> Result<(usize, KW), &'static str> {
   todo!("scan_exprs: v1[e1;e2;e3]")
 }
 
