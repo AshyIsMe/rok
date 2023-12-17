@@ -549,7 +549,14 @@ fn test_fold() {
 fn test_parse_functions() {
   // See https://estradajke.github.io/k9-simples/k9/User-Functions.html
   //
-  let f = KW::Function{body: vec![KW::Noun(K::Int(Some(2))), KW::Verb{name: "*".to_string()}], args: vec![K::Name("x".to_string())]};
+  let f = KW::Function {
+    body: vec![
+      KW::Noun(K::Int(Some(2))),
+      KW::Verb { name: "*".to_string() },
+      KW::Noun(K::Name("x".to_string())),
+    ],
+    args: vec![K::Name("x".to_string())],
+  };
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("{2 * x}").unwrap()).unwrap(), f);
 

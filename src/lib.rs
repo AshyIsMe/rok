@@ -733,9 +733,9 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
             queue = q;
             Ok(vec![f])
           }
-          Err(e) => Err(e)
+          Err(e) => Err(e),
         }
-      },
+      }
       (w1, w2, w3, w4) => match queue.pop_back() {
         Some(v) => Ok(vec![v, w1.clone(), w2.clone(), w3.clone(), w4.clone()]),
         None => {
@@ -767,25 +767,29 @@ fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
     .expect("infinite iterator can't be empty")
 }
 
-fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> { // Result<(queue, KW::Function{...})
+fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
+  // Result<(queue, KW::Function{...})
   // Parse a function definition off the back of the queue, Eg:
   // parse_function_def([f: {x*2}]) => Ok(([f:], KW::Function{body:"x*2", args: vec![]}))
   let mut depth = 0; // nested functions depth
   debug!("queue: {:?}", queue);
-  for i in (queue.len()-1)..0 {
-    debug!("{:?}, {}, {}", queue, depth, i);
+  for i in (0..queue.len()).rev() {
+    debug!("queue: {:?}, depth: {}, i: {}", queue, depth, i);
     match queue.get(i) {
-      Some(KW::RCB) => depth+=1,
-      Some(KW::LCB) => match depth{
-        0=> {
-          let body: Vec<KW> = queue.range(i+1..).cloned().collect();
+      Some(KW::RCB) => depth += 1,
+      Some(KW::LCB) => match depth {
+        0 => {
+          let body: Vec<KW> = queue.range(i + 1..).cloned().collect();
           let args = vec![K::Name("x".to_string())]; // AA TODO find the args dynamically
-          return Ok((queue.range(0..i).cloned().collect(), KW::Function { body: body, args: args }));
+          return Ok((
+            queue.range(0..i).cloned().collect(),
+            KW::Function { body: body, args: args },
+          ));
         }
-        _ => depth-=1
-      }
+        _ => depth -= 1,
+      },
       Some(_) => continue,
-      None => panic!("impossible")
+      None => panic!("impossible"),
     }
   }
   Err("parse error: mismatched brackets")
