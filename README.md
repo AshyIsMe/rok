@@ -13,3 +13,11 @@ oK.js is under 1k lines of javascript, can we do the same in under 1k lines of r
 * https://github.com/razetime/ngn-k-tutorial/blob/main/01-intro.md
 * https://k.miraheze.org/wiki/Main_Page
 
+
+## debug run
+
+```
+RUST_LOG=rok=debug cargo run
+```
+
+
