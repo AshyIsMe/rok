@@ -767,10 +767,28 @@ fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
     .expect("infinite iterator can't be empty")
 }
 
-fn parse_function_def(_queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> { // Result<(queue, KW::Function{...})
+fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> { // Result<(queue, KW::Function{...})
   // Parse a function definition off the back of the queue, Eg:
   // parse_function_def([f: {x*2}]) => Ok(([f:], KW::Function{body:"x*2", args: vec![]}))
-  todo!("collect_function_def()")
+  let mut depth = 0; // nested functions depth
+  debug!("queue: {:?}", queue);
+  for i in (queue.len()-1)..0 {
+    debug!("{:?}, {}, {}", queue, depth, i);
+    match queue.get(i) {
+      Some(KW::RCB) => depth+=1,
+      Some(KW::LCB) => match depth{
+        0=> {
+          let body: Vec<KW> = queue.range(i+1..).cloned().collect();
+          let args = vec![K::Name("x".to_string())]; // AA TODO find the args dynamically
+          return Ok((queue.range(0..i).cloned().collect(), KW::Function { body: body, args: args }));
+        }
+        _ => depth-=1
+      }
+      Some(_) => continue,
+      None => panic!("impossible")
+    }
+  }
+  Err("parse error: mismatched brackets")
 }
 
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
