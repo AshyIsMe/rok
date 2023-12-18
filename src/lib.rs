@@ -274,8 +274,9 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       let colon = Some((v_ident, v_d_colon, v_none3, v_none4));
       match colon {
         Some((m, d, _triad, _tetrad)) => match (l, r) {
-          (Some(KW::Noun(l)), KW::Noun(r)) => d(env, l, KW::Noun(r)),
-          (Some(KW::Noun(l)), r @ KW::Verb { .. }) => d(env, l, r),
+          (Some(KW::Noun(l)), r @ KW::Noun(_) | r @ KW::Verb { .. } | r @ KW::Function { .. }) => {
+            d(env, l, r)
+          }
           (None, KW::Noun(r)) => m(r).map(KW::Noun),
           _ => panic!("impossible"),
         },
@@ -699,7 +700,12 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         // 1 monad
         apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, v, r])
       }
-      (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb { .. }) => {
+      (
+        any,
+        x @ KW::Noun(_),
+        KW::Verb { name },
+        y @ KW::Noun(_) | y @ KW::Verb { .. } | y @ KW::Function { .. },
+      ) => {
         // 2 dyad (including assignment)
         apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }

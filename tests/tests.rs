@@ -559,13 +559,9 @@ fn test_parse_functions() {
   };
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("{2 * x}").unwrap()).unwrap(), f);
-
-  eval(&mut env, scan("f:{2 * x}").unwrap()).unwrap();
-  assert_eq!(eval(&mut env, scan("f 2").unwrap()).unwrap(), f);
 }
 
 #[test]
-#[ignore] // not yet implemented
 fn test_functions() {
   // See https://estradajke.github.io/k9-simples/k9/User-Functions.html
   //
