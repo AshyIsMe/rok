@@ -325,6 +325,22 @@ pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
     _ => panic!("verb required"),
   }
 }
+pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str> {
+  match f {
+    KW::Function { body, args } => match arg {
+      KW::Noun(x) => {
+        // TODO This will lose names if the function does global assignment
+        let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
+        // TODO don't hard code x here. Eg. {[foo] foo * 2} is a valid function
+        e.names.extend([("x".to_string(), KW::Noun(x.clone()))]);
+        eval(&mut e, body)
+      }
+      KW::Exprs(args) => todo!("apply_function [args]"),
+      _ => todo!("apply_function other cases"),
+    },
+    _ => panic!("impossible"),
+  }
+}
 
 // promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
 // Similar to promote_num() can we combine these somehow and be more concise?
@@ -699,6 +715,21 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
       (w, v @ KW::Verb { .. }, KW::Verb { name }, x @ KW::Noun(_)) => {
         // 1 monad
         apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, v, r])
+      }
+      (w, f @ KW::Function { .. }, x @ KW::Noun(_), any)
+        if matches!(w, KW::StartOfLine | KW::LP) =>
+      {
+        // 0 monad function
+        apply_function(env, f, x.clone()).map(|r| vec![w, r, any])
+      }
+      (
+        w,
+        v @ KW::Verb { .. } | v @ KW::Function { .. },
+        f @ KW::Function { .. },
+        x @ KW::Noun(_),
+      ) => {
+        // 1 monad function
+        apply_function(env, f, x.clone()).map(|r| vec![w, v, r])
       }
       (
         any,
