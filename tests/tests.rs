@@ -555,7 +555,7 @@ fn test_parse_functions() {
       KW::Verb { name: "*".to_string() },
       KW::Noun(K::Name("x".to_string())),
     ],
-    args: vec![K::Name("x".to_string())],
+    args: vec!["x".to_string()],
   };
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("{2 * x}").unwrap()).unwrap(), f);

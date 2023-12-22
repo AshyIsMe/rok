@@ -41,7 +41,7 @@ pub enum K {
 pub enum KW /* KWords */ {
   Noun(K),
   // Function: {x + y}. args is Vec<K::Name>
-  Function { body: Vec<KW>, args: Vec<K> }, //, curry, env } // TODO currying and env closure?
+  Function { body: Vec<KW>, args: Vec<String> }, //, curry, env } // TODO currying and env closure?
   // View{ value, r, cache, depends->val }
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
@@ -54,6 +54,8 @@ pub enum KW /* KWords */ {
   RP,  // )
   LCB, // {
   RCB, // }
+  LB,  // [
+  RB,  // ]
   SC,  // semicolon
 }
 
@@ -329,13 +331,17 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
   match f {
     KW::Function { body, args } => match arg {
       KW::Noun(x) => {
-        // TODO This will lose names if the function does global assignment
-        let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
-        // TODO don't hard code x here. Eg. {[foo] foo * 2} is a valid function
-        e.names.extend([("x".to_string(), KW::Noun(x.clone()))]);
-        eval(&mut e, body)
+        match args.len() {
+          1 => {
+            // TODO This will lose names if the function does global assignment
+            let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
+            e.names.extend([(args[0].clone(), KW::Noun(x.clone()))]);
+            eval(&mut e, body)
+          }
+          _ => todo!("currying"),
+        }
       }
-      KW::Exprs(args) => todo!("apply_function [args]"),
+      KW::Exprs(_args) => todo!("apply_function [args]"),
       _ => todo!("apply_function other cases"),
     },
     _ => panic!("impossible"),
@@ -817,7 +823,7 @@ fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'stati
       Some(KW::LCB) => match depth {
         0 => {
           let body: Vec<KW> = queue.range(i + 1..).cloned().collect();
-          let args = vec![K::Name("x".to_string())]; // AA TODO find the args dynamically
+          let args = parse_function_args(body.clone());
           return Ok((
             queue.range(0..i).cloned().collect(),
             KW::Function { body: body, args: args },
@@ -830,6 +836,27 @@ fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'stati
     }
   }
   Err("parse error: mismatched brackets")
+}
+
+fn parse_function_args(body: Vec<KW>) -> Vec<String> {
+  if let Some(KW::LB) = body.first() {
+    // TODO
+    // - {[a;b;c] a+b+c}
+    // - {[a;b] {x+y}[a;b]} // nested functions also need to work
+    todo!("named args")
+  } else {
+    // - {x + y + z} or {z * x + y} => vec!["x","y","z"]
+    if body.contains(&KW::LCB) {
+      todo!("handle nested functions properly");
+    }
+    let mut args: Vec<String> = body
+      .iter()
+      .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+      .unique()
+      .collect();
+    args.sort();
+    args
+  }
 }
 
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
@@ -845,11 +872,14 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       ')' => words.push(KW::RP),
       '{' => words.push(KW::LCB),
       '}' => words.push(KW::RCB),
-      '[' => {
-        let (j, k) = scan_exprs(&code[i..]).unwrap();
-        words.push(k);
-        skip = j;
-      }
+      '[' => words.push(KW::LB),
+      ']' => words.push(KW::RB),
+      // TODO Remove this
+      // '[' => {
+      //   let (j, k) = scan_exprs(&code[i..]).unwrap();
+      //   words.push(k);
+      //   skip = j;
+      // }
       ';' => words.push(KW::SC),
       '0'..='9' | '-' => {
         if let Ok((j, k)) = scan_number(&code[i..]) {
@@ -1017,6 +1047,7 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
 }
 
 pub fn scan_exprs(_code: &str) -> Result<(usize, KW), &'static str> {
+  // TODO possibly not needed
   todo!("scan_exprs: v1[e1;e2;e3]")
 }
 
