@@ -822,12 +822,8 @@ fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'stati
       Some(KW::RCB) => depth += 1,
       Some(KW::LCB) => match depth {
         0 => {
-          let body: Vec<KW> = queue.range(i + 1..).cloned().collect();
-          let args = parse_function_args(body.clone());
-          return Ok((
-            queue.range(0..i).cloned().collect(),
-            KW::Function { body: body, args: args },
-          ));
+          let (args, body) = parse_function_args(queue.range(i + 1..).cloned().collect())?;
+          return Ok((queue.range(0..i).cloned().collect(), KW::Function { body, args }));
         }
         _ => depth -= 1,
       },
@@ -838,12 +834,25 @@ fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'stati
   Err("parse error: mismatched brackets")
 }
 
-fn parse_function_args(body: Vec<KW>) -> Vec<String> {
+fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static str> {
   if let Some(KW::LB) = body.first() {
     // TODO
-    // - {[a;b;c] a+b+c}
     // - {[a;b] {x+y}[a;b]} // nested functions also need to work
-    todo!("named args")
+    match body.iter().position(|kw| matches!(kw, KW::RB)) {
+      // - {[a;b;c] a+b+c}
+      Some(i) => {
+        if body[1..i].iter().all(|kw| matches!(kw, KW::SC | KW::Noun(K::Name(_)))) {
+          let args: Vec<String> = body[1..i]
+            .iter()
+            .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+            .collect();
+          Ok((args, body[i..].iter().cloned().collect()))
+        } else {
+          Err("parse error: invalid function args")
+        }
+      }
+      None => Err("parse error: mismatched square brackets"),
+    }
   } else {
     // - {x + y + z} or {z * x + y} => vec!["x","y","z"]
     if body.contains(&KW::LCB) {
@@ -855,7 +864,7 @@ fn parse_function_args(body: Vec<KW>) -> Vec<String> {
       .unique()
       .collect();
     args.sort();
-    args
+    Ok((args, body))
   }
 }
 

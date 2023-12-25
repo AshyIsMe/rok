@@ -573,7 +573,6 @@ fn test_functions() {
 }
 
 #[test]
-#[ignore] // not yet implemented
 fn test_expr_funcargs() {
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("+[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
