@@ -488,7 +488,7 @@ fn test_table_reader() {
   let mut df =
     DataFrame::new(vec![Series::new("a", [1, 2, 3i64]), Series::new("b", [4, 5, 6i64])]).unwrap();
   let mut file = File::create("test.csv").expect("could not create file");
-  let _ = CsvWriter::new(&mut file).has_header(true).with_delimiter(b',').finish(&mut df);
+  let _ = CsvWriter::new(&mut file).include_header(true).with_separator(b',').finish(&mut df);
 
   let t1 = K::Table(df.clone());
   let t2 = eval(&mut env, scan("2:`test.csv").unwrap()).unwrap();
