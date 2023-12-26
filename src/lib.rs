@@ -363,7 +363,18 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
         match exprs.len() {
           0 | 1 => todo!("currying"),
           2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
-          _ => Err("rank error"),
+          _ => match name.as_str() {
+            "$" => {
+              // $[if;then;elif;then;...;else]
+              // all values are truthy except: 0, 0x00 or ().
+              // TODO:
+              // - Split exprs by ;
+              // - Iterate sub-exprs in pairs, eval first, if truthy return second
+              // - Handle else case at the end
+              todo!("cond")
+            }
+            _ => Err("rank error"),
+          },
         }
       }
       _ => panic!("impossible"),
