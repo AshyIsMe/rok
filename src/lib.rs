@@ -354,7 +354,19 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
           }
         }
       }
-      _ => todo!("apply_function other cases"),
+      _ => todo!("apply_function other cases?"),
+    },
+    KW::Verb { name } => match arg {
+      KW::Noun(_) => todo!("currying"),
+      KW::Exprs(exprs) => {
+        let exprs: Vec<KW> = exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
+        match exprs.len() {
+          0 | 1 => todo!("currying"),
+          2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
+          _ => Err("rank error"),
+        }
+      }
+      _ => panic!("impossible"),
     },
     _ => panic!("impossible"),
   }
@@ -734,16 +746,19 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         // 1 monad
         apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, v, r])
       }
-      (w, f @ KW::Function { .. }, x @ KW::Noun(_) | x @ KW::Exprs(_), any)
-        if matches!(w, KW::StartOfLine | KW::LP) =>
-      {
+      (
+        w,
+        f @ KW::Verb { .. } | f @ KW::Function { .. },
+        x @ KW::Noun(_) | x @ KW::Exprs(_),
+        any,
+      ) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad function
         apply_function(env, f, x.clone()).map(|r| vec![w, r, any])
       }
       (
         w,
         v @ KW::Verb { .. } | v @ KW::Function { .. },
-        f @ KW::Function { .. },
+        f @ KW::Verb { .. } | f @ KW::Function { .. },
         x @ KW::Noun(_) | x @ KW::Exprs(_),
       ) => {
         // 1 monad function

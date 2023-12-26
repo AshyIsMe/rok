@@ -588,7 +588,6 @@ fn test_expr_funcargs() {
 }
 
 #[test]
-#[ignore]
 fn test_named_primitives() {
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("+[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
