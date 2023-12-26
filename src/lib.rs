@@ -2,6 +2,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs::File;
 use std::iter::zip;
@@ -36,20 +37,27 @@ pub enum K {
   //Quote(Box<K>) // Is Quote a noun?
   Name(String),
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
   Noun(K),
-  // Function{ body, args, curry, env }
+  // Function: {x + y}. args is Vec<K::Name>
+  Function { body: Vec<KW>, args: Vec<String> }, //, curry, env } // TODO currying and env closure?
   // View{ value, r, cache, depends->val }
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   Adverb { name: String },
+  Exprs(Vec<KW>), // list of expressions: [e1;e2;e3]
   // Cond { body: Vec< Vec<K> > } //list of expressions...
   StartOfLine,
   Nothing,
-  LP,
-  RP,
-  SC, // semicolon
+  LP,  // (
+  RP,  // )
+  LCB, // {
+  RCB, // }
+  LB,  // [
+  RB,  // ]
+  SC,  // semicolon
 }
 
 impl K {
@@ -269,8 +277,9 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       let colon = Some((v_ident, v_d_colon, v_none3, v_none4));
       match colon {
         Some((m, d, _triad, _tetrad)) => match (l, r) {
-          (Some(KW::Noun(l)), KW::Noun(r)) => d(env, l, KW::Noun(r)),
-          (Some(KW::Noun(l)), r @ KW::Verb { .. }) => d(env, l, r),
+          (Some(KW::Noun(l)), r @ KW::Noun(_) | r @ KW::Verb { .. } | r @ KW::Function { .. }) => {
+            d(env, l, r)
+          }
           (None, KW::Noun(r)) => m(r).map(KW::Noun),
           _ => panic!("impossible"),
         },
@@ -287,9 +296,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
             (if r.len() > 1 { d_a_l } else { d_a_a })(l, r).map(KW::Noun)
           }
         }
-        (None, KW::Noun(r)) => {
-          (if r.len() > 1 { m_l } else { m_a })(r).map(KW::Noun)
-        }
+        (None, KW::Noun(r)) => (if r.len() > 1 { m_l } else { m_a })(r).map(KW::Noun),
         _ => {
           panic!("impossible")
         }
@@ -319,6 +326,49 @@ pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
       _ => panic!("invalid adverb"),
     },
     _ => panic!("verb required"),
+  }
+}
+pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str> {
+  match f {
+    KW::Function { body, args } => match arg {
+      KW::Noun(x) => {
+        match args.len() {
+          1 => {
+            // TODO This will lose names if the function does global assignment
+            let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
+            e.names.extend([(args[0].clone(), KW::Noun(x.clone()))]);
+            eval(&mut e, body)
+          }
+          _ => todo!("currying"),
+        }
+      }
+      KW::Exprs(exprs) => {
+        let exprs: Vec<KW> = exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
+        match exprs.len().cmp(&args.len()) {
+          Ordering::Greater => Err("rank error"),
+          Ordering::Less => todo!("currying"),
+          Ordering::Equal => {
+            let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
+            e.names.extend(zip(args, exprs).collect::<Vec<(String, KW)>>());
+            eval(&mut e, body)
+          }
+        }
+      }
+      _ => todo!("apply_function other cases?"),
+    },
+    KW::Verb { name } => match arg {
+      KW::Noun(_) => todo!("currying"),
+      KW::Exprs(exprs) => {
+        let exprs: Vec<KW> = exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
+        match exprs.len() {
+          0 | 1 => todo!("currying"),
+          2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
+          _ => Err("rank error"),
+        }
+      }
+      _ => panic!("impossible"),
+    },
+    _ => panic!("impossible"),
   }
 }
 
@@ -540,10 +590,19 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     Err("type")
   }
 }
-pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> { 
+pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
   if let KW::Verb { ref name } = v {
     let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
-    Ok(apply_primitive(env, &name.clone(), Some(KW::Noun(x.clone())), KW::Noun(v_fold(&mut e, v, y).unwrap())).unwrap().unwrap_noun())
+    Ok(
+      apply_primitive(
+        env,
+        &name.clone(),
+        Some(KW::Noun(x.clone())),
+        KW::Noun(v_fold(&mut e, v, y).unwrap()),
+      )
+      .unwrap()
+      .unwrap_noun(),
+    )
   } else {
     Err("type")
   }
@@ -687,7 +746,30 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         // 1 monad
         apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, v, r])
       }
-      (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb { .. }) => {
+      (
+        w,
+        f @ KW::Verb { .. } | f @ KW::Function { .. },
+        x @ KW::Noun(_) | x @ KW::Exprs(_),
+        any,
+      ) if matches!(w, KW::StartOfLine | KW::LP) => {
+        // 0 monad function
+        apply_function(env, f, x.clone()).map(|r| vec![w, r, any])
+      }
+      (
+        w,
+        v @ KW::Verb { .. } | v @ KW::Function { .. },
+        f @ KW::Verb { .. } | f @ KW::Function { .. },
+        x @ KW::Noun(_) | x @ KW::Exprs(_),
+      ) => {
+        // 1 monad function
+        apply_function(env, f, x.clone()).map(|r| vec![w, v, r])
+      }
+      (
+        any,
+        x @ KW::Noun(_),
+        KW::Verb { name },
+        y @ KW::Noun(_) | y @ KW::Verb { .. } | y @ KW::Function { .. },
+      ) => {
         // 2 dyad (including assignment)
         apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }
@@ -710,6 +792,30 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
           )])
         } else {
           Err("invalid list syntax")
+        }
+      }
+      (w1, w2, w3, KW::RCB) => {
+        queue.push_back(w1);
+        queue.push_back(w2);
+        queue.push_back(w3);
+        match parse_function_def(queue.clone()) {
+          Ok((q, f)) => {
+            queue = q;
+            Ok(vec![f])
+          }
+          Err(e) => Err(e),
+        }
+      }
+      (w1, w2, w3, KW::RB) => {
+        queue.push_back(w1);
+        queue.push_back(w2);
+        queue.push_back(w3);
+        match parse_exprs(queue.clone()) {
+          Ok((q, expr)) => {
+            queue = q;
+            Ok(vec![expr])
+          }
+          Err(e) => Err(e),
         }
       }
       (w1, w2, w3, w4) => match queue.pop_back() {
@@ -743,6 +849,89 @@ fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
     .expect("infinite iterator can't be empty")
 }
 
+fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
+  // Result<(queue, KW::Function{...})
+  // Parse a function definition off the back of the queue, Eg:
+  // parse_function_def([f: {x*2}]) => Ok(([f:], KW::Function{body:"x*2", args: vec![]}))
+  let mut depth = 0; // nested functions depth
+  debug!("queue: {:?}", queue);
+  for i in (0..queue.len()).rev() {
+    debug!("queue: {:?}, depth: {}, i: {}", queue, depth, i);
+    match queue.get(i) {
+      Some(KW::RCB) => depth += 1,
+      Some(KW::LCB) => match depth {
+        0 => {
+          let (args, body) = parse_function_args(queue.range(i + 1..).cloned().collect())?;
+          return Ok((queue.range(0..i).cloned().collect(), KW::Function { body, args }));
+        }
+        _ => depth -= 1,
+      },
+      Some(_) => continue,
+      None => panic!("impossible"),
+    }
+  }
+  Err("parse error: mismatched brackets")
+}
+
+fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static str> {
+  if let Some(KW::LB) = body.first() {
+    // TODO
+    // - {[a;b] {x+y}[a;b]} // nested functions also need to work
+    match body.iter().position(|kw| matches!(kw, KW::RB)) {
+      // - {[a;b;c] a+b+c}
+      Some(i) => {
+        if body[1..i].iter().all(|kw| matches!(kw, KW::SC | KW::Noun(K::Name(_)))) {
+          let args: Vec<String> = body[1..i]
+            .iter()
+            .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+            .collect();
+          Ok((args, body[i + 1..].to_vec()))
+        } else {
+          Err("parse error: invalid function args")
+        }
+      }
+      None => Err("parse error: mismatched square brackets"),
+    }
+  } else {
+    // - {x + y + z} or {z * x + y} => vec!["x","y","z"]
+    if body.contains(&KW::LCB) {
+      todo!("handle nested functions properly");
+    }
+    let mut args: Vec<String> = body
+      .iter()
+      .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+      .unique()
+      .collect();
+    args.sort();
+    Ok((args, body))
+  }
+}
+
+fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
+  // [expr;list;in;square;brackets] => KW::Exprs(vec![expr,list,in,square,brackets])
+  // TODO Nested exprs [[1;2;3];`a;`b]
+  let mut depth = 0; // nested functions depth
+  debug!("queue: {:?}", queue);
+  for i in (0..queue.len()).rev() {
+    debug!("queue: {:?}, depth: {}, i: {}", queue, depth, i);
+    match queue.get(i) {
+      Some(KW::RB) => depth += 1,
+      Some(KW::LB) => match depth {
+        0 => {
+          return Ok((
+            queue.range(0..i).cloned().collect(),
+            KW::Exprs(queue.range(i + 1..).cloned().collect()),
+          ))
+        }
+        _ => depth -= 1,
+      },
+      Some(_) => continue,
+      None => panic!("impossible"),
+    }
+  }
+  Err("parse error: mismatched square brackets")
+}
+
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
   let mut words = vec![];
   let mut skip: usize = 0;
@@ -754,6 +943,10 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     match c {
       '(' => words.push(KW::LP),
       ')' => words.push(KW::RP),
+      '{' => words.push(KW::LCB),
+      '}' => words.push(KW::RCB),
+      '[' => words.push(KW::LB),
+      ']' => words.push(KW::RB),
       ';' => words.push(KW::SC),
       '0'..='9' | '-' => {
         if let Ok((j, k)) = scan_number(&code[i..]) {
@@ -903,14 +1096,10 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     match ss.len() {
       0 => panic!("wat - invalid scansymbol()"),
       1 => Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
-      _ => {
-        Ok((
-          i - 1,
-          KW::Noun(K::SymbolArray(
-            Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap(),
-          )),
-        ))
-      }
+      _ => Ok((
+        i - 1,
+        KW::Noun(K::SymbolArray(Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap())),
+      )),
     }
   }
 }
