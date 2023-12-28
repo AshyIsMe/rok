@@ -14,6 +14,10 @@ fn test_scan() {
   assert_eq!(scan("1 0 1 0 1").unwrap(), vec![Noun(K::BoolArray(arr!([1, 0, 1, 0, 1u8])))]);
   assert_eq!(scan("1 2 3").unwrap(), vec![Noun(K::IntArray(arr!([1, 2, 3i64])))]);
   assert_eq!(scan("1 2 3.14").unwrap(), vec![Noun(K::FloatArray(arr!([1., 2., 3.14])))]);
+  assert_eq!(
+    scan("1-1").unwrap(),
+    vec![Noun(K::Int(Some(1))), KW::Verb { name: "-".to_string() }, Noun(K::Int(Some(1)))]
+  );
 }
 
 #[test]
