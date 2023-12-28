@@ -359,11 +359,39 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
     KW::Verb { name } => match arg {
       KW::Noun(_) => todo!("currying"),
       KW::Exprs(exprs) => {
-        let exprs: Vec<KW> = exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
-        match exprs.len() {
+        let exprs_no_sc: Vec<KW> =
+          exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
+        match exprs_no_sc.len() {
           0 | 1 => todo!("currying"),
-          2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
-          _ => Err("rank error"),
+          2 => apply_primitive(env, &name, Some(exprs_no_sc[0].clone()), exprs_no_sc[1].clone()),
+          _ => match name.as_str() {
+            "$" => {
+              // $[if;then;elif;then;...;else]
+              // all values are truthy except: 0, 0x00 or ().
+              debug!("cond");
+              let mut split_exprs = exprs.split(|kw| matches!(kw, KW::SC));
+              loop {
+                match (split_exprs.next(), split_exprs.next()) {
+                  (Some(pred), Some(val)) => {
+                    debug!("pred: {:?}, val: {:?}", pred, val);
+                    match eval(env, pred.into()) {
+                      Ok(KW::Noun(K::Bool(0))) => continue,
+                      Ok(KW::Noun(K::Int(Some(0)))) => continue,
+                      Ok(_) => return eval(env, val.into()),
+                      Err(e) => return Err(e),
+                    }
+                  }
+                  (Some(pred), None) => {
+                    debug!("pred: {:?}, val: None", pred);
+                    return eval(env, pred.into()); // else case
+                  }
+                  (None, Some(_)) => panic!("impossible"),
+                  (None, None) => panic!("impossible"),
+                }
+              }
+            }
+            _ => Err("rank error"),
+          },
         }
       }
       _ => panic!("impossible"),

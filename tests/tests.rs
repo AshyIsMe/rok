@@ -595,3 +595,15 @@ fn test_named_primitives() {
   eval(&mut env, scan("p:+").unwrap()).unwrap();
   assert_eq!(eval(&mut env, scan("p[2;2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 }
+
+#[test]
+fn test_cond() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  let res = eval(&mut env, scan("$[1;`a;0;`b]").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::Symbol("a".to_string())));
+
+  let res = eval(&mut env, scan("$[0;`a;0;`b;`c]").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::Symbol("c".to_string())));
+}
