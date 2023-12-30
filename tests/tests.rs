@@ -16,7 +16,7 @@ fn test_scan() {
   assert_eq!(scan("1 2 3.14").unwrap(), vec![Noun(K::FloatArray(arr!([1., 2., 3.14])))]);
   assert_eq!(
     scan("1-1").unwrap(),
-    vec![Noun(K::Int(Some(1))), KW::Verb { name: "-".to_string() }, Noun(K::Int(Some(1)))]
+    vec![Noun(K::Bool(1)), KW::Verb { name: "-".to_string() }, Noun(K::Bool(1))]
   );
 }
 
