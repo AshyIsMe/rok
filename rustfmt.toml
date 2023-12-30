@@ -14,7 +14,7 @@
 # TODO: go through this more and compress the code! https://rust-lang.github.io/rustfmt/?version=master&search=
 
 tab_spaces = 2
-max_width = 100
+max_width = 160
 use_small_heuristics = "Max"
 fn_single_line = true
 where_single_line = true

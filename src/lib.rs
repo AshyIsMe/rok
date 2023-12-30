@@ -11,7 +11,7 @@ use std::{collections::VecDeque, iter::repeat, ops};
 
 // oK.js is 1k lines of javascript in one file for a k6 interpreter.
 // The Challenge: Can we do the same in RUST?
-// (Probably gonna need a lot of macros and to turn of cargo fmt maybe?)
+// (Probably gonna need a lot of macros and to tune cargo fmt maybe?)
 //
 
 // Initially I thought all K Arrays should be arrow arrays...
@@ -96,17 +96,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
   match k {
     K::List(v) => Ok(v),
     // TODO: reduce this repetition with a macro
-    K::BoolArray(a) => Ok(
-      a.iter()
-        .map(|i| {
-          if i.try_extract::<u8>().is_ok() {
-            K::Bool(i.try_extract::<u8>().unwrap())
-          } else {
-            panic!("oops")
-          }
-        })
-        .collect(),
-    ),
+    K::BoolArray(a) => Ok(a.iter().map(|i| if i.try_extract::<u8>().is_ok() { K::Bool(i.try_extract::<u8>().unwrap()) } else { panic!("oops") }).collect()),
     K::IntArray(v) => Ok(
       v.iter()
         .map(|i| {
@@ -133,9 +123,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
         })
         .collect(),
     ),
-    K::CharArray(v) => {
-      Ok(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect())
-    }
+    K::CharArray(v) => Ok(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect()),
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
     }
@@ -152,10 +140,7 @@ pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
       })
       .collect();
     Ok(K::BoolArray(arr!(v)))
-  } else if nouns
-    .iter()
-    .all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Int(Some(_)))))
-  {
+  } else if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Int(Some(_))))) {
     let v: Vec<i64> = nouns
       .iter()
       .map(|w| match w {
@@ -165,10 +150,7 @@ pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
       })
       .collect();
     Ok(K::IntArray(arr!(v)))
-  } else if nouns
-    .iter()
-    .all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Float(_))))
-  {
+  } else if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Float(_)))) {
     let v: Vec<f64> = nouns
       .iter()
       .map(|w| match w {
@@ -244,19 +226,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
   // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
   let verbs: IndexMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = IndexMap::from([
     // (":", (v_ident as V1, v_ident as V1, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_none3 as V3, v_none4 as V4)),
-    (
-      "+",
-      (
-        v_flip as V1,
-        v_flip as V1,
-        v_plus as V2,
-        v_plus as V2,
-        v_plus as V2,
-        v_plus as V2,
-        v_none3 as V3,
-        v_none4 as V4,
-      ),
-    ),
+    ("+", (v_flip as V1, v_flip as V1, v_plus as V2, v_plus as V2, v_plus as V2, v_plus as V2, v_none3 as V3, v_none4 as V4)),
     ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
@@ -265,11 +235,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
     // ("*/", (v_product, v_product, v_d_product, v_d_product, v_d_product, v_d_product, v_none3, v_none4)), // TODO
   ]);
 
-  let adverbs: IndexMap<&str, (AV1, AV2)> = IndexMap::from([
-    ("'", (v_each as AV1, v_d_each as AV2)),
-    ("/", (v_fold, v_d_fold)),
-    ("\\", (v_scan, v_d_scan)),
-  ]);
+  let adverbs: IndexMap<&str, (AV1, AV2)> = IndexMap::from([("'", (v_each as AV1, v_d_each as AV2)), ("/", (v_fold, v_d_fold)), ("\\", (v_scan, v_d_scan))]);
 
   match v {
     ":" => {
@@ -277,9 +243,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       let colon = Some((v_ident, v_d_colon, v_none3, v_none4));
       match colon {
         Some((m, d, _triad, _tetrad)) => match (l, r) {
-          (Some(KW::Noun(l)), r @ KW::Noun(_) | r @ KW::Verb { .. } | r @ KW::Function { .. }) => {
-            d(env, l, r)
-          }
+          (Some(KW::Noun(l)), r @ KW::Noun(_) | r @ KW::Verb { .. } | r @ KW::Function { .. }) => d(env, l, r),
           (None, KW::Noun(r)) => m(r).map(KW::Noun),
           _ => panic!("impossible"),
         },
@@ -303,12 +267,8 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
       },
       None => match adverbs.get(&v[v.len() - 1..]) {
         Some((m_a, d_a)) => match (l, r) {
-          (Some(KW::Noun(l)), KW::Noun(r)) => {
-            d_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, l, r).map(KW::Noun)
-          }
-          (None, KW::Noun(r)) => {
-            m_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, r).map(KW::Noun)
-          }
+          (Some(KW::Noun(l)), KW::Noun(r)) => d_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, l, r).map(KW::Noun),
+          (None, KW::Noun(r)) => m_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, r).map(KW::Noun),
           _ => todo!("other adverb cases"),
         },
         None => todo!("NotYetImplemented {}", v),
@@ -359,8 +319,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
     KW::Verb { name } => match arg {
       KW::Noun(_) => todo!("currying"),
       KW::Exprs(exprs) => {
-        let exprs_no_sc: Vec<KW> =
-          exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
+        let exprs_no_sc: Vec<KW> = exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
         match exprs_no_sc.len() {
           0 | 1 => todo!("currying"),
           2 => apply_primitive(env, &name, Some(exprs_no_sc[0].clone()), exprs_no_sc[1].clone()),
@@ -411,9 +370,7 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
 
     (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
     (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Int(Some(l)), K::BoolArray(r)) => {
-      (K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap()))
-    }
+    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap())),
     (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(arr!([*l])), r),
     (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
     (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
@@ -424,24 +381,14 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
-    (K::Float(l), K::BoolArray(r)) => {
-      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
-    }
-    (K::Float(l), K::IntArray(r)) => {
-      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
-    }
+    (K::Float(l), K::BoolArray(r)) => (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+    (K::Float(l), K::IntArray(r)) => (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
     (K::Float(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l])), r),
 
     (K::BoolArray(_), K::Bool(r)) => (l, K::BoolArray(arr!([*r]))),
-    (K::BoolArray(l), K::Int(Some(r))) => {
-      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))
-    }
-    (K::BoolArray(l), K::Int(None)) => {
-      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))
-    }
-    (K::BoolArray(l), K::Float(r)) => {
-      (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))
-    }
+    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r]))),
+    (K::BoolArray(l), K::Int(None)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>]))),
+    (K::BoolArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r]))),
     (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
@@ -515,11 +462,7 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
         let cols: Vec<Series> = d
           .iter()
           .map(|(k, v)| match v {
-            K::SymbolArray(s)
-            | K::BoolArray(s)
-            | K::IntArray(s)
-            | K::FloatArray(s)
-            | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
+            K::SymbolArray(s) | K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
             _ => todo!("handle atoms"),
           })
           .collect();
@@ -604,11 +547,7 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce
   if let KW::Verb { name } = v {
     k_to_vec(x).and_then(|v| {
-      let r = v.iter().cloned().reduce(|x, y| {
-        apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
-          .unwrap()
-          .unwrap_noun()
-      });
+      let r = v.iter().cloned().reduce(|x, y| apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone())).unwrap().unwrap_noun());
       match r {
         Some(k) => Ok(k.clone()),
         None => Err("TODO not sure what this error case is"),
@@ -621,16 +560,7 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
 pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
   if let KW::Verb { ref name } = v {
     let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
-    Ok(
-      apply_primitive(
-        env,
-        &name.clone(),
-        Some(KW::Noun(x.clone())),
-        KW::Noun(v_fold(&mut e, v, y).unwrap()),
-      )
-      .unwrap()
-      .unwrap_noun(),
-    )
+    Ok(apply_primitive(env, &name.clone(), Some(KW::Noun(x.clone())), KW::Noun(v_fold(&mut e, v, y).unwrap())).unwrap().unwrap_noun())
   } else {
     Err("type")
   }
@@ -652,25 +582,16 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
     K::SymbolArray(s) => match r {
       K::List(v) => {
         if s.len() == v.len() {
-          Ok(K::Dictionary(IndexMap::from_iter(zip(
-            s.iter().map(|s| strip_quotes(s.to_string())),
-            v.iter().cloned(),
-          ))))
+          Ok(K::Dictionary(IndexMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), v.iter().cloned()))))
         } else if v.len() == 1 {
-          Ok(K::Dictionary(IndexMap::from_iter(zip(
-            s.iter().map(|s| strip_quotes(s.to_string())),
-            repeat(v[0].clone()),
-          ))))
+          Ok(K::Dictionary(IndexMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), repeat(v[0].clone())))))
         } else {
           Err("length")
         }
       }
       K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
         // `a`b`c!1 2 3 => `a`b`c!(1;2;3)
-        Ok(K::Dictionary(IndexMap::from_iter(zip(
-          s.iter().map(|s| strip_quotes(s.to_string())),
-          k_to_vec(r).unwrap().iter().cloned(),
-        ))))
+        Ok(K::Dictionary(IndexMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), k_to_vec(r).unwrap().iter().cloned()))))
       }
       _ => {
         if s.len() == 0 {
@@ -678,10 +599,7 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         } else if s.len() == 1 {
           Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
         } else {
-          Ok(K::Dictionary(IndexMap::from_iter(zip(
-            s.iter().map(|s| strip_quotes(s.to_string())),
-            repeat(r),
-          ))))
+          Ok(K::Dictionary(IndexMap::from_iter(zip(s.iter().map(|s| strip_quotes(s.to_string())), repeat(r)))))
         }
       }
     },
@@ -702,9 +620,7 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
         match Path::new(&s).extension() {
           Some(e) => {
             if e == "csv" {
-              Ok(KW::Noun(K::Table(
-                CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap(),
-              )))
+              Ok(KW::Noun(K::Table(CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap())))
             } else if e == "parquet" {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
               Ok(KW::Noun(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap())))
@@ -774,30 +690,15 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         // 1 monad
         apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, v, r])
       }
-      (
-        w,
-        f @ KW::Verb { .. } | f @ KW::Function { .. },
-        x @ KW::Noun(_) | x @ KW::Exprs(_),
-        any,
-      ) if matches!(w, KW::StartOfLine | KW::LP) => {
+      (w, f @ KW::Verb { .. } | f @ KW::Function { .. }, x @ KW::Noun(_) | x @ KW::Exprs(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad function
         apply_function(env, f, x.clone()).map(|r| vec![w, r, any])
       }
-      (
-        w,
-        v @ KW::Verb { .. } | v @ KW::Function { .. },
-        f @ KW::Verb { .. } | f @ KW::Function { .. },
-        x @ KW::Noun(_) | x @ KW::Exprs(_),
-      ) => {
+      (w, v @ KW::Verb { .. } | v @ KW::Function { .. }, f @ KW::Verb { .. } | f @ KW::Function { .. }, x @ KW::Noun(_) | x @ KW::Exprs(_)) => {
         // 1 monad function
         apply_function(env, f, x.clone()).map(|r| vec![w, v, r])
       }
-      (
-        any,
-        x @ KW::Noun(_),
-        KW::Verb { name },
-        y @ KW::Noun(_) | y @ KW::Verb { .. } | y @ KW::Function { .. },
-      ) => {
+      (any, x @ KW::Noun(_), KW::Verb { name }, y @ KW::Noun(_) | y @ KW::Verb { .. } | y @ KW::Function { .. }) => {
         // 2 dyad (including assignment)
         apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }
@@ -811,13 +712,8 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         // List
         if let Some(i) = stack.iter().position(|w| matches!(w, KW::RP)) {
           // Pull off stack until first KW::RP, Drop all KW::SC and KW::RP tokens.
-          let nouns: VecDeque<KW> = stack
-            .drain(..i + 1)
-            .filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP))
-            .collect();
-          Ok(vec![KW::Noun(
-            vec2list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
-          )])
+          let nouns: VecDeque<KW> = stack.drain(..i + 1).filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP)).collect();
+          Ok(vec![KW::Noun(vec2list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap())])
         } else {
           Err("invalid list syntax")
         }
@@ -870,11 +766,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
 }
 
 fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
-  stack
-    .drain(..stack.len().min(4))
-    .chain(repeat(KW::Nothing))
-    .next_tuple()
-    .expect("infinite iterator can't be empty")
+  stack.drain(..stack.len().min(4)).chain(repeat(KW::Nothing)).next_tuple().expect("infinite iterator can't be empty")
 }
 
 fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
@@ -909,10 +801,7 @@ fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static
       // - {[a;b;c] a+b+c}
       Some(i) => {
         if body[1..i].iter().all(|kw| matches!(kw, KW::SC | KW::Noun(K::Name(_)))) {
-          let args: Vec<String> = body[1..i]
-            .iter()
-            .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
-            .collect();
+          let args: Vec<String> = body[1..i].iter().filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None }).collect();
           Ok((args, body[i + 1..].to_vec()))
         } else {
           Err("parse error: invalid function args")
@@ -925,11 +814,7 @@ fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static
     if body.contains(&KW::LCB) {
       todo!("handle nested functions properly");
     }
-    let mut args: Vec<String> = body
-      .iter()
-      .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
-      .unique()
-      .collect();
+    let mut args: Vec<String> = body.iter().filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None }).unique().collect();
     args.sort();
     Ok((args, body))
   }
@@ -945,12 +830,7 @@ fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> 
     match queue.get(i) {
       Some(KW::RB) => depth += 1,
       Some(KW::LB) => match depth {
-        0 => {
-          return Ok((
-            queue.range(0..i).cloned().collect(),
-            KW::Exprs(queue.range(i + 1..).cloned().collect()),
-          ))
-        }
+        0 => return Ok((queue.range(0..i).cloned().collect(), KW::Exprs(queue.range(i + 1..).cloned().collect()))),
         _ => depth -= 1,
       },
       Some(_) => continue,
@@ -1024,8 +904,9 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
         words.push(k);
         skip = j;
       }
-      ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
-      | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }), // TODO forced monads +: -: etc
+      ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_' | '$' | '?' | '@' | '.' => {
+        words.push(KW::Verb { name: c.to_string() })
+      } // TODO forced monads +: -: etc
       '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }), // TODO ': /: \:
       ' ' | '\t' | '\n' => continue,
       'a'..='z' | 'A'..='Z' => {
@@ -1044,9 +925,7 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
   // split on space and parse to numeric
   //
   // an array *potentially* extends until the first symbol character
-  let sentence = match code.find(|c: char| {
-    !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '-', 'n', 'N'].contains(&c))
-  }) {
+  let sentence = match code.find(|c: char| !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '-', 'n', 'N'].contains(&c))) {
     Some(c) => {
       if code.chars().nth(c).unwrap() == '-' {
         &code[..c - 1]
@@ -1058,10 +937,7 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
   };
 
   // split on the whitespace, and try to parse each 'word', stopping when we can't parse a word
-  let parts: Vec<(&str, K)> = sentence
-    .split_whitespace()
-    .map_while(|term| scan_num_token(term).ok().map(|x| (term, x)))
-    .collect();
+  let parts: Vec<(&str, K)> = sentence.split_whitespace().map_while(|term| scan_num_token(term).ok().map(|x| (term, x))).collect();
 
   // the end is the end of the last successfully parsed term
   if let Some((term, _)) = parts.last() {
@@ -1124,9 +1000,7 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
   // split on ` or space`
   //
   // a SymbolArray *potentially* extends until the first symbol character
-  let sentence = match code.find(|c: char| {
-    !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '_', '`'].contains(&c))
-  }) {
+  let sentence = match code.find(|c: char| !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '_', '`'].contains(&c))) {
     Some(c) => &code[..c],
     None => code,
   };
@@ -1166,10 +1040,7 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     match ss.len() {
       0 => panic!("wat - invalid scansymbol()"),
       1 => Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
-      _ => Ok((
-        i - 1,
-        KW::Noun(K::SymbolArray(Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap())),
-      )),
+      _ => Ok((i - 1, KW::Noun(K::SymbolArray(Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap())))),
     }
   }
 }
