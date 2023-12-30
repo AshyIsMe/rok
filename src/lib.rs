@@ -1028,14 +1028,12 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
     }
     None => code,
   };
-  debug!("code: {:?}", code);
 
   // split on the whitespace, and try to parse each 'word', stopping when we can't parse a word
   let parts: Vec<(&str, K)> = sentence
     .split_whitespace()
     .map_while(|term| scan_num_token(term).ok().map(|x| (term, x)))
     .collect();
-  debug!("parts: {:?}", parts);
 
   // the end is the end of the last successfully parsed term
   if let Some((term, _)) = parts.last() {
@@ -1158,16 +1156,16 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
-  match term {
+  let i = if !term.starts_with('-') && term.contains('-') {
+    //handle "1-1"
+    term.find('-').unwrap()
+  } else {
+    term.len()
+  };
+  match &term[..i] {
     "0N" => Ok(K::Int(None)),
     "0n" => Ok(K::Float(f64::NAN)),
     _ => {
-      let i = if !term.starts_with('-') && term.contains('-') {
-        //handle "1-1"
-        term.find('-').unwrap()
-      } else {
-        term.len()
-      };
       if let Ok(i) = term[..i].parse::<u8>() {
         match i {
           0 | 1 => Ok(K::Bool(i)),
