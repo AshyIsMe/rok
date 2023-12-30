@@ -14,6 +14,19 @@ fn test_scan() {
   assert_eq!(scan("1 0 1 0 1").unwrap(), vec![Noun(K::BoolArray(arr!([1, 0, 1, 0, 1u8])))]);
   assert_eq!(scan("1 2 3").unwrap(), vec![Noun(K::IntArray(arr!([1, 2, 3i64])))]);
   assert_eq!(scan("1 2 3.14").unwrap(), vec![Noun(K::FloatArray(arr!([1., 2., 3.14])))]);
+  assert_eq!(
+    scan("1-1").unwrap(),
+    vec![Noun(K::Bool(1)), KW::Verb { name: "-".to_string() }, Noun(K::Bool(1))]
+  );
+  assert_eq!(
+    scan("0N-1").unwrap(),
+    vec![Noun(K::Int(None)), KW::Verb { name: "-".to_string() }, Noun(K::Bool(1))]
+  );
+  // This works but NAN != NAN so the assert fails
+  // assert_eq!(
+  //   scan("0n-1").unwrap(),
+  //   vec![Noun(K::Float(f64::NAN)), KW::Verb { name: "-".to_string() }, Noun(K::Bool(1))]
+  // );
 }
 
 #[test]

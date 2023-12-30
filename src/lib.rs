@@ -976,7 +976,37 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       '[' => words.push(KW::LB),
       ']' => words.push(KW::RB),
       ';' => words.push(KW::SC),
-      '0'..='9' | '-' => {
+      '-' => {
+        // couple different cases here:
+        // 1-1 or a-1: dyadic
+        // 1 -1 or (-1 or [-1 or {-1: negative number
+        // 1 - 1:  dyadic verb
+        let prev = if i > 0 { code.chars().nth(i - 1) } else { None };
+        let next = code.chars().nth(i + 1);
+        match (prev, next) {
+          (Some(p), Some(n)) => {
+            if p.is_ascii_alphanumeric() && n.is_ascii_digit() {
+              words.push(KW::Verb { name: c.to_string() })
+            } else if let Ok((j, k)) = scan_number(&code[i..]) {
+              words.push(k);
+              skip = j;
+            } else {
+              words.push(KW::Verb { name: c.to_string() })
+            }
+          }
+          (Some(_), None) => words.push(KW::Verb { name: c.to_string() }),
+          (None, Some(_)) => {
+            if let Ok((j, k)) = scan_number(&code[i..]) {
+              words.push(k);
+              skip = j;
+            } else {
+              words.push(KW::Verb { name: c.to_string() })
+            }
+          }
+          (None, None) => words.push(KW::Verb { name: c.to_string() }),
+        }
+      }
+      '0'..='9' => {
         if let Ok((j, k)) = scan_number(&code[i..]) {
           words.push(k);
           skip = j;
@@ -1017,7 +1047,13 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
   let sentence = match code.find(|c: char| {
     !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '-', 'n', 'N'].contains(&c))
   }) {
-    Some(c) => &code[..c],
+    Some(c) => {
+      if code.chars().nth(c).unwrap() == '-' {
+        &code[..c - 1]
+      } else {
+        &code[..c]
+      }
+    }
     None => code,
   };
 
@@ -1029,7 +1065,13 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
 
   // the end is the end of the last successfully parsed term
   if let Some((term, _)) = parts.last() {
-    let l = term.as_ptr() as usize - sentence.as_ptr() as usize + term.len() - 1;
+    let i = if !term.starts_with('-') && term.contains('-') {
+      // handle "1-1"
+      term.find('-').unwrap()
+    } else {
+      term.len()
+    };
+    let l = term.as_ptr() as usize - sentence.as_ptr() as usize + i - 1;
 
     let nums: Vec<K> = parts.into_iter().map(|(_term, num)| num).collect();
     match nums.len() {
@@ -1142,18 +1184,24 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
 }
 
 pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
-  match term {
+  let i = if !term.starts_with('-') && term.contains('-') {
+    //handle "1-1"
+    term.find('-').unwrap()
+  } else {
+    term.len()
+  };
+  match &term[..i] {
     "0N" => Ok(K::Int(None)),
     "0n" => Ok(K::Float(f64::NAN)),
     _ => {
-      if let Ok(i) = term.parse::<u8>() {
+      if let Ok(i) = term[..i].parse::<u8>() {
         match i {
           0 | 1 => Ok(K::Bool(i)),
           _ => Ok(K::Int(Some(i as i64))),
         }
-      } else if let Ok(i) = term.parse::<i64>() {
+      } else if let Ok(i) = term[..i].parse::<i64>() {
         Ok(K::Int(Some(i)))
-      } else if let Ok(f) = term.parse::<f64>() {
+      } else if let Ok(f) = term[..i].parse::<f64>() {
         Ok(K::Float(f))
       } else {
         Err("invalid num token")
