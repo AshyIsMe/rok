@@ -156,8 +156,16 @@ impl fmt::Display for K {
           .unwrap()
         )
       }
-      // _ => write!(f, "{:?}", self),
-      _ => todo!("Display for K"),
+      K::Nil => write!(f, "()"),
+      K::List(l) => {
+        let s = ["(".to_string(), l.iter().map(|k| format!("{}", k)).join("\n "), ")".to_string()]
+          .join("");
+        write!(f, "{}", s)
+      }
+      //K::Dictionary(_d) => write!(f, "{:?}", self),
+      K::Dictionary(_d) => todo!("dict"),
+      K::Table(_t) => todo!("table"),
+      K::Name(_n) => todo!("name"),
     }
   }
 }
