@@ -11,5 +11,6 @@ env_logger = "0.10.0"
 indexmap = { version = "2.0.0", features = ["rayon"] }
 itertools = "0.12.0"
 log = "0.4.19"
-polars = { version = "0.35.4", features = ["performant", "simd", "lazy", "parquet", "dtype-categorical"] }
+# polars = { version = "0.35.4", features = ["performant", "nightly", "simd", "cse", "lazy", "parquet", "dtype-categorical"] }
+polars = { version = "0.35.4", features = ["performant", "cse", "lazy", "parquet", "dtype-categorical"] }
 rustyline = "13.0.0"
