@@ -218,11 +218,11 @@ fn test_strings() {
   );
   assert_eq!(
     format!("{:?}", eval(&mut env, scan("\"\"").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::CharArray(Series::new("", ""))))
+    format!("{:?}", Noun(K::CharArray(Series::new("", "").cast(&DataType::Utf8).unwrap())))
   );
   assert_eq!(
     format!("{:?}", eval(&mut env, scan("\"abcABC\"").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::CharArray(Series::new("", "abcABC"))))
+    format!("{:?}", Noun(K::CharArray(Series::new("", "abcABC").cast(&DataType::Utf8).unwrap())))
   );
 }
 

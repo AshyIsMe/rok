@@ -220,9 +220,15 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
         })
         .collect(),
     ),
-    K::CharArray(v) => {
-      Ok(v.u8().unwrap().into_iter().map(|c| K::Char(c.unwrap() as char)).collect())
-    }
+    K::CharArray(v) => Ok(
+      v.cast(&DataType::UInt8)
+        .unwrap()
+        .u8()
+        .unwrap()
+        .into_iter()
+        .map(|c| K::Char(c.unwrap() as char))
+        .collect(),
+    ),
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
     }
