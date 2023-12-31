@@ -4,6 +4,7 @@ use log::debug;
 use polars::prelude::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::File;
 use std::iter::zip;
 use std::path::Path;
@@ -71,6 +72,30 @@ impl K {
       CharArray(a) => a.len(),
       Dictionary(d) => d.len(),
       _ => 1,
+    }
+  }
+}
+
+impl fmt::Display for K {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      K::Bool(b) => write!(f, "{}", b),
+      K::Int(None) => write!(f, "0N"),
+      K::Int(Some(i)) => write!(f, "{}", i),
+      K::Float(fl) => {
+        if fl.is_nan() {
+          write!(f, "0n")
+        } else {
+          write!(f, "{}", fl)
+        }
+      }
+      K::Char(c) => write!(f, "{}", c),
+      K::Symbol(s) => write!(f, "`{}", s),
+      K::SymbolArray(s) => {
+        let s = Series::new("", str_concat(s.cast(&DataType::Utf8).unwrap().utf8().unwrap(), "`", false)).iter().next().unwrap().to_string();
+        write!(f, "`{}", strip_quotes(s))
+      }
+      _ => todo!("Display for K"),
     }
   }
 }

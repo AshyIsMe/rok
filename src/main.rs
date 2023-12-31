@@ -39,9 +39,16 @@ fn main() {
           //scan tokens instead of eval
           let r = scan(&line[2..]).unwrap();
           println!("{r:?}\n");
-        } else {
+        } else if line.starts_with("\\d ") {
+          //debug print
           let r = eval(&mut env, scan(&line).unwrap());
           println!("{r:?}\n");
+        } else {
+          let r = eval(&mut env, scan(&line).unwrap());
+          match r {
+            Ok(KW::Noun(n)) => println!("{n}\n"),
+            _ => todo!("print cases"),
+          }
         }
       }
       Err(ReadlineError::Interrupted) | Err(ReadlineError::Eof) => break,
