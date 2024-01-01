@@ -78,6 +78,8 @@ impl K {
 
 impl fmt::Display for K {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    // TODO Detect term width and render long lines to max width with ... on the end.
+    // For perf reasons aswell as convenience: printing (!1000000000) is silly
     match self {
       K::Bool(b) => write!(f, "{}", b),
       K::Int(None) => write!(f, "0N"),
@@ -162,10 +164,18 @@ impl fmt::Display for K {
           .join("");
         write!(f, "{}", s)
       }
-      //K::Dictionary(_d) => write!(f, "{:?}", self),
-      K::Dictionary(_d) => todo!("dict"),
-      K::Table(_t) => todo!("table"),
-      K::Name(_n) => todo!("name"),
+      K::Dictionary(d) => {
+        // Shakti style dict render:
+        //  `abc`def!(123;"abc")
+        // abc|123
+        // def|"abc"
+        let s = d.iter().map(|(k, v)| format!("{}|{}", k, v)).join("\n");
+        write!(f, "{}", s)
+      }
+      K::Table(t) => {
+        write!(f, "{}", t) // Let polars render Tables (DataFrames)
+      }
+      K::Name(n) => write!(f, "{:?}", n), // should never actually be visible
     }
   }
 }

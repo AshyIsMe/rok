@@ -31,23 +31,24 @@ fn main() {
         let _ = rl.add_history_entry(&line);
         if line.trim_end() == "\\" {
           //help
-          println!("'nyi\n");
+          println!("'nyi");
         } else if line.trim_end() == "\\\\" {
           //quit
           break;
         } else if line.starts_with("\\s ") {
           //scan tokens instead of eval
           let r = scan(&line[2..]).unwrap();
-          println!("{r:?}\n");
+          println!("{r:?}");
         } else if line.starts_with("\\d ") {
           //debug print
-          let r = eval(&mut env, scan(&line).unwrap());
-          println!("{r:?}\n");
+          println!("debug print:");
+          let r = eval(&mut env, scan(&line[2..]).unwrap());
+          println!("{r:?}");
         } else {
           let r = eval(&mut env, scan(&line).unwrap());
           match r {
-            Ok(KW::Noun(n)) => println!("{n}\n"),
-            _ => todo!("print cases"),
+            Ok(KW::Noun(n)) => println!("{n}"),
+            _ => println!("{:?}", r),
           }
         }
       }
