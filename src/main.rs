@@ -47,7 +47,7 @@ fn main() {
         } else {
           let r = eval(&mut env, scan(&line).unwrap());
           match r {
-            Ok(KW::Noun(n)) => println!("{n}"),
+            Ok(kw) => println!("{kw}"),
             _ => println!("{:?}", r),
           }
         }

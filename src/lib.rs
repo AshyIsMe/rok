@@ -175,7 +175,7 @@ impl fmt::Display for K {
       K::Table(t) => {
         write!(f, "{}", t) // Let polars render Tables (DataFrames)
       }
-      K::Name(n) => write!(f, "{:?}", n), // should never actually be visible
+      K::Name(n) => write!(f, "{}", n),
     }
   }
 }
@@ -185,6 +185,22 @@ impl KW {
     match self {
       KW::Noun(n) => n.clone(),
       _ => panic!("not a noun"),
+    }
+  }
+}
+
+impl fmt::Display for KW {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      KW::Noun(n) => write!(f, "{}", n),
+      KW::Verb { name } | KW::Adverb { name } => write!(f, "{}", name),
+      KW::Function { body, args } => {
+        let a =
+          ["[".to_string(), args.iter().map(|n| n.to_string()).join(";"), "]".to_string()].join("");
+        let b = body.iter().map(|kw| format!("{}", kw)).join(" ");
+        write!(f, "{{{} {}}}", a, b)
+      }
+      _ => todo!("Display for KW"),
     }
   }
 }
