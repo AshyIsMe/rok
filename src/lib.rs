@@ -195,12 +195,31 @@ impl fmt::Display for KW {
       KW::Noun(n) => write!(f, "{}", n),
       KW::Verb { name } | KW::Adverb { name } => write!(f, "{}", name),
       KW::Function { body, args } => {
-        let a =
-          ["[".to_string(), args.iter().map(|n| n.to_string()).join(";"), "]".to_string()].join("");
         let b = body.iter().map(|kw| format!("{}", kw)).join(" ");
-        write!(f, "{{{} {}}}", a, b)
+        if *args != vec!["x".to_string(), "y".to_string(), "z".to_string()]
+          && *args != vec!["x".to_string(), "y".to_string()]
+          && *args != vec!["x".to_string()]
+        {
+          let a = ["[".to_string(), args.iter().map(|n| n.to_string()).join(";"), "]".to_string()]
+            .join("");
+          write!(f, "{{{} {}}}", a, b)
+        } else {
+          write!(f, "{{{}}}", b)
+        }
       }
-      _ => todo!("Display for KW"),
+      KW::Exprs(e) => {
+        let s = e.iter().map(|kw| format!("{}", kw)).join("");
+        write!(f, "[{}]", s)
+      }
+      KW::StartOfLine => panic!("impossible"),
+      KW::Nothing => panic!("impossible"),
+      KW::LP => write!(f, "("),
+      KW::RP => write!(f, ")"),
+      KW::LCB => write!(f, "{{"),
+      KW::RCB => write!(f, "}}"),
+      KW::LB => write!(f, "["),
+      KW::RB => write!(f, "]"),
+      KW::SC => write!(f, ";"),
     }
   }
 }
