@@ -80,6 +80,8 @@ impl fmt::Display for K {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     // TODO Detect term width and render long lines to max width with ... on the end.
     // For perf reasons aswell as convenience: printing (!1000000000) is silly
+    let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
+    let (cols, rows) = (cols as usize, rows as usize);
     match self {
       K::Bool(b) => write!(f, "{}", b),
       K::Int(None) => write!(f, "0N"),
@@ -116,28 +118,36 @@ impl fmt::Display for K {
         write!(f, "{}b", strip_quotes(s))
       }
       K::IntArray(b) => {
-        let s = b
-          .i64()
-          .unwrap()
-          .into_iter()
-          .map(|b| match b {
-            Some(i) => i.to_string() + " ",
-            None => "0N ".to_string(),
-          })
-          .collect();
-        write!(f, "{}", strip_quotes(s))
+        let max_n = cols / 2; // ints take min 2 chars, we could fit this many max on a row
+        let s = strip_quotes(
+          b.i64()
+            .unwrap()
+            .into_iter()
+            .take(max_n)
+            .map(|b| match b {
+              Some(i) => i.to_string() + " ",
+              None => "0N ".to_string(),
+            })
+            .collect(),
+        );
+        let s = if s.len() < cols { s } else { s[..(cols - 2)].to_string() + ".." };
+        write!(f, "{}", s)
       }
       K::FloatArray(b) => {
-        let s = b
-          .f64()
-          .unwrap()
-          .into_iter()
-          .map(|b| match b {
-            Some(i) => i.to_string() + " ",
-            None => "0n ".to_string(),
-          })
-          .collect();
-        write!(f, "{}", strip_quotes(s))
+        let max_n = cols / 2; // floats also take min 2 chars, we could fit this many max on a row
+        let s = strip_quotes(
+          b.f64()
+            .unwrap()
+            .into_iter()
+            .take(max_n)
+            .map(|b| match b {
+              Some(i) => i.to_string() + " ",
+              None => "0n ".to_string(),
+            })
+            .collect(),
+        );
+        let s = if s.len() < cols { s } else { s[..(cols - 2)].to_string() + ".." };
+        write!(f, "{}", s)
       }
       K::CharArray(s) => {
         write!(
@@ -1340,6 +1350,7 @@ pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
   match &term[..i] {
     "0N" => Ok(K::Int(None)),
     "0n" => Ok(K::Float(f64::NAN)),
+    "0w" => todo!("inf and ninf https://github.com/kparc/kcc#nulls-and-infinities"),
     _ => {
       if let Ok(i) = term[..i].parse::<u8>() {
         match i {
