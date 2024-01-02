@@ -432,6 +432,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
         _ => panic!("impossible"),
       }
     }
+    // TODO https://code.kx.com/q4m3/4_Operators/#411-alias
     "::" => todo!("special case :: verb (for global assignment)"),
     _ => match verbs.get(v) {
       Some((m_a, m_l, d_a_a, d_l_a, d_a_l, d_l_l, _triad, _tetrad)) => match (l, r) {
