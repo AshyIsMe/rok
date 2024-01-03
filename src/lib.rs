@@ -78,10 +78,10 @@ impl K {
 
 impl fmt::Display for K {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    // TODO Detect term width and render long lines to max width with ... on the end.
+    // Detect term width and render long lines to max width with ... on the end.
     // For perf reasons aswell as convenience: printing (!1000000000) is silly
     let (cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
-    let (cols, rows) = (cols as usize, rows as usize);
+    let (cols, _rows) = (cols as usize, rows as usize);
     match self {
       K::Bool(b) => write!(f, "{}", b),
       K::Int(None) => write!(f, "0N"),
@@ -96,6 +96,7 @@ impl fmt::Display for K {
       K::Char(c) => write!(f, "{}", c),
       K::Symbol(s) => write!(f, "`{}", s),
       K::SymbolArray(s) => {
+        //TODO handle long line elipses properly
         let s =
           Series::new("", str_concat(s.cast(&DataType::Utf8).unwrap().utf8().unwrap(), "`", false))
             .iter()
@@ -105,6 +106,7 @@ impl fmt::Display for K {
         write!(f, "`{}", strip_quotes(s))
       }
       K::BoolArray(b) => {
+        //TODO handle long line elipses properly
         let s = b
           .bool()
           .unwrap()
@@ -149,27 +151,32 @@ impl fmt::Display for K {
         let s = if s.len() < cols { s } else { s[..(cols - 2)].to_string() + ".." };
         write!(f, "{}", s)
       }
-      K::CharArray(s) => {
-        write!(
-          f,
-          "\"{}\"",
-          std::str::from_utf8(
-            &s.cast(&DataType::UInt8)
-              .unwrap()
-              .u8()
-              .unwrap()
-              .into_iter()
-              .map(|u| match u {
-                Some(u) => u,
-                None => panic!("impossible"),
-              })
-              .collect::<Vec<u8>>(),
-          )
-          .unwrap()
+      K::CharArray(ca) => {
+        let s = std::str::from_utf8(
+          &ca
+            .cast(&DataType::UInt8)
+            .unwrap()
+            .u8()
+            .unwrap()
+            .into_iter()
+            .take(cols - 2)
+            .map(|u| match u {
+              Some(u) => u,
+              None => panic!("impossible"),
+            })
+            .collect::<Vec<u8>>(),
         )
+        .unwrap()
+        .to_string();
+        if s.len() < (cols - 2) {
+          write!(f, "\"{}\"", s)
+        } else {
+          write!(f, "\"{}..", s[..(cols - 3)].to_string())
+        }
       }
       K::Nil => write!(f, "()"),
       K::List(l) => {
+        //TODO handle long line elipses properly
         let s = ["(".to_string(), l.iter().map(|k| format!("{}", k)).join("\n "), ")".to_string()]
           .join("");
         write!(f, "{}", s)
@@ -179,6 +186,7 @@ impl fmt::Display for K {
         //  `abc`def!(123;"abc")
         // abc|123
         // def|"abc"
+        //TODO handle long line elipses properly
         let s = d.iter().map(|(k, v)| format!("{}|{}", k, v)).join("\n");
         write!(f, "{}", s)
       }
