@@ -96,14 +96,23 @@ impl fmt::Display for K {
       K::Char(c) => write!(f, "{}", c),
       K::Symbol(s) => write!(f, "`{}", s),
       K::SymbolArray(s) => {
-        //TODO handle long line elipses properly
-        let s =
-          Series::new("", str_concat(s.cast(&DataType::Utf8).unwrap().utf8().unwrap(), "`", false))
-            .iter()
-            .next()
-            .unwrap()
-            .to_string();
-        write!(f, "`{}", strip_quotes(s))
+        let max_n = cols / 2; // symbols take min 2 chars, we could fit this many max on a row
+        let s = strip_quotes(
+          Series::new(
+            "",
+            str_concat(
+              &s.cast(&DataType::Utf8).unwrap().utf8().unwrap().slice(0, max_n),
+              "`",
+              false,
+            ),
+          )
+          .iter()
+          .next()
+          .unwrap()
+          .to_string(),
+        );
+        let s = if s.len() < cols { s } else { s[..(cols - 3)].to_string() + ".." };
+        write!(f, "`{}", s)
       }
       K::BoolArray(b) => {
         //TODO handle long line elipses properly
