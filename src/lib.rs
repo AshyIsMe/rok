@@ -115,18 +115,24 @@ impl fmt::Display for K {
         write!(f, "`{}", s)
       }
       K::BoolArray(b) => {
-        //TODO handle long line elipses properly
         let s = b
           .bool()
           .unwrap()
           .into_iter()
+          .take(cols - 1)
           .map(|b| match b {
             Some(false) => "0",
             Some(true) => "1",
             _ => panic!("impossible"),
           })
-          .collect();
-        write!(f, "{}b", strip_quotes(s))
+          .collect::<Vec<&str>>()
+          .join("");
+        let s = if s.len() < cols - 1 {
+          strip_quotes(s.to_string())
+        } else {
+          strip_quotes(s[..(cols - 3)].to_string() + "..")
+        };
+        write!(f, "{}b", s)
       }
       K::IntArray(b) => {
         let max_n = cols / 2; // ints take min 2 chars, we could fit this many max on a row
@@ -185,9 +191,25 @@ impl fmt::Display for K {
       }
       K::Nil => write!(f, "()"),
       K::List(l) => {
-        //TODO handle long line elipses properly
-        let s = ["(".to_string(), l.iter().map(|k| format!("{}", k)).join("\n "), ")".to_string()]
-          .join("");
+        let s = [
+          "(".to_string(),
+          l.iter()
+            .map(|k| match k {
+              // TODO handle nested lists better
+              K::List(_) | K::Dictionary(_) => format!("{}", k),
+              _ => {
+                let s = format!("{}", k);
+                if s.len() < cols - 1 {
+                  s
+                } else {
+                  s[..(cols - 3)].to_string() + ".."
+                }
+              }
+            })
+            .join("\n "),
+          ")".to_string(),
+        ]
+        .join("");
         write!(f, "{}", s)
       }
       K::Dictionary(d) => {
