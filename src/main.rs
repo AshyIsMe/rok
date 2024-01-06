@@ -8,7 +8,7 @@ use rustyline::DefaultEditor;
 
 fn main() {
   env_logger::init();
-  println!("rok {}", env!("CARGO_PKG_VERSION"));
+  println!("rok {}, type \\ for more info", env!("CARGO_PKG_VERSION"));
 
   let data_dir = match directories::ProjectDirs::from("github", "AshyIsMe", "rok") {
     Some(dirs) => dirs.data_dir().to_path_buf(),
