@@ -31,7 +31,9 @@ fn main() {
         let _ = rl.add_history_entry(&line);
         if line.trim_end() == "\\" {
           //help
-          println!("'nyi");
+          // println!("'nyi");
+          println!("verbs: {:?}", primitives_table().keys());
+          println!("adverbs: {:?}", adverbs_table().keys());
         } else if line.trim_end() == "\\\\" {
           //quit
           break;

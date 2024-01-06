@@ -410,6 +410,39 @@ pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("ran
 type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
 type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
 
+pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+  IndexMap::from([
+    // (":", (v_ident as V1, v_ident as V1, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_none3 as V3, v_none4 as V4)),
+    (
+      "+",
+      (
+        v_flip as V1,
+        v_flip as V1,
+        v_plus as V2,
+        v_plus as V2,
+        v_plus as V2,
+        v_plus as V2,
+        v_none3 as V3,
+        v_none4 as V4,
+      ),
+    ),
+    ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
+    ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
+    ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
+    ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
+    ("+/", (v_sum, v_sum, v_d_sum, v_d_sum, v_d_sum, v_d_sum, v_none3, v_none4)),
+    // ("*/", (v_product, v_product, v_d_product, v_d_product, v_d_product, v_d_product, v_none3, v_none4)), // TODO
+  ])
+}
+
+pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
+  IndexMap::from([
+    ("'", (v_each as AV1, v_d_each as AV2)),
+    ("/", (v_fold, v_d_fold)),
+    ("\\", (v_scan, v_d_scan)),
+  ])
+}
+
 pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
   // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
   //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
@@ -437,34 +470,9 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
   // "/" : [null,      null,       null,       null,       pack,       pack,       null,    null  ],
   // "\\": [null,      null,       null,       unpack,     split,      null,       null,    null  ],
   // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
-  let verbs: IndexMap<&str, (V1, V1, V2, V2, V2, V2, V3, V4)> = IndexMap::from([
-    // (":", (v_ident as V1, v_ident as V1, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_none3 as V3, v_none4 as V4)),
-    (
-      "+",
-      (
-        v_flip as V1,
-        v_flip as V1,
-        v_plus as V2,
-        v_plus as V2,
-        v_plus as V2,
-        v_plus as V2,
-        v_none3 as V3,
-        v_none4 as V4,
-      ),
-    ),
-    ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
-    ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
-    ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
-    ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
-    ("+/", (v_sum, v_sum, v_d_sum, v_d_sum, v_d_sum, v_d_sum, v_none3, v_none4)),
-    // ("*/", (v_product, v_product, v_d_product, v_d_product, v_d_product, v_d_product, v_none3, v_none4)), // TODO
-  ]);
+  let verbs = primitives_table();
 
-  let adverbs: IndexMap<&str, (AV1, AV2)> = IndexMap::from([
-    ("'", (v_each as AV1, v_d_each as AV2)),
-    ("/", (v_fold, v_d_fold)),
-    ("\\", (v_scan, v_d_scan)),
-  ]);
+  let adverbs = adverbs_table();
 
   match v {
     ":" => {
