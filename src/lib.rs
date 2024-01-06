@@ -186,7 +186,7 @@ impl fmt::Display for K {
         if s.len() < (cols - 2) {
           write!(f, "\"{}\"", s)
         } else {
-          write!(f, "\"{}..", s[..(cols - 3)].to_string())
+          write!(f, "\"{}..", &s[..(cols - 3)])
         }
       }
       K::Nil => write!(f, "()"),

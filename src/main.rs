@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -32,8 +33,8 @@ fn main() {
         if line.trim_end() == "\\" {
           //help
           // println!("'nyi");
-          println!("verbs: {:?}", primitives_table().keys());
-          println!("adverbs: {:?}", adverbs_table().keys());
+          println!("verbs: {}", primitives_table().keys().map(|s| s).join(" "));
+          println!("adverbs: {}", adverbs_table().keys().map(|s| s).join(" "));
         } else if line.trim_end() == "\\\\" {
           //quit
           break;
