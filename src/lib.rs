@@ -430,7 +430,25 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
-    ("+/", (v_sum, v_sum, v_d_sum, v_d_sum, v_d_sum, v_d_sum, v_none3, v_none4)),
+  ])
+}
+
+pub fn specialcombinations_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+  IndexMap::from([
+    // Special Combinations are performance optimisations for easy known cases.
+    (
+      "+/",
+      (
+        v_sum as V1,
+        v_sum as V1,
+        v_d_sum as V2,
+        v_d_sum as V2,
+        v_d_sum as V2,
+        v_d_sum as V2,
+        v_none3 as V3,
+        v_none4 as V4,
+      ),
+    ),
     // ("*/", (v_product, v_product, v_d_product, v_d_product, v_d_product, v_d_product, v_none3, v_none4)), // TODO
   ])
 }
@@ -470,7 +488,10 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
   // "/" : [null,      null,       null,       null,       pack,       pack,       null,    null  ],
   // "\\": [null,      null,       null,       unpack,     split,      null,       null,    null  ],
   // "':": [null,      null,       null,       null,       kwindow,    null,       null,    null  ],
-  let verbs = primitives_table();
+
+  let mut verbs = IndexMap::new();
+  verbs.extend(primitives_table().iter());
+  verbs.extend(specialcombinations_table().iter());
 
   let adverbs = adverbs_table();
 

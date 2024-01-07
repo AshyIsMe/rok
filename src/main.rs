@@ -32,7 +32,6 @@ fn main() {
         let _ = rl.add_history_entry(&line);
         if line.trim_end() == "\\" {
           //help
-          // println!("'nyi");
           println!("verbs: {}", primitives_table().keys().map(|s| s).join(" "));
           println!("adverbs: {}", adverbs_table().keys().map(|s| s).join(" "));
         } else if line.trim_end() == "\\\\" {
