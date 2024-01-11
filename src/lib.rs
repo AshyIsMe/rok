@@ -402,6 +402,7 @@ type V2 = fn(K, K) -> Result<K, &'static str>;
 type V3 = fn(K, K, K) -> Result<K, &'static str>;
 type V4 = fn(K, K, K, K) -> Result<K, &'static str>;
 
+pub fn v_nyi(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
@@ -430,6 +431,8 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
+    // ("=", (v_imat, v_group, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
+    ("=", (v_nyi, v_nyi, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
   ])
 }
 
@@ -731,6 +734,28 @@ fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
     Err("length")
   }
 }
+
+pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
+  if x.len() != y.len() {
+    Err("length")
+  } else {
+    match promote_nouns(x, y) {
+      (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
+      (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l == r) as u8)),
+      (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => Ok(K::Bool(0)),
+      (K::Float(l), K::Float(r)) => Ok(K::Bool((l == r) as u8)),
+      (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+      (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+      (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+      (_, K::Dictionary(_)) => todo!("dict"),
+      (K::Dictionary(_), _) => todo!("dict"),
+      (_, K::Table(_)) => todo!("table"),
+      (K::Table(_), _) => todo!("table"),
+      _ => Err("nyi"),
+    }
+  }
+}
+
 pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
 pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
 pub fn v_flip(x: K) -> Result<K, &'static str> {

@@ -620,3 +620,15 @@ fn test_cond() {
   println!("res: {:?}", res);
   assert_eq!(res, Noun(K::Symbol("c".to_string())));
 }
+
+#[test]
+fn test_equal() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  let res = eval(&mut env, scan("1 = 1").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::Bool(1)));
+
+  let res = eval(&mut env, scan("1 2 3 = 1 2 3").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::BoolArray(arr!([1, 1, 1u8]))));
+}
