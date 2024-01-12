@@ -71,6 +71,7 @@ impl K {
       FloatArray(a) => a.len(),
       CharArray(a) => a.len(),
       Dictionary(d) => d.len(),
+      List(v) => v.len(),
       _ => 1,
     }
   }
@@ -402,7 +403,12 @@ type V2 = fn(K, K) -> Result<K, &'static str>;
 type V3 = fn(K, K, K) -> Result<K, &'static str>;
 type V4 = fn(K, K, K, K) -> Result<K, &'static str>;
 
-pub fn v_nyi(_x: K) -> Result<K, &'static str> { Err("nyi") }
+// AA TODO: can we do this with a macro?
+// fn nyi1(n: &str) -> V1 { |_x: K| Err(format!("nyi: {}", n.clone())) }
+// fn nyi2(n: &str) -> V2 { |_x: K, _y: K| Err(format!("nyi: {}", n.clone())) }
+
+pub fn v_nyi1(_x: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_nyi2(_x: K, _y: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
@@ -411,28 +417,19 @@ pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("ran
 type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
 type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
 
+#[rustfmt::skip]
 pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
   IndexMap::from([
     // (":", (v_ident as V1, v_ident as V1, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_none3 as V3, v_none4 as V4)),
-    (
-      "+",
-      (
-        v_flip as V1,
-        v_flip as V1,
-        v_plus as V2,
-        v_plus as V2,
-        v_plus as V2,
-        v_plus as V2,
-        v_none3 as V3,
-        v_none4 as V4,
-      ),
-    ),
+    ("+", (v_flip as V1, v_flip as V1, v_plus as V2, v_plus as V2, v_plus as V2, v_plus as V2, v_none3 as V3, v_none4 as V4,)),
     ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
     // ("=", (v_imat, v_group, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
-    ("=", (v_nyi, v_nyi, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
+    ("=", (v_nyi1, v_nyi1, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
+    // "#" : [count,     count,      take,       reshape,    take,       reshape,    null,    null  ],
+    ("#", (v_count, v_count, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4,)),
   ])
 }
 
@@ -737,6 +734,7 @@ fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
 
 pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
   if x.len() != y.len() {
+    debug!("x.len(): {}, y.len(): {}", x.len(), y.len());
     Err("length")
   } else {
     match promote_nouns(x, y) {
@@ -747,6 +745,8 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
       (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
       (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
       (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+      (K::List(_), _) => todo!("list"),
+      (_, K::List(_)) => todo!("list"),
       (_, K::Dictionary(_)) => todo!("dict"),
       (K::Dictionary(_), _) => todo!("dict"),
       (_, K::Table(_)) => todo!("table"),
@@ -755,6 +755,8 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
     }
   }
 }
+
+pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
 
 pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
 pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
