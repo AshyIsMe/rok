@@ -745,6 +745,9 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
       (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
       (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
       (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+      (K::List(l), K::List(r)) => {
+        Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l == r).collect::<Vec<bool>>())))
+      }
       (K::List(_), _) => todo!("list"),
       (_, K::List(_)) => todo!("list"),
       (_, K::Dictionary(_)) => todo!("dict"),
