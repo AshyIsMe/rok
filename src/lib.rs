@@ -684,6 +684,17 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
     (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
 
+    (K::List(_), K::SymbolArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::List(_), K::BoolArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::List(_), K::IntArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::List(_), K::FloatArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::List(_), K::CharArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::SymbolArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::BoolArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::IntArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::FloatArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::CharArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+
     _ => (l, r),
   }
 }
@@ -745,9 +756,12 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
       (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
       (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
       (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
-      (K::List(l), K::List(r)) => {
-        Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l == r).collect::<Vec<bool>>())))
-      }
+      (K::List(l), K::List(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+        .map(|(l, r)| {
+          let (l, r) = promote_nouns(l.clone(), r.clone());
+          l == r
+        })
+        .collect::<Vec<bool>>()))),
       (K::List(_), _) => todo!("list"),
       (_, K::List(_)) => todo!("list"),
       (_, K::Dictionary(_)) => todo!("dict"),

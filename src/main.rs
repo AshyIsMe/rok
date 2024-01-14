@@ -32,8 +32,8 @@ fn main() {
         let _ = rl.add_history_entry(&line);
         if line.trim_end() == "\\" {
           //help
-          println!("verbs: {}", primitives_table().keys().map(|s| s).join(" "));
-          println!("adverbs: {}", adverbs_table().keys().map(|s| s).join(" "));
+          println!("verbs: {}", primitives_table().keys().join(" "));
+          println!("adverbs: {}", adverbs_table().keys().join(" "));
         } else if line.trim_end() == "\\\\" {
           //quit
           break;

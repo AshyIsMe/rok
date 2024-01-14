@@ -649,6 +649,10 @@ fn test_equal() {
   println!("res: {:?}", res);
   assert_eq!(res, Noun(K::BoolArray(arr!([1, 1, 0u8]))));
 
+  let res = eval(&mut env, scan("(1;2;\"3\") = 1 2 3").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::BoolArray(arr!([1, 1, 0u8]))));
+
   // TODO dict
   // let res = eval(&mut env, scan("1 2 3 = `a`b`c!(1;2;3)").unwrap()).unwrap();
   // println!("res: {:?}", res);
