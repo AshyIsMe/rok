@@ -281,7 +281,6 @@ macro_rules! arr {
   };
 }
 
-// pub fn enlist(k: K) -> Result<K, &'static str> {
 pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
   match k {
     K::List(v) => Ok(v),
@@ -695,6 +694,23 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::FloatArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
     (K::CharArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
 
+    (K::List(_), K::Dictionary(r_inner)) => (
+      v_makedict(
+        K::SymbolArray(
+          Series::new("", r_inner.keys().cloned().collect::<Vec<String>>())
+            .cast(&DataType::Categorical(None))
+            .unwrap(),
+        ),
+        l,
+      )
+      .unwrap(),
+      r,
+    ),
+    (K::Dictionary(l_inner), K::List(_)) => (
+      // TODO SymbolArray for keys not CharArray
+      l.clone(),
+      v_makedict(K::List(l_inner.keys().map(|s| K::CharArray(arr!(s))).collect()), r).unwrap(),
+    ),
     _ => (l, r),
   }
 }
@@ -762,10 +778,16 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
           l == r
         })
         .collect::<Vec<bool>>()))),
-      (K::List(_), _) => todo!("list"),
-      (_, K::List(_)) => todo!("list"),
-      (_, K::Dictionary(_)) => todo!("dict"),
-      (K::Dictionary(_), _) => todo!("dict"),
+      (K::Dictionary(l), K::Dictionary(r)) => {
+        Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
+          if r.keys().contains(k) {
+            // TODO promote_nouns() so K::Bool(1) matches K::Int(Some(1))
+            Some((k.clone(), K::Bool((l.get(k) == r.get(k)) as u8)))
+          } else {
+            None
+          }
+        }))))
+      }
       (_, K::Table(_)) => todo!("table"),
       (K::Table(_), _) => todo!("table"),
       _ => Err("nyi"),
