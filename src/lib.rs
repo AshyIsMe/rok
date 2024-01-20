@@ -10,6 +10,10 @@ use std::iter::zip;
 use std::path::Path;
 use std::{collections::VecDeque, iter::repeat, ops};
 
+mod verbs;
+
+pub use verbs::*;
+
 // oK.js is 1k lines of javascript in one file for a k6 interpreter.
 // The Challenge: Can we do the same in RUST?
 // (Probably gonna need a lot of macros and to tune cargo fmt maybe?)
@@ -71,6 +75,7 @@ impl K {
       FloatArray(a) => a.len(),
       CharArray(a) => a.len(),
       Dictionary(d) => d.len(),
+      List(v) => v.len(),
       _ => 1,
     }
   }
@@ -280,7 +285,6 @@ macro_rules! arr {
   };
 }
 
-// pub fn enlist(k: K) -> Result<K, &'static str> {
 pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
   match k {
     K::List(v) => Ok(v),
@@ -337,7 +341,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
     _ => Err("todo"),
   }
 }
-pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
+pub fn vec_to_list(nouns: Vec<KW>) -> Result<K, &'static str> {
   if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_)))) {
     let v: Vec<u8> = nouns
       .iter()
@@ -402,6 +406,12 @@ type V2 = fn(K, K) -> Result<K, &'static str>;
 type V3 = fn(K, K, K) -> Result<K, &'static str>;
 type V4 = fn(K, K, K, K) -> Result<K, &'static str>;
 
+// AA TODO: can we do this with a macro?
+// fn nyi1(n: &str) -> V1 { |_x: K| Err(format!("nyi: {}", n.clone())) }
+// fn nyi2(n: &str) -> V2 { |_x: K, _y: K| Err(format!("nyi: {}", n.clone())) }
+
+pub fn v_nyi1(_x: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_nyi2(_x: K, _y: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
@@ -410,26 +420,19 @@ pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("ran
 type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
 type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
 
+#[rustfmt::skip]
 pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
   IndexMap::from([
     // (":", (v_ident as V1, v_ident as V1, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_none3 as V3, v_none4 as V4)),
-    (
-      "+",
-      (
-        v_flip as V1,
-        v_flip as V1,
-        v_plus as V2,
-        v_plus as V2,
-        v_plus as V2,
-        v_plus as V2,
-        v_none3 as V3,
-        v_none4 as V4,
-      ),
-    ),
+    ("+", (v_flip as V1, v_flip as V1, v_plus as V2, v_plus as V2, v_plus as V2, v_plus as V2, v_none3 as V3, v_none4 as V4,)),
     ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
+    // ("=", (v_imat, v_group, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
+    ("=", (v_nyi1, v_nyi1, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
+    // "#" : [count,     count,      take,       reshape,    take,       reshape,    null,    null  ],
+    ("#", (v_count, v_count, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4,)),
   ])
 }
 
@@ -627,6 +630,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
 
 // promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
 // Similar to promote_num() can we combine these somehow and be more concise?
+#[rustfmt::skip]
 fn promote_nouns(l: K, r: K) -> (K, K) {
   match (&l, &r) {
     (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
@@ -636,9 +640,7 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
 
     (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
     (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Int(Some(l)), K::BoolArray(r)) => {
-      (K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap()))
-    }
+    (K::Int(Some(l)), K::BoolArray(r)) => {(K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap()))}
     (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(arr!([*l])), r),
     (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
     (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
@@ -649,24 +651,14 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
-    (K::Float(l), K::BoolArray(r)) => {
-      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
-    }
-    (K::Float(l), K::IntArray(r)) => {
-      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
-    }
+    (K::Float(l), K::BoolArray(r)) => {(K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
+    (K::Float(l), K::IntArray(r)) => {(K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
     (K::Float(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l])), r),
 
     (K::BoolArray(_), K::Bool(r)) => (l, K::BoolArray(arr!([*r]))),
-    (K::BoolArray(l), K::Int(Some(r))) => {
-      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))
-    }
-    (K::BoolArray(l), K::Int(None)) => {
-      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))
-    }
-    (K::BoolArray(l), K::Float(r)) => {
-      (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))
-    }
+    (K::BoolArray(l), K::Int(Some(r))) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))}
+    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))}
+    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))}
     (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
@@ -684,6 +676,35 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
     (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
 
+    (K::List(_), K::SymbolArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::List(_), K::BoolArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::List(_), K::IntArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::List(_), K::FloatArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::List(_), K::CharArray(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::SymbolArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::BoolArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::IntArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::FloatArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+    (K::CharArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
+
+    (K::List(_), K::Dictionary(r_inner)) => (
+      v_makedict(K::SymbolArray(Series::new("", r_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), l,) .unwrap(),
+      r),
+    (K::Dictionary(l_inner), K::List(_)) => (
+      l.clone(),
+      v_makedict(K::SymbolArray(Series::new("", l_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), r,) .unwrap()),
+    (_l, K::Dictionary(_)) if !matches!(_l, K::Dictionary(_)) => match (l.len(), r.len()) {
+      (0,0) => todo!("promote_nouns empties"),
+      (1,_) => todo!("promote_nouns atom"),
+      (_,1) => todo!("promote_nouns atom"),
+      (llen, rlen) => if llen == rlen { promote_nouns(K::List(k_to_vec(l).unwrap()), r) } else { (l,r) }
+    }
+    (K::Dictionary(_), _r) if !matches!(_r, K::Dictionary(_))=> match (l.len(), r.len()) {
+      (0,0) => todo!("promote_nouns empties"),
+      (1,_) => todo!("promote_nouns atom"),
+      (_,1) => todo!("promote_nouns atom"),
+      (llen, rlen) => if llen == rlen { promote_nouns(l, K::List(k_to_vec(r).unwrap())) } else { (l,r) }
+    }
     _ => (l, r),
   }
 }
@@ -729,226 +750,6 @@ fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
     Ok(true)
   } else {
     Err("length")
-  }
-}
-pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
-pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
-pub fn v_flip(x: K) -> Result<K, &'static str> {
-  match x {
-    K::Dictionary(d) => {
-      if d.iter().map(|(_k, v)| v.len()).all_equal() {
-        let cols: Vec<Series> = d
-          .iter()
-          .map(|(k, v)| match v {
-            K::SymbolArray(s)
-            | K::BoolArray(s)
-            | K::IntArray(s)
-            | K::FloatArray(s)
-            | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
-            _ => todo!("handle atoms"),
-          })
-          .collect();
-        Ok(K::Table(DataFrame::new(cols).unwrap()))
-      } else {
-        Err("length")
-      }
-    }
-    _ => todo!("flip the rest"),
-  }
-}
-macro_rules! atomicdyad {
-  ($op:tt, $v:ident, $l:ident, $r:ident) => {
-    match ($l, $r) {
-      (K::Dictionary(ld), K::Dictionary(rd)) => {
-        Ok(K::Dictionary(IndexMap::from_iter(ld.keys().chain(rd.keys()).unique().map(|k| {
-          let a = ld.get(k);
-          let b = rd.get(k);
-          match (a, b) {
-            (None, Some(b)) => (k.clone(), b.clone()),
-            (Some(a), None) => (k.clone(), a.clone()),
-            (Some(a), Some(b)) => (k.clone(), $v(a.clone(), b.clone()).unwrap()),
-            (None, None) => panic!("impossible")
-          }
-        }))))
-      }
-      (K::Dictionary(ld), r) => {
-        Ok(K::Dictionary(IndexMap::from_iter(ld.iter().map(|(k,v)| (k.clone(), $v(v.clone(), r.clone()).unwrap())))))
-      }
-      (l, K::Dictionary(rd)) => {
-        Ok(K::Dictionary(IndexMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
-      }
-      (K::List(lv), K::List(rv)) => {
-        Ok(K::List(zip(lv, rv).map(|(x, y)| $v(x.clone(), y.clone()).unwrap()).collect()))
-      }
-      (K::List(lv), r) => {
-        Ok(K::List(lv.iter().map(|x| $v(x.clone(), r.clone()).unwrap()).collect()))
-      }
-      (l, K::List(rv)) => {
-        Ok(K::List(rv.iter().map(|y| $v(l.clone(), y.clone()).unwrap()).collect()))
-      }
-      (l,r) => len_ok(&l, &r).and_then(|_| Ok(l $op r)),
-    }
-  };
-}
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, l, r) }
-pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
-pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, l, r) }
-pub fn v_first(_x: K) -> Result<K, &'static str> { todo!("implement first") }
-pub fn v_times(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(*, v_times, l, r) }
-pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
-pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide,l, r) }
-pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
-pub fn v_mod(_l: K, _r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
-pub fn v_iota(r: K) -> Result<K, &'static str> {
-  debug!("v_iota");
-  match r {
-    K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
-    _ => todo!("v_iota variants"),
-  }
-}
-pub fn v_sum(x: K) -> Result<K, &'static str> {
-  match x {
-    K::BoolArray(a) => Ok(K::Int(a.sum())),
-    K::IntArray(a) => Ok(K::Int(a.sum())),
-    K::FloatArray(a) => Ok(K::Float(a.sum().unwrap_or(f64::NAN))),
-    _ => todo!("other types of K"),
-  }
-}
-pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()) }
-
-pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
-  match l {
-    K::SymbolArray(_) | K::Symbol(_) => v_makedict(l, r),
-    _ => v_mod(l, r),
-  }
-}
-
-pub fn v_each(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("each") }
-pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
-pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
-  // split into list, then reduce
-  if let KW::Verb { name } = v {
-    k_to_vec(x).and_then(|v| {
-      let r = v.iter().cloned().reduce(|x, y| {
-        apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
-          .unwrap()
-          .unwrap_noun()
-      });
-      match r {
-        Some(k) => Ok(k.clone()),
-        None => Err("TODO not sure what this error case is"),
-      }
-    })
-  } else {
-    Err("type")
-  }
-}
-pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
-  if let KW::Verb { ref name } = v {
-    let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
-    Ok(
-      apply_primitive(
-        env,
-        &name.clone(),
-        Some(KW::Noun(x.clone())),
-        KW::Noun(v_fold(&mut e, v, y).unwrap()),
-      )
-      .unwrap()
-      .unwrap_noun(),
-    )
-  } else {
-    Err("type")
-  }
-}
-pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
-pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
-
-fn strip_quotes(s: String) -> String {
-  if s.starts_with('\"') && s.ends_with('\"') {
-    s[1..s.len() - 1].into()
-  } else {
-    s
-  }
-}
-pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
-  debug!("v_makedict() l: {:?}", l);
-  debug!("v_makedict() r: {:?}", r);
-  match l {
-    K::SymbolArray(s) => match r {
-      K::List(v) => {
-        if s.len() == v.len() {
-          Ok(K::Dictionary(IndexMap::from_iter(zip(
-            s.iter().map(|s| strip_quotes(s.to_string())),
-            v.iter().cloned(),
-          ))))
-        } else if v.len() == 1 {
-          Ok(K::Dictionary(IndexMap::from_iter(zip(
-            s.iter().map(|s| strip_quotes(s.to_string())),
-            repeat(v[0].clone()),
-          ))))
-        } else {
-          Err("length")
-        }
-      }
-      K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
-        // `a`b`c!1 2 3 => `a`b`c!(1;2;3)
-        Ok(K::Dictionary(IndexMap::from_iter(zip(
-          s.iter().map(|s| strip_quotes(s.to_string())),
-          k_to_vec(r).unwrap().iter().cloned(),
-        ))))
-      }
-      _ => {
-        if s.len() == 0 {
-          Err("length")
-        } else if s.len() == 1 {
-          Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
-        } else {
-          Ok(K::Dictionary(IndexMap::from_iter(zip(
-            s.iter().map(|s| strip_quotes(s.to_string())),
-            repeat(r),
-          ))))
-        }
-      }
-    },
-    K::Symbol(s) => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
-    _ => {
-      todo!("modulo")
-    }
-  }
-}
-
-pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
-pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
-  debug!("l: {:?}, r: {:?}", l, r);
-  match (&l, &r) {
-    (K::Int(Some(2i64)), KW::Noun(K::Symbol(s))) => {
-      let p = Path::new(&s);
-      if p.exists() {
-        match Path::new(&s).extension() {
-          Some(e) => {
-            if e == "csv" {
-              Ok(KW::Noun(K::Table(
-                CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap(),
-              )))
-            } else if e == "parquet" {
-              // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
-              Ok(KW::Noun(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap())))
-            } else {
-              todo!("other file types")
-            }
-          }
-          _ => todo!("no extension"),
-        }
-      } else {
-        Err("path does not exist")
-      }
-    }
-    (K::Name(n), r) => {
-      env.names.extend([(n.clone(), r.clone())]);
-      Ok(r.clone())
-    }
-    (_, KW::Noun(r)) => Ok(KW::Noun(v_rident(l, r.clone()).unwrap())),
-    _ => panic!("impossible"),
   }
 }
 
@@ -1041,7 +842,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
             .filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP))
             .collect();
           Ok(vec![KW::Noun(
-            vec2list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
+            vec_to_list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
           )])
         } else {
           Err("invalid list syntax")
