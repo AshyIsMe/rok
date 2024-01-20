@@ -626,6 +626,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
 
 // promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
 // Similar to promote_num() can we combine these somehow and be more concise?
+#[rustfmt::skip]
 fn promote_nouns(l: K, r: K) -> (K, K) {
   match (&l, &r) {
     (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
@@ -635,9 +636,7 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
 
     (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
     (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Int(Some(l)), K::BoolArray(r)) => {
-      (K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap()))
-    }
+    (K::Int(Some(l)), K::BoolArray(r)) => {(K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap()))}
     (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(arr!([*l])), r),
     (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
     (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
@@ -648,24 +647,14 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
-    (K::Float(l), K::BoolArray(r)) => {
-      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
-    }
-    (K::Float(l), K::IntArray(r)) => {
-      (K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))
-    }
+    (K::Float(l), K::BoolArray(r)) => {(K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
+    (K::Float(l), K::IntArray(r)) => {(K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
     (K::Float(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l])), r),
 
     (K::BoolArray(_), K::Bool(r)) => (l, K::BoolArray(arr!([*r]))),
-    (K::BoolArray(l), K::Int(Some(r))) => {
-      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))
-    }
-    (K::BoolArray(l), K::Int(None)) => {
-      (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))
-    }
-    (K::BoolArray(l), K::Float(r)) => {
-      (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))
-    }
+    (K::BoolArray(l), K::Int(Some(r))) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))}
+    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))}
+    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))}
     (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
@@ -695,29 +684,11 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::CharArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
 
     (K::List(_), K::Dictionary(r_inner)) => (
-      v_makedict(
-        K::SymbolArray(
-          Series::new("", r_inner.keys().cloned().collect::<Vec<String>>())
-            .cast(&DataType::Categorical(None))
-            .unwrap(),
-        ),
-        l,
-      )
-      .unwrap(),
-      r,
-    ),
+      v_makedict(K::SymbolArray(Series::new("", r_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), l,) .unwrap(),
+      r),
     (K::Dictionary(l_inner), K::List(_)) => (
       l.clone(),
-      v_makedict(
-        K::SymbolArray(
-          Series::new("", l_inner.keys().cloned().collect::<Vec<String>>())
-            .cast(&DataType::Categorical(None))
-            .unwrap(),
-        ),
-        r,
-      )
-      .unwrap(),
-    ),
+      v_makedict(K::SymbolArray(Series::new("", l_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), r,) .unwrap()),
     _ => (l, r),
   }
 }
