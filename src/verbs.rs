@@ -1,5 +1,7 @@
 use crate::*;
 
+pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
   if x.len() != y.len() {
     debug!("x.len(): {}, y.len(): {}", x.len(), y.len());
@@ -37,6 +39,8 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
 }
 
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
+pub fn v_take(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_reshape(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
 pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
@@ -106,6 +110,39 @@ pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide,l, r) }
 pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
 pub fn v_mod(_l: K, _r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
+
+pub fn v_where(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_min(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_reverse(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_max(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_asc(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_lesser(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_desc(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_greater(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_not(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_match(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_enlist(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_concat(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_isnull(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_fill(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_except(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_floor(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_drop(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_delete(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_cut(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_string(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_dfmt(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
 pub fn v_iota(r: K) -> Result<K, &'static str> {
   debug!("v_iota");
   match r {

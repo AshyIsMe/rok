@@ -422,6 +422,7 @@ type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
 
 #[rustfmt::skip]
 pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+  // https://k.miraheze.org/wiki/Primitives#Verbs
   IndexMap::from([
     // (":", (v_ident as V1, v_ident as V1, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_none3 as V3, v_none4 as V4)),
     ("+", (v_flip as V1, v_flip as V1, v_plus as V2, v_plus as V2, v_plus as V2, v_plus as V2, v_none3 as V3, v_none4 as V4,)),
@@ -429,10 +430,20 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
     ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
-    // ("=", (v_imat, v_group, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
-    ("=", (v_nyi1, v_nyi1, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
-    // "#" : [count,     count,      take,       reshape,    take,       reshape,    null,    null  ],
-    ("#", (v_count, v_count, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4,)),
+    ("&", (v_where, v_where, v_min, v_min, v_min, v_min, v_none3, v_none4)),
+    ("|", (v_reverse, v_reverse, v_max, v_max, v_max, v_max, v_none3, v_none4)),
+    ("<", (v_asc, v_asc, v_lesser, v_lesser, v_lesser, v_lesser, v_none3, v_none4)),
+    (">", (v_desc, v_desc, v_greater, v_greater, v_greater, v_greater, v_none3, v_none4)),
+    ("=", (v_imat, v_group, v_equal, v_equal, v_equal, v_equal, v_none3, v_none4)),
+    ("~", (v_not, v_not, v_match, v_match, v_match, v_match, v_none3, v_none4)),
+    (",", (v_enlist, v_enlist, v_concat, v_concat, v_concat, v_concat, v_none3, v_none4)),
+    ("^", (v_isnull, v_isnull, v_fill, v_except, v_fill, v_except, v_none3, v_none4)),
+    ("#", (v_count, v_count, v_take, v_reshape, v_take, v_reshape, v_none3, v_none4,)),
+    ("_", (v_floor, v_floor, v_drop, v_delete, v_drop, v_cut, v_none3, v_none4,)),
+    ("$", (v_string, v_string, v_dfmt, v_dfmt, v_dfmt, v_dfmt, v_none3, v_none4,)),
+  // "?" : [real,      unique,     rnd,        pfind,      rnd,        ar(pfind),  splice,  null  ],
+  // "@" : [type,      type,       atx,        atx,        atx,        atx,        amend4,  amend4],
+  // "." : [keval,     keval,      call,       call,       call,       call,       dmend3,  dmend4],
   ])
 }
 
