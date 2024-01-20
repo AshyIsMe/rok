@@ -337,7 +337,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
     _ => Err("todo"),
   }
 }
-pub fn vec2list(nouns: Vec<KW>) -> Result<K, &'static str> {
+pub fn vec_to_list(nouns: Vec<KW>) -> Result<K, &'static str> {
   if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_)))) {
     let v: Vec<u8> = nouns
       .iter()
@@ -689,6 +689,18 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::Dictionary(l_inner), K::List(_)) => (
       l.clone(),
       v_makedict(K::SymbolArray(Series::new("", l_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), r,) .unwrap()),
+    (_l, K::Dictionary(_)) if !matches!(_l, K::Dictionary(_)) => match (l.len(), r.len()) {
+      (0,0) => todo!("promote_nouns empties"),
+      (1,_) => todo!("promote_nouns atom"),
+      (_,1) => todo!("promote_nouns atom"),
+      (llen, rlen) => if llen == rlen { promote_nouns(K::List(k_to_vec(l).unwrap()), r) } else { (l,r) }
+    }
+    (K::Dictionary(_), _r) if !matches!(_r, K::Dictionary(_))=> match (l.len(), r.len()) {
+      (0,0) => todo!("promote_nouns empties"),
+      (1,_) => todo!("promote_nouns atom"),
+      (_,1) => todo!("promote_nouns atom"),
+      (llen, rlen) => if llen == rlen { promote_nouns(l, K::List(k_to_vec(r).unwrap())) } else { (l,r) }
+    }
     _ => (l, r),
   }
 }
@@ -1085,7 +1097,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
             .filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP))
             .collect();
           Ok(vec![KW::Noun(
-            vec2list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
+            vec_to_list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
           )])
         } else {
           Err("invalid list syntax")
