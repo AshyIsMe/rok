@@ -653,8 +653,15 @@ fn test_equal() {
   println!("res: {:?}", res);
   assert_eq!(res, Noun(K::BoolArray(arr!([1, 1, 0u8]))));
 
-  // TODO dict
-  let res = eval(&mut env, scan("(2;3;\"a\") = `a`b`c!(2;3;4)").unwrap()).unwrap();
+  let res = eval(&mut env, scan("(1;2;\"a\") = `a`b`c!(1;2;3)").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  let k =
+    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![K::Bool(1u8), K::Bool(1u8), K::Bool(0u8)]);
+  let d1 = v_makedict(k, v).unwrap();
+  assert_eq!(res, Noun(d1));
+
+  let res = eval(&mut env, scan("(`a`b`c!(1;2;3)) = (1;2;\"a\")").unwrap()).unwrap();
   println!("res: {:?}", res);
   let k =
     K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());

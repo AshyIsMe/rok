@@ -707,9 +707,16 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
       r,
     ),
     (K::Dictionary(l_inner), K::List(_)) => (
-      // TODO SymbolArray for keys not CharArray
       l.clone(),
-      v_makedict(K::List(l_inner.keys().map(|s| K::CharArray(arr!(s))).collect()), r).unwrap(),
+      v_makedict(
+        K::SymbolArray(
+          Series::new("", l_inner.keys().cloned().collect::<Vec<String>>())
+            .cast(&DataType::Categorical(None))
+            .unwrap(),
+        ),
+        r,
+      )
+      .unwrap(),
     ),
     _ => (l, r),
   }
@@ -781,8 +788,8 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
       (K::Dictionary(l), K::Dictionary(r)) => {
         Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
           if r.keys().contains(k) {
-            // TODO promote_nouns() so K::Bool(1) matches K::Int(Some(1))
-            Some((k.clone(), K::Bool((l.get(k) == r.get(k)) as u8)))
+            let (l, r) = promote_nouns(l.get(k).unwrap().clone(), r.get(k).unwrap().clone());
+            Some((k.clone(), K::Bool((l == r) as u8)))
           } else {
             None
           }
