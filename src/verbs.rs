@@ -143,6 +143,25 @@ pub fn v_dfmt(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
+pub fn v_randfloat(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_unique(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_rand(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_type(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_at(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+// https://k.miraheze.org/wiki/Amend
+pub fn v_amend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_amend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_eval(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_dot(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+// https://k.miraheze.org/wiki/Deep_amend
+pub fn v_deepamend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_deepamend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_try(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+
 pub fn v_iota(r: K) -> Result<K, &'static str> {
   debug!("v_iota");
   match r {
@@ -206,6 +225,11 @@ pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
 }
 pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
 pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
+
+pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
+pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
+pub fn v_eachright(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
+pub fn v_eachleft(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
 
 pub fn strip_quotes(s: String) -> String {
   if s.starts_with('\"') && s.ends_with('\"') {

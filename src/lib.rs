@@ -416,6 +416,7 @@ pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
+pub fn v_d_none2(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 
 type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
 type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
@@ -441,9 +442,9 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("#", (v_count, v_count, v_take, v_reshape, v_take, v_reshape, v_none3, v_none4,)),
     ("_", (v_floor, v_floor, v_drop, v_delete, v_drop, v_cut, v_none3, v_none4,)),
     ("$", (v_string, v_string, v_dfmt, v_dfmt, v_dfmt, v_dfmt, v_none3, v_none4,)),
-  // "?" : [real,      unique,     rnd,        pfind,      rnd,        ar(pfind),  splice,  null  ],
-  // "@" : [type,      type,       atx,        atx,        atx,        atx,        amend4,  amend4],
-  // "." : [keval,     keval,      call,       call,       call,       call,       dmend3,  dmend4],
+    ("?", (v_randfloat, v_unique, v_rand, v_find, v_rand, v_find, v_splice, v_none4,)),
+    ("@", (v_type, v_type, v_at, v_at, v_at, v_at, v_amend3, v_amend4,)),
+    (".", (v_eval, v_eval, v_dot, v_dot, v_dot, v_dot, v_deepamend3, v_deepamend4,)),
   ])
 }
 
@@ -472,6 +473,9 @@ pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
     ("'", (v_each as AV1, v_d_each as AV2)),
     ("/", (v_fold, v_d_fold)),
     ("\\", (v_scan, v_d_scan)),
+    ("':", (v_eachprior, v_windows)),
+    ("/:", (v_eachright, v_d_none2)),
+    ("\\:", (v_eachleft, v_d_none2)),
   ])
 }
 
