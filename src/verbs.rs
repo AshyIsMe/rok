@@ -319,3 +319,8 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
     _ => panic!("impossible"),
   }
 }
+
+pub fn v_prm(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_in(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_has(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_within(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }

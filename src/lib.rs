@@ -406,10 +406,6 @@ type V2 = fn(K, K) -> Result<K, &'static str>;
 type V3 = fn(K, K, K) -> Result<K, &'static str>;
 type V4 = fn(K, K, K, K) -> Result<K, &'static str>;
 
-// AA TODO: can we do this with a macro?
-// fn nyi1(n: &str) -> V1 { |_x: K| Err(format!("nyi: {}", n.clone())) }
-// fn nyi2(n: &str) -> V2 { |_x: K, _y: K| Err(format!("nyi: {}", n.clone())) }
-
 pub fn v_nyi1(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_nyi2(_x: K, _y: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
@@ -448,22 +444,67 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
   ])
 }
 
+#[rustfmt::skip]
+pub fn named_primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+  // Note, only really need IndexMap<&str, (V1, V2)> but this way it's simpler in apply_primitive()
+  IndexMap::from([
+    // https://estradajke.github.io/k9-simples/k9/Named-Functions.html
+    // https://k.miraheze.org/wiki/Primitives#Named_Verbs
+    // Utility
+    ("bin", (v_none1 as V1, v_none1 as V1, v_nyi2 as V2, v_nyi2 as V2, v_nyi2 as V2, v_nyi2 as V2, v_none3 as V3, v_none4 as V4)),
+    ("cmb", (v_none1, v_none1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("find", (v_none1, v_none1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("freq", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("in", (v_none1, v_none1, v_in, v_in, v_in, v_in, v_none3, v_none4)),
+    ("has", (v_none1, v_none1, v_has, v_has, v_has, v_has, v_none3, v_none4)),
+    ("like", (v_none1, v_none1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("prm", (v_prm, v_prm, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("within", (v_none1, v_none1, v_within, v_within, v_within, v_within, v_none3, v_none4)),
+    // Maths
+    ("abs", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("bar", (v_none1, v_none1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("cos", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("deltas", (v_nyi1, v_nyi1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("div", (v_none1, v_none1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("dot", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("exp", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("log", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("rand", (v_nyi1, v_nyi1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("sin", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("sum", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("sums", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("sqrt", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("sqr", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    // Stats
+    ("avg", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("count", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("dev", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("first", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("last", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("mavg", (v_none1, v_none1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("med", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("mode", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("msum", (v_none1, v_none1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("var", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    // Table
+    ("asc", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("dsc", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("key", (v_none1, v_none1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("meta", (v_nyi1, v_nyi1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("top", (v_nyi1, v_nyi1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    ("unkey", (v_nyi1, v_nyi1, v_nyi2, v_nyi2, v_nyi2, v_nyi2, v_none3, v_none4)),
+    // Misc
+    ("min", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("max", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("countd", (v_nyi1, v_nyi1, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+  ])
+}
+
+#[rustfmt::skip]
 pub fn specialcombinations_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
   IndexMap::from([
     // Special Combinations are performance optimisations for easy known cases.
-    (
-      "+/",
-      (
-        v_sum as V1,
-        v_sum as V1,
-        v_d_sum as V2,
-        v_d_sum as V2,
-        v_d_sum as V2,
-        v_d_sum as V2,
-        v_none3 as V3,
-        v_none4 as V4,
-      ),
-    ),
+    ("+/", (v_sum as V1, v_sum as V1, v_d_sum as V2, v_d_sum as V2, v_d_sum as V2, v_d_sum as V2, v_none3 as V3, v_none4 as V4)),
     // ("*/", (v_product, v_product, v_d_product, v_d_product, v_d_product, v_d_product, v_none3, v_none4)), // TODO
   ])
 }
@@ -510,6 +551,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
   let mut verbs = IndexMap::new();
   verbs.extend(primitives_table().iter());
   verbs.extend(specialcombinations_table().iter());
+  verbs.extend(named_primitives_table().iter());
 
   let adverbs = adverbs_table();
 
@@ -787,7 +829,14 @@ fn resolve_names(env: Env, fragment: (KW, KW, KW, KW)) -> Result<(KW, KW, KW, KW
       },
       KW::Noun(K::Name(n)) => resolved_words.push(match env.names.get(n) {
         Some(k) => k.clone(),
-        None => w.clone(),
+        None => {
+          // look up name in named_primitives_table() and fallback to w.clone()
+          let named_prims = named_primitives_table();
+          match named_prims.get(&n[..]) {
+            Some(_) => KW::Verb { name: n.to_string() },
+            None => w.clone(),
+          }
+        }
       }),
       _ => resolved_words.push(w.clone()),
     }
