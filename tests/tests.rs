@@ -601,7 +601,6 @@ fn test_expr_funcargs() {
 }
 
 #[test]
-#[ignore]
 fn test_expr_order() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
