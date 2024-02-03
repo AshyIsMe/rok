@@ -56,13 +56,14 @@ pub enum KW /* KWords */ {
   Cond(Vec<KW>),  // conditional form $[p;t;f]
   StartOfLine,
   Nothing,
-  LP,  // (
-  RP,  // )
-  LCB, // {
-  RCB, // }
-  LB,  // [
-  RB,  // ]
-  SC,  // semicolon
+  LP,        // (
+  RP,        // )
+  LCB,       // {
+  RCB,       // }
+  LB,        // [
+  RB,        // ]
+  SC,        // semicolon
+  CondStart, // $[ Cond start token
 }
 
 impl K {
@@ -278,6 +279,7 @@ impl fmt::Display for KW {
       KW::LB => write!(f, "["),
       KW::RB => write!(f, "]"),
       KW::SC => write!(f, ";"),
+      KW::CondStart => write!(f, "$["),
     }
   }
 }
@@ -1048,6 +1050,7 @@ fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static
 fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
   // [expr;list;in;square;brackets] => KW::Exprs(vec![expr,list,in,square,brackets])
   // TODO Nested exprs [[1;2;3];`a;`b]
+  // TODO Cond exprs $[...]
   let mut depth = 0; // nested functions depth
   debug!("queue: {:?}", queue);
   for i in (0..queue.len()).rev() {
@@ -1087,13 +1090,8 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       ']' => words.push(KW::RB),
       ';' => words.push(KW::SC),
       '$' if code.chars().nth(i + 1) == Some('[') => {
-        if let Ok((j, k)) = scan_cond(&code[i..]) {
-          words.push(k);
-          skip = j;
-        } else {
-          // Should this be an error here?
-          words.push(KW::Verb { name: c.to_string() })
-        }
+        words.push(KW::CondStart);
+        skip = 1;
       }
       '-' => {
         // couple different cases here:
@@ -1156,10 +1154,6 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     };
   }
   Ok(words)
-}
-
-pub fn scan_cond(code: &str) -> Result<(usize, KW), &'static str> {
-  todo!("Scan KW::Cond properly")
 }
 
 pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
