@@ -53,7 +53,7 @@ pub enum KW /* KWords */ {
   Verb { name: String },
   Adverb { name: String },
   Exprs(Vec<KW>), // list of expressions: [e1;e2;e3]
-  // Cond { body: Vec< Vec<K> > } //list of expressions...
+  Cond(Vec<KW>),  // conditional form $[p;t;f]
   StartOfLine,
   Nothing,
   LP,  // (
@@ -264,6 +264,10 @@ impl fmt::Display for KW {
       KW::Exprs(e) => {
         let s = e.iter().map(|kw| format!("{}", kw)).join("");
         write!(f, "[{}]", s)
+      }
+      KW::Cond(e) => {
+        let s = e.iter().map(|kw| format!("{}", kw)).join("");
+        write!(f, "$[{}]", s)
       }
       KW::StartOfLine => panic!("impossible"),
       KW::Nothing => panic!("impossible"),
@@ -848,6 +852,22 @@ fn resolve_names(env: Env, fragment: (KW, KW, KW, KW)) -> Result<(KW, KW, KW, KW
 }
 
 pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
+  // split sentence on KW::SC and eval left to right
+  // eg: a:2 ; a+2   => 4
+
+  // // TODO need to only split on depth 0 KW::SC
+  // // eg. vec![ a:2 ; $[1;2;3] ] => [[a:2], [$[1;2;3]]]
+  // // TODO OR... properly model KW::Cond(), KW::Exprs(), etc
+  // let mut r: KW = KW::Nothing;
+  // for sen in sentence.split(|kw| *kw == KW::SC) {
+  //   r = eval_expr(env, sen.to_vec()).unwrap()
+  // }
+  // Ok(r)
+
+  eval_expr(env, sentence)
+}
+
+pub fn eval_expr(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
   let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
   let mut stack: VecDeque<KW> = VecDeque::new();
 
@@ -1066,6 +1086,15 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       '[' => words.push(KW::LB),
       ']' => words.push(KW::RB),
       ';' => words.push(KW::SC),
+      '$' if code.chars().nth(i + 1) == Some('[') => {
+        if let Ok((j, k)) = scan_cond(&code[i..]) {
+          words.push(k);
+          skip = j;
+        } else {
+          // Should this be an error here?
+          words.push(KW::Verb { name: c.to_string() })
+        }
+      }
       '-' => {
         // couple different cases here:
         // 1-1 or a-1: dyadic
@@ -1127,6 +1156,10 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     };
   }
   Ok(words)
+}
+
+pub fn scan_cond(code: &str) -> Result<(usize, KW), &'static str> {
+  todo!("Scan KW::Cond properly")
 }
 
 pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
@@ -1192,6 +1225,7 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
       } else if code.chars().nth(i) == Some('\\') {
         match code.chars().nth(i + 1) {
           Some('\\') => s.push('\\'),
+          Some('"') => s.push('"'),
           Some('t') => s.push('\t'),
           Some('n') => s.push('\n'),
           // TODO: handle the rest
