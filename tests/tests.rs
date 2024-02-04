@@ -32,13 +32,32 @@ fn test_scan() {
 #[test]
 fn test_scan_lambda() {
   let tokens = vec![
-    KW::LCB,
     KW::Noun(K::Name("x".into())),
     KW::Verb { name: "+".to_string() },
     KW::Noun(K::Name("y".into())),
-    KW::RCB,
   ];
-  assert_eq!(scan("{x+y}").unwrap(), tokens);
+  let f = KW::Function { body: tokens, args: vec!["x".to_string(), "y".to_string()] };
+  assert_eq!(scan("{x+y}").unwrap(), vec![f]);
+}
+
+#[test]
+fn test_scan_exprs() {
+  let tokens = vec![KW::Noun(K::Name("x".into())), KW::SC, KW::Noun(K::Name("y".into()))];
+  let e = KW::Exprs(tokens);
+  assert_eq!(scan("[x;y]").unwrap(), vec![e]);
+}
+
+#[test]
+fn test_scan_cond() {
+  let tokens = vec![
+    KW::Noun(K::Bool(1)),
+    KW::SC,
+    KW::Noun(K::Int(Some(2))),
+    KW::SC,
+    KW::Noun(K::Int(Some(3))),
+  ];
+  let e = KW::Cond(tokens);
+  assert_eq!(scan("$[1;2;3]").unwrap(), vec![e]);
 }
 
 #[test]

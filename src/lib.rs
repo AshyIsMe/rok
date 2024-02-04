@@ -1115,6 +1115,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
       ')' => words.push(KW::RP),
       '{' => words.push(KW::LCB),
       '}' => words.push(KW::RCB),
+      '[' if i == 0 => words.push(KW::LB),
       '[' => match code.chars().nth(i - 1) {
         Some(c) => {
           if " ()[]".contains(c) {
@@ -1207,6 +1208,7 @@ pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
     match t {
       KW::LB => todo!("scan_pass2 exprs"),
       KW::CondStart => todo!("scan_pass2 CondStart"),
+      KW::LCB => todo!("scan_pass2 Function"),
       KW::FuncArgsStart => todo!("scan_pass2 FuncArgsStart"),
       _ => tkns.push(t.clone()),
     }
