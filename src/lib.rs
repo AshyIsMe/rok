@@ -52,18 +52,21 @@ pub enum KW /* KWords */ {
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   Adverb { name: String },
-  Exprs(Vec<KW>), // list of expressions: [e1;e2;e3]
-  Cond(Vec<KW>),  // conditional form $[p;t;f]
+  // TODO current usage of Exprs should be replaced with FuncArgs where required.
+  Exprs(Vec<KW>),    // list of expressions: [e1;e2;e3]
+  FuncArgs(Vec<KW>), // function arguments: f[a1;a2;3]
+  Cond(Vec<KW>),     // conditional form $[p;t;f]
   StartOfLine,
   Nothing,
-  LP,        // (
-  RP,        // )
-  LCB,       // {
-  RCB,       // }
-  LB,        // [
-  RB,        // ]
-  SC,        // semicolon
-  CondStart, // $[ Cond start token
+  LP,            // (
+  RP,            // )
+  LCB,           // {
+  RCB,           // }
+  LB,            // [
+  RB,            // ]
+  SC,            // semicolon
+  CondStart,     // $[ Cond start token
+  FuncArgsStart, // [ but explicitly function arguments start
 }
 
 impl K {
@@ -266,6 +269,10 @@ impl fmt::Display for KW {
         let s = e.iter().map(|kw| format!("{}", kw)).join("");
         write!(f, "[{}]", s)
       }
+      KW::FuncArgs(e) => {
+        let s = e.iter().map(|kw| format!("{}", kw)).join("");
+        write!(f, "[{}]", s)
+      }
       KW::Cond(e) => {
         let s = e.iter().map(|kw| format!("{}", kw)).join("");
         write!(f, "$[{}]", s)
@@ -280,6 +287,7 @@ impl fmt::Display for KW {
       KW::RB => write!(f, "]"),
       KW::SC => write!(f, ";"),
       KW::CondStart => write!(f, "$["),
+      KW::FuncArgsStart => write!(f, "["),
     }
   }
 }
@@ -958,6 +966,15 @@ pub fn eval_expr(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
           Err(e) => Err(e),
         }
       }
+      (w1, w2, w3, w4 @ KW::Cond(_)) => {
+        queue.push_back(w1);
+        queue.push_back(w2);
+        queue.push_back(w3);
+        match parse_cond(env, w4) {
+          Ok(r) => Ok(vec![r]),
+          Err(e) => Err(e),
+        }
+      }
       (w1, w2, w3, w4) => match queue.pop_back() {
         Some(v) => Ok(vec![v, w1.clone(), w2.clone(), w3.clone(), w4.clone()]),
         None => {
@@ -1049,8 +1066,8 @@ fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static
 
 fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
   // [expr;list;in;square;brackets] => KW::Exprs(vec![expr,list,in,square,brackets])
+  // Cond exprs $[...] => KW::Cond(vec![...])
   // TODO Nested exprs [[1;2;3];`a;`b]
-  // TODO Cond exprs $[...]
   let mut depth = 0; // nested functions depth
   debug!("queue: {:?}", queue);
   for i in (0..queue.len()).rev() {
@@ -1066,6 +1083,15 @@ fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> 
         }
         _ => depth -= 1,
       },
+      Some(KW::CondStart) => match depth {
+        0 => {
+          return Ok((
+            queue.range(0..i).cloned().collect(),
+            KW::Cond(queue.range(i + 1..).cloned().collect()),
+          ))
+        }
+        _ => depth -= 1,
+      },
       Some(_) => continue,
       None => panic!("impossible"),
     }
@@ -1073,7 +1099,10 @@ fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> 
   Err("parse error: mismatched square brackets")
 }
 
-pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
+fn parse_cond(env: &mut Env, kw: KW) -> Result<KW, &'static str> { todo!("parse_cond") }
+
+pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> { scan_pass2(scan_pass1(code)?) }
+pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
   let mut words = vec![];
   let mut skip: usize = 0;
   for (i, c) in code.char_indices() {
@@ -1086,7 +1115,16 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       ')' => words.push(KW::RP),
       '{' => words.push(KW::LCB),
       '}' => words.push(KW::RCB),
-      '[' => words.push(KW::LB),
+      '[' => match code.chars().nth(i - 1) {
+        Some(c) => {
+          if " ()[]".contains(c) {
+            words.push(KW::LB)
+          } else {
+            words.push(KW::FuncArgsStart)
+          }
+        }
+        None => words.push(KW::LB),
+      },
       ']' => words.push(KW::RB),
       ';' => words.push(KW::SC),
       '$' if code.chars().nth(i + 1) == Some('[') => {
@@ -1154,6 +1192,26 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     };
   }
   Ok(words)
+}
+pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
+  // TODO Parse out raw tokens into "pass2" form:
+  // - Function{_}
+  // - Exprs()
+  // - FuncArgs()
+  // - Cond()
+  // ie. Strip out all LB, RB, LCB, RCB, SC, CondStart, FuncArgsStart tokens
+
+  let mut tkns = vec![];
+  for i in 0..tokens.len() {
+    let t = tokens.get(i).unwrap();
+    match t {
+      KW::LB => todo!("scan_pass2 exprs"),
+      KW::CondStart => todo!("scan_pass2 CondStart"),
+      KW::FuncArgsStart => todo!("scan_pass2 FuncArgsStart"),
+      _ => tkns.push(t.clone()),
+    }
+  }
+  Ok(tkns)
 }
 
 pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
