@@ -50,11 +50,9 @@ fn test_scan_exprs() {
 #[test]
 fn test_scan_cond() {
   let tokens = vec![
-    KW::Noun(K::Bool(1)),
-    KW::SC,
-    KW::Noun(K::Int(Some(2))),
-    KW::SC,
-    KW::Noun(K::Int(Some(3))),
+    vec![KW::Noun(K::Bool(1))],
+    vec![KW::Noun(K::Int(Some(2)))],
+    vec![KW::Noun(K::Int(Some(3)))],
   ];
   let e = KW::Cond(tokens);
   assert_eq!(scan("$[1;2;3]").unwrap(), vec![e]);

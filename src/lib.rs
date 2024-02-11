@@ -53,9 +53,9 @@ pub enum KW /* KWords */ {
   Verb { name: String },
   Adverb { name: String },
   // TODO current usage of Exprs should be replaced with FuncArgs where required.
-  Exprs(Vec<KW>),    // list of expressions: [e1;e2;e3]
-  FuncArgs(Vec<KW>), // function arguments: f[a1;a2;3]
-  Cond(Vec<KW>),     // conditional form $[p;t;f]
+  Exprs(Vec<KW>),     // list of expressions: [e1;e2;e3]
+  FuncArgs(Vec<KW>),  // function arguments: f[a1;a2;3]
+  Cond(Vec<Vec<KW>>), // conditional form $[p;t;f]
   StartOfLine,
   Nothing,
   LP,            // (
@@ -274,7 +274,7 @@ impl fmt::Display for KW {
         write!(f, "[{}]", s)
       }
       KW::Cond(e) => {
-        let s = e.iter().map(|kw| format!("{}", kw)).join("");
+        let s = e.iter().map(|kw| format!("{:?}", kw)).join(""); // TODO
         write!(f, "$[{}]", s)
       }
       KW::StartOfLine => panic!("impossible"),
@@ -1066,7 +1066,6 @@ fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static
 
 fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
   // [expr;list;in;square;brackets] => KW::Exprs(vec![expr,list,in,square,brackets])
-  // Cond exprs $[...] => KW::Cond(vec![...])
   // TODO Nested exprs [[1;2;3];`a;`b]
   let mut depth = 0; // nested functions depth
   debug!("queue: {:?}", queue);
@@ -1083,15 +1082,6 @@ fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> 
         }
         _ => depth -= 1,
       },
-      Some(KW::CondStart) => match depth {
-        0 => {
-          return Ok((
-            queue.range(0..i).cloned().collect(),
-            KW::Cond(queue.range(i + 1..).cloned().collect()),
-          ))
-        }
-        _ => depth -= 1,
-      },
       Some(_) => continue,
       None => panic!("impossible"),
     }
@@ -1103,6 +1093,7 @@ fn parse_cond(env: &mut Env, kw: KW) -> Result<KW, &'static str> { todo!("parse_
 
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> { scan_pass2(scan_pass1(code)?) }
 pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
+  // First tokenization pass.
   let mut words = vec![];
   let mut skip: usize = 0;
   for (i, c) in code.char_indices() {
@@ -1211,7 +1202,7 @@ pub fn split_on(
       continue;
     }
     let t = tokens.get(i).unwrap();
-    println!("t:{t}, depth:{depth}");
+    // println!("t:{t}, depth:{depth}");
     match t {
       KW::LB | KW::LCB | KW::LP | KW::CondStart | KW::FuncArgsStart => {
         depth += 1;
@@ -1223,23 +1214,24 @@ pub fn split_on(
         if *t == delim {
           splits.extend(vec![tokens[start..i].to_vec()]);
           start = i + 1;
-          println!("delim found: t:{t}, start:{start}");
+          // println!("delim found: t:{t}, start:{start}");
         } else if *t == end_tok {
           splits.extend(vec![tokens[start..i].to_vec()]);
           start = i + 1;
-          println!("end_tok found: t:{t}, start:{start}");
+          // println!("end_tok found: t:{t}, start:{start}");
           break;
         }
       }
       _ => continue,
     }
   }
-  println!("split_on() done");
+  // println!("split_on() done");
   Ok((splits, tokens[start..].to_vec()))
 }
 
 pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
-  // TODO Parse out raw tokens into "pass2" form:
+  // Second tokenization pass, raw tokens into basic parsed tokens.
+  // Parse out raw tokens into "pass2" form:
   // - Function{_}
   // - Exprs()
   // - FuncArgs()
@@ -1247,11 +1239,20 @@ pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
   // ie. Strip out all LB, RB, LCB, RCB, SC, CondStart, FuncArgsStart tokens
 
   let mut tkns = vec![];
+  let mut skip = 0;
   for i in 0..tokens.len() {
+    if skip > 0 {
+      skip -= 1;
+      continue;
+    }
     let t = tokens.get(i).unwrap();
     match t {
       KW::LB => todo!("scan_pass2 exprs"),
-      KW::CondStart => todo!("scan_pass2 CondStart"),
+      KW::CondStart => {
+        let (condargs, rest) = split_on(tokens[i + 1..].to_vec(), KW::SC, KW::RB).unwrap();
+        tkns.push(KW::Cond(condargs.iter().map(|v| scan_pass2(v.clone()).unwrap()).collect()));
+        skip = tokens.len() - rest.len() - i;
+      }
       KW::LCB => todo!("scan_pass2 Function"),
       KW::FuncArgsStart => todo!("scan_pass2 FuncArgsStart"),
       _ => tkns.push(t.clone()),
