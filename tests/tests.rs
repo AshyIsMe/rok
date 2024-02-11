@@ -61,6 +61,57 @@ fn test_scan_cond() {
 }
 
 #[test]
+fn test_split_on() {
+  let tokens = vec![
+    // KW::CondStart, // don't pass open token through
+    KW::Noun(K::Bool(1)),
+    KW::SC,
+    KW::Noun(K::Int(Some(2))),
+    KW::SC,
+    KW::Noun(K::Int(Some(3))),
+    KW::RB,
+    KW::Noun(K::Bool(1)),
+  ];
+  assert_eq!(
+    split_on(tokens, KW::SC, KW::RB),
+    Ok((
+      vec![
+        vec![KW::Noun(K::Bool(1))],
+        vec![KW::Noun(K::Int(Some(2)))],
+        vec![KW::Noun(K::Int(Some(3)))]
+      ],
+      vec![KW::Noun(K::Bool(1)),]
+    ))
+  );
+
+  let tokens = vec![
+    // KW::CondStart, // don't pass open token through
+    KW::Noun(K::Bool(1)),
+    KW::SC,
+    KW::LB,
+    KW::Noun(K::Int(Some(2))),
+    KW::SC,
+    KW::Noun(K::Int(Some(3))),
+    KW::RB,
+    KW::SC,
+    KW::Noun(K::Int(Some(4))),
+    KW::RB,
+    KW::Noun(K::Bool(1)),
+  ];
+  assert_eq!(
+    split_on(tokens, KW::SC, KW::RB),
+    Ok((
+      vec![
+        vec![KW::Noun(K::Bool(1))],
+        vec![KW::LB, KW::Noun(K::Int(Some(2))), KW::SC, KW::Noun(K::Int(Some(3))), KW::RB],
+        vec![KW::Noun(K::Int(Some(4)))]
+      ],
+      vec![KW::Noun(K::Bool(1)),]
+    ))
+  );
+}
+
+#[test]
 fn test_eval() {
   let mut env = Env { names: HashMap::new(), parent: None };
 

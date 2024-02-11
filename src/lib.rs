@@ -1194,6 +1194,50 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
   }
   Ok(words)
 }
+
+pub fn split_on(
+  tokens: Vec<KW>, delim: KW, end_tok: KW,
+) -> Result<(Vec<Vec<KW>>, Vec<KW>), &'static str> {
+  // Split tokens on delim token until end token.
+  // Depth of 0 meaning we keep track of nested parens, brackets, funcs etc
+  let mut depth = 0;
+  let mut splits: Vec<Vec<KW>> = vec![];
+  let mut start = 0;
+  for i in 0..tokens.len() {
+    if depth < 0 {
+      return Err("mismatched parens, brackets or curly brackets"); // TODO better message
+    }
+    if start > i {
+      continue;
+    }
+    let t = tokens.get(i).unwrap();
+    println!("t:{t}, depth:{depth}");
+    match t {
+      KW::LB | KW::LCB | KW::LP | KW::CondStart | KW::FuncArgsStart => {
+        depth += 1;
+      }
+      KW::RB | KW::RCB | KW::RP if depth > 0 => {
+        depth -= 1;
+      }
+      t if depth == 0 => {
+        if *t == delim {
+          splits.extend(vec![tokens[start..i].to_vec()]);
+          start = i + 1;
+          println!("delim found: t:{t}, start:{start}");
+        } else if *t == end_tok {
+          splits.extend(vec![tokens[start..i].to_vec()]);
+          start = i + 1;
+          println!("end_tok found: t:{t}, start:{start}");
+          break;
+        }
+      }
+      _ => continue,
+    }
+  }
+  println!("split_on() done");
+  Ok((splits, tokens[start..].to_vec()))
+}
+
 pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
   // TODO Parse out raw tokens into "pass2" form:
   // - Function{_}
