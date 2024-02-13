@@ -664,31 +664,6 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
           0 | 1 => todo!("currying"),
           2 => apply_primitive(env, &name, Some(exprs_no_sc[0].clone()), exprs_no_sc[1].clone()),
           _ => match name.as_str() {
-            "$" => {
-              // $[if;then;elif;then;...;else]
-              // all values are truthy except: 0, 0x00 or ().
-              debug!("cond");
-              let mut split_exprs = exprs.split(|kw| matches!(kw, KW::SC));
-              loop {
-                match (split_exprs.next(), split_exprs.next()) {
-                  (Some(pred), Some(val)) => {
-                    debug!("pred: {:?}, val: {:?}", pred, val);
-                    match eval(env, pred.into()) {
-                      Ok(KW::Noun(K::Bool(0))) => continue,
-                      Ok(KW::Noun(K::Int(Some(0)))) => continue,
-                      Ok(_) => return eval(env, val.into()),
-                      Err(e) => return Err(e),
-                    }
-                  }
-                  (Some(pred), None) => {
-                    debug!("pred: {:?}, val: None", pred);
-                    return eval(env, pred.into()); // else case
-                  }
-                  (None, Some(_)) => panic!("impossible"),
-                  (None, None) => panic!("impossible"),
-                }
-              }
-            }
             _ => Err("rank error"),
           },
         }
@@ -886,6 +861,12 @@ pub fn eval_expr(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
     // debug!("stack: {stack:?}");
     let fragment = resolve_names(env.clone(), get_fragment(&mut stack)).unwrap();
     let result: Result<Vec<KW>, &'static str> = match fragment {
+      (w1, w2 @ KW::Cond { .. }, any1, any2) if matches!(w1, KW::StartOfLine | KW::LP) => {
+        match parse_cond(env, w2) {
+          Ok(r) => Ok(vec![w1, r, any1, any2]),
+          Err(e) => Err(e),
+        }
+      }
       (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad
         apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, r, any])
@@ -963,15 +944,6 @@ pub fn eval_expr(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
             queue = q;
             Ok(vec![expr])
           }
-          Err(e) => Err(e),
-        }
-      }
-      (w1, w2, w3, w4 @ KW::Cond(_)) => {
-        queue.push_back(w1);
-        queue.push_back(w2);
-        queue.push_back(w3);
-        match parse_cond(env, w4) {
-          Ok(r) => Ok(vec![r]),
           Err(e) => Err(e),
         }
       }
@@ -1089,7 +1061,32 @@ fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> 
   Err("parse error: mismatched square brackets")
 }
 
-fn parse_cond(env: &mut Env, kw: KW) -> Result<KW, &'static str> { todo!("parse_cond") }
+fn parse_cond(env: &mut Env, kw: KW) -> Result<KW, &'static str> {
+  match kw {
+    KW::Cond(exprs) => {
+      // $[if;then;elif;then;...;else]
+      // all values are truthy except: 0, 0x00 or ().
+      for pv in exprs.chunks(2) {
+        if pv.len() == 2 {
+          let pred = &pv[0];
+          let val = &pv[1];
+          match eval(env, pred.to_vec()) {
+            Ok(KW::Noun(K::Bool(0))) => continue,
+            Ok(KW::Noun(K::Int(Some(0)))) => continue,
+            Ok(_) => return eval(env, val.to_vec()),
+            Err(e) => return Err(e),
+          }
+        } else if pv.len() == 1 {
+          return eval(env, pv[0].clone()); // final else case
+        } else {
+          panic!("impossible")
+        }
+      }
+      panic!("impossible")
+    }
+    _ => panic!("impossible"),
+  }
+}
 
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> { scan_pass2(scan_pass1(code)?) }
 pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
