@@ -923,18 +923,6 @@ pub fn eval_expr(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
           Err("invalid list syntax")
         }
       }
-      (w1, w2, w3, KW::RCB) => {
-        queue.push_back(w1);
-        queue.push_back(w2);
-        queue.push_back(w3);
-        match parse_function_def(queue.clone()) {
-          Ok((q, f)) => {
-            queue = q;
-            Ok(vec![f])
-          }
-          Err(e) => Err(e),
-        }
-      }
       (w1, w2, w3, KW::RB) => {
         queue.push_back(w1);
         queue.push_back(w2);
@@ -976,64 +964,6 @@ fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
     .chain(repeat(KW::Nothing))
     .next_tuple()
     .expect("infinite iterator can't be empty")
-}
-
-fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
-  // Result<(queue, KW::Function{...})
-  // Parse a function definition off the back of the queue, Eg:
-  // parse_function_def([f: {x*2}]) => Ok(([f:], KW::Function{body:"x*2", args: vec![]}))
-  let mut depth = 0; // nested functions depth
-  debug!("queue: {:?}", queue);
-  for i in (0..queue.len()).rev() {
-    debug!("queue: {:?}, depth: {}, i: {}", queue, depth, i);
-    match queue.get(i) {
-      Some(KW::RCB) => depth += 1,
-      Some(KW::LCB) => match depth {
-        0 => {
-          let (args, body) = parse_function_args(queue.range(i + 1..).cloned().collect())?;
-          return Ok((queue.range(0..i).cloned().collect(), KW::Function { body, args }));
-        }
-        _ => depth -= 1,
-      },
-      Some(_) => continue,
-      None => panic!("impossible"),
-    }
-  }
-  Err("parse error: mismatched brackets")
-}
-
-fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static str> {
-  if let Some(KW::LB) = body.first() {
-    // TODO
-    // - {[a;b] {x+y}[a;b]} // nested functions also need to work
-    match body.iter().position(|kw| matches!(kw, KW::RB)) {
-      // - {[a;b;c] a+b+c}
-      Some(i) => {
-        if body[1..i].iter().all(|kw| matches!(kw, KW::SC | KW::Noun(K::Name(_)))) {
-          let args: Vec<String> = body[1..i]
-            .iter()
-            .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
-            .collect();
-          Ok((args, body[i + 1..].to_vec()))
-        } else {
-          Err("parse error: invalid function args")
-        }
-      }
-      None => Err("parse error: mismatched square brackets"),
-    }
-  } else {
-    // - {x + y + z} or {z * x + y} => vec!["x","y","z"]
-    if body.contains(&KW::LCB) {
-      todo!("handle nested functions properly");
-    }
-    let mut args: Vec<String> = body
-      .iter()
-      .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
-      .unique()
-      .collect();
-    args.sort();
-    Ok((args, body))
-  }
 }
 
 fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
@@ -1250,12 +1180,69 @@ pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
         tkns.push(KW::Cond(condargs.iter().map(|v| scan_pass2(v.clone()).unwrap()).collect()));
         skip = tokens.len() - rest.len() - i;
       }
-      KW::LCB => todo!("scan_pass2 Function"),
+      KW::LCB => {
+        let (f, rest) = scan_function(tokens[i + 1..].to_vec()).unwrap();
+        tkns.push(f);
+        skip = tokens.len() - rest.len() - i;
+      }
       KW::FuncArgsStart => todo!("scan_pass2 FuncArgsStart"),
       _ => tkns.push(t.clone()),
     }
   }
   Ok(tkns)
+}
+
+fn scan_function(tokens: Vec<KW>) -> Result<(KW, Vec<KW>), &'static str> {
+  let mut depth = 0; // nested functions depth
+  for i in 0..tokens.len() {
+    match tokens.get(i) {
+      Some(KW::LCB) => depth += 1,
+      Some(KW::RCB) => match depth {
+        0 => {
+          let (args, body) = scan_function_args(tokens[0..i].to_vec())?;
+          return Ok((KW::Function { body, args }, tokens[i..].to_vec()));
+        }
+        _ => depth -= 1,
+      },
+      Some(_) => continue,
+      None => panic!("impossible"),
+    }
+  }
+  Err("parse error: mismatched brackets")
+}
+
+fn scan_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static str> {
+  if let Some(KW::LB) = body.first() {
+    // TODO
+    // - {[a;b] {x+y}[a;b]} // nested functions also need to work
+    match body.iter().position(|kw| matches!(kw, KW::RB)) {
+      // - {[a;b;c] a+b+c}
+      Some(i) => {
+        if body[1..i].iter().all(|kw| matches!(kw, KW::SC | KW::Noun(K::Name(_)))) {
+          let args: Vec<String> = body[1..i]
+            .iter()
+            .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+            .collect();
+          Ok((args, body[i + 1..].to_vec()))
+        } else {
+          Err("parse error: invalid function args")
+        }
+      }
+      None => Err("parse error: mismatched square brackets"),
+    }
+  } else {
+    // - {x + y + z} or {z * x + y} => vec!["x","y","z"]
+    if body.contains(&KW::LCB) {
+      todo!("handle nested functions properly");
+    }
+    let mut args: Vec<String> = body
+      .iter()
+      .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+      .unique()
+      .collect();
+    args.sort();
+    Ok((args, body))
+  }
 }
 
 pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
