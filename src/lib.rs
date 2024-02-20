@@ -52,10 +52,9 @@ pub enum KW /* KWords */ {
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   Adverb { name: String },
-  // TODO current usage of Exprs should be replaced with FuncArgs where required.
-  Exprs(Vec<KW>),     // list of expressions: [e1;e2;e3]
-  FuncArgs(Vec<KW>),  // function arguments: f[a1;a2;3]
-  Cond(Vec<Vec<KW>>), // conditional form $[p;t;f]
+  Exprs(Vec<KW>),         // list of expressions: [e1;e2;e3]
+  FuncArgs(Vec<Vec<KW>>), // function arguments: f[a1;a2;3]
+  Cond(Vec<Vec<KW>>),     // conditional form $[p;t;f]
   StartOfLine,
   Nothing,
   LP,            // (
@@ -270,7 +269,7 @@ impl fmt::Display for KW {
         write!(f, "[{}]", s)
       }
       KW::FuncArgs(e) => {
-        let s = e.iter().map(|kw| format!("{}", kw)).join("");
+        let s = e.iter().map(|kw| format!("{:?}", kw)).join(""); // TODO
         write!(f, "[{}]", s)
       }
       KW::Cond(e) => {
@@ -641,8 +640,9 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
           _ => todo!("currying"),
         }
       }
-      KW::Exprs(exprs) => {
-        let exprs: Vec<KW> = exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
+      KW::FuncArgs(exprs) => {
+        let exprs: Vec<KW> =
+          exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
         match exprs.len().cmp(&args.len()) {
           Ordering::Greater => Err("rank error"),
           Ordering::Less => todo!("currying"),
@@ -657,12 +657,12 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
     },
     KW::Verb { name } => match arg {
       KW::Noun(_) => todo!("currying"),
-      KW::Exprs(exprs) => {
-        let exprs_no_sc: Vec<KW> =
-          exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
-        match exprs_no_sc.len() {
+      KW::FuncArgs(exprs) => {
+        let exprs: Vec<KW> =
+          exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
+        match exprs.len() {
           0 | 1 => todo!("currying"),
-          2 => apply_primitive(env, &name, Some(exprs_no_sc[0].clone()), exprs_no_sc[1].clone()),
+          2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
           _ => match name.as_str() {
             _ => Err("rank error"),
           },
@@ -878,7 +878,7 @@ pub fn eval_expr(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
       (
         w,
         f @ KW::Verb { .. } | f @ KW::Function { .. },
-        x @ KW::Noun(_) | x @ KW::Exprs(_),
+        x @ KW::Noun(_) | x @ KW::FuncArgs(_),
         any,
       ) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad function
@@ -888,7 +888,7 @@ pub fn eval_expr(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         w,
         v @ KW::Verb { .. } | v @ KW::Function { .. },
         f @ KW::Verb { .. } | f @ KW::Function { .. },
-        x @ KW::Noun(_) | x @ KW::Exprs(_),
+        x @ KW::Noun(_) | x @ KW::FuncArgs(_),
       ) => {
         // 1 monad function
         apply_function(env, f, x.clone()).map(|r| vec![w, v, r])
@@ -1036,7 +1036,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
       '[' if i == 0 => words.push(KW::LB),
       '[' => match code.chars().nth(i - 1) {
         Some(c) => {
-          if " ()[]".contains(c) {
+          if " ()[]{".contains(c) {
             words.push(KW::LB)
           } else {
             words.push(KW::FuncArgsStart)
@@ -1185,7 +1185,11 @@ pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
         tkns.push(f);
         skip = tokens.len() - rest.len() - i;
       }
-      KW::FuncArgsStart => todo!("scan_pass2 FuncArgsStart"),
+      KW::FuncArgsStart => {
+        let (funcargs, rest) = split_on(tokens[i + 1..].to_vec(), KW::SC, KW::RB).unwrap();
+        tkns.push(KW::FuncArgs(funcargs.iter().map(|v| scan_pass2(v.clone()).unwrap()).collect()));
+        skip = tokens.len() - rest.len() - i;
+      }
       _ => tkns.push(t.clone()),
     }
   }
