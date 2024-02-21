@@ -42,7 +42,7 @@ fn test_scan_lambda() {
 
 #[test]
 fn test_scan_exprs() {
-  let tokens = vec![KW::Noun(K::Name("x".into())), KW::SC, KW::Noun(K::Name("y".into()))];
+  let tokens = vec![vec![KW::Noun(K::Name("x".into()))], vec![KW::Noun(K::Name("y".into()))]];
   let e = KW::Exprs(tokens);
   assert_eq!(scan("[x;y]").unwrap(), vec![e]);
 }
@@ -672,8 +672,21 @@ fn test_expr_funcargs() {
 fn test_expr_order() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  // AA TODO exprs in k are evaluated right to left but semicolon effectively acts as NewLine
-  assert_eq!(eval(&mut env, scan("a:2;a+2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+  // exprs in k are evaluated right to left but semicolon effectively acts as NewLine
+  assert_eq!(eval(&mut env, scan("[a:2;a+2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+  // unbracketed exprs also should work
+  assert_eq!(eval(&mut env, scan("b:2;b+2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+
+  assert_eq!(eval(&mut env, scan("2 + [c:2;c]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+}
+
+#[test]
+fn test_expr() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(eval(&mut env, scan("[a:2;a] + 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+
+  assert_eq!(eval(&mut env, scan("2 + [a:2;a] + 0").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 }
 
 #[test]
