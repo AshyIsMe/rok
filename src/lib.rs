@@ -907,23 +907,6 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
           Err("invalid list syntax")
         }
       }
-      // TODO are all 3 KW::Exprs cases required here?
-      (w1, w2, w3, KW::Exprs(exprs)) => {
-        let res: Result<Vec<KW>, &'static str> =
-          exprs.iter().map(|sentence| eval(env, sentence.clone())).collect();
-        match res {
-          Ok(res) => Ok(vec![w1, w2, w3, res.last().unwrap().clone()]),
-          Err(e) => Err(e),
-        }
-      }
-      (w1, w2, KW::Exprs(exprs), w4) => {
-        let res: Result<Vec<KW>, &'static str> =
-          exprs.iter().map(|sentence| eval(env, sentence.clone())).collect();
-        match res {
-          Ok(res) => Ok(vec![w1, w2, res.last().unwrap().clone(), w4]),
-          Err(e) => Err(e),
-        }
-      }
       (w1, KW::Exprs(exprs), w3, w4) /* if matches!(w1, KW::StartOfLine | KW::LP)*/ => {
         let res: Result<Vec<KW>, &'static str> =
           exprs.iter().map(|sentence| eval(env, sentence.clone())).collect();
