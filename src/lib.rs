@@ -52,17 +52,20 @@ pub enum KW /* KWords */ {
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   Adverb { name: String },
-  Exprs(Vec<KW>), // list of expressions: [e1;e2;e3]
-  // Cond { body: Vec< Vec<K> > } //list of expressions...
+  Exprs(Vec<Vec<KW>>),    // list of expressions: [e1;e2;e3]
+  FuncArgs(Vec<Vec<KW>>), // function arguments: f[a1;a2;3]
+  Cond(Vec<Vec<KW>>),     // conditional form $[p;t;f]
   StartOfLine,
   Nothing,
-  LP,  // (
-  RP,  // )
-  LCB, // {
-  RCB, // }
-  LB,  // [
-  RB,  // ]
-  SC,  // semicolon
+  LP,            // (
+  RP,            // )
+  LCB,           // {
+  RCB,           // }
+  LB,            // [
+  RB,            // ]
+  SC,            // semicolon
+  CondStart,     // $[ Cond start token
+  FuncArgsStart, // [ but explicitly function arguments start
 }
 
 impl K {
@@ -262,8 +265,16 @@ impl fmt::Display for KW {
         }
       }
       KW::Exprs(e) => {
-        let s = e.iter().map(|kw| format!("{}", kw)).join("");
+        let s = e.iter().map(|kw| format!("{:?}", kw)).join(""); // TODO
         write!(f, "[{}]", s)
+      }
+      KW::FuncArgs(e) => {
+        let s = e.iter().map(|kw| format!("{:?}", kw)).join(""); // TODO
+        write!(f, "[{}]", s)
+      }
+      KW::Cond(e) => {
+        let s = e.iter().map(|kw| format!("{:?}", kw)).join(""); // TODO
+        write!(f, "$[{}]", s)
       }
       KW::StartOfLine => panic!("impossible"),
       KW::Nothing => panic!("impossible"),
@@ -274,6 +285,8 @@ impl fmt::Display for KW {
       KW::LB => write!(f, "["),
       KW::RB => write!(f, "]"),
       KW::SC => write!(f, ";"),
+      KW::CondStart => write!(f, "$["),
+      KW::FuncArgsStart => write!(f, "["),
     }
   }
 }
@@ -627,8 +640,9 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
           _ => todo!("currying"),
         }
       }
-      KW::Exprs(exprs) => {
-        let exprs: Vec<KW> = exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
+      KW::FuncArgs(exprs) => {
+        let exprs: Vec<KW> =
+          exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
         match exprs.len().cmp(&args.len()) {
           Ordering::Greater => Err("rank error"),
           Ordering::Less => todo!("currying"),
@@ -643,38 +657,13 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
     },
     KW::Verb { name } => match arg {
       KW::Noun(_) => todo!("currying"),
-      KW::Exprs(exprs) => {
-        let exprs_no_sc: Vec<KW> =
-          exprs.iter().filter(|kw| !matches!(kw, KW::SC)).cloned().collect();
-        match exprs_no_sc.len() {
+      KW::FuncArgs(exprs) => {
+        let exprs: Vec<KW> =
+          exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
+        match exprs.len() {
           0 | 1 => todo!("currying"),
-          2 => apply_primitive(env, &name, Some(exprs_no_sc[0].clone()), exprs_no_sc[1].clone()),
+          2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
           _ => match name.as_str() {
-            "$" => {
-              // $[if;then;elif;then;...;else]
-              // all values are truthy except: 0, 0x00 or ().
-              debug!("cond");
-              let mut split_exprs = exprs.split(|kw| matches!(kw, KW::SC));
-              loop {
-                match (split_exprs.next(), split_exprs.next()) {
-                  (Some(pred), Some(val)) => {
-                    debug!("pred: {:?}, val: {:?}", pred, val);
-                    match eval(env, pred.into()) {
-                      Ok(KW::Noun(K::Bool(0))) => continue,
-                      Ok(KW::Noun(K::Int(Some(0)))) => continue,
-                      Ok(_) => return eval(env, val.into()),
-                      Err(e) => return Err(e),
-                    }
-                  }
-                  (Some(pred), None) => {
-                    debug!("pred: {:?}, val: None", pred);
-                    return eval(env, pred.into()); // else case
-                  }
-                  (None, Some(_)) => panic!("impossible"),
-                  (None, None) => panic!("impossible"),
-                }
-              }
-            }
             _ => Err("rank error"),
           },
         }
@@ -856,6 +845,12 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
     // debug!("stack: {stack:?}");
     let fragment = resolve_names(env.clone(), get_fragment(&mut stack)).unwrap();
     let result: Result<Vec<KW>, &'static str> = match fragment {
+      (w1, w2 @ KW::Cond { .. }, any1, any2) if matches!(w1, KW::StartOfLine | KW::LP) => {
+        match parse_cond(env, w2) {
+          Ok(r) => Ok(vec![w1, r, any1, any2]),
+          Err(e) => Err(e),
+        }
+      }
       (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad
         apply_primitive(env, &name, None, x.clone()).map(|r| vec![w, r, any])
@@ -867,7 +862,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
       (
         w,
         f @ KW::Verb { .. } | f @ KW::Function { .. },
-        x @ KW::Noun(_) | x @ KW::Exprs(_),
+        x @ KW::Noun(_) | x @ KW::FuncArgs(_),
         any,
       ) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad function
@@ -877,7 +872,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         w,
         v @ KW::Verb { .. } | v @ KW::Function { .. },
         f @ KW::Verb { .. } | f @ KW::Function { .. },
-        x @ KW::Noun(_) | x @ KW::Exprs(_),
+        x @ KW::Noun(_) | x @ KW::FuncArgs(_),
       ) => {
         // 1 monad function
         apply_function(env, f, x.clone()).map(|r| vec![w, v, r])
@@ -912,27 +907,11 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
           Err("invalid list syntax")
         }
       }
-      (w1, w2, w3, KW::RCB) => {
-        queue.push_back(w1);
-        queue.push_back(w2);
-        queue.push_back(w3);
-        match parse_function_def(queue.clone()) {
-          Ok((q, f)) => {
-            queue = q;
-            Ok(vec![f])
-          }
-          Err(e) => Err(e),
-        }
-      }
-      (w1, w2, w3, KW::RB) => {
-        queue.push_back(w1);
-        queue.push_back(w2);
-        queue.push_back(w3);
-        match parse_exprs(queue.clone()) {
-          Ok((q, expr)) => {
-            queue = q;
-            Ok(vec![expr])
-          }
+      (w1, KW::Exprs(exprs), w3, w4) /* if matches!(w1, KW::StartOfLine | KW::LP)*/ => {
+        let res: Result<Vec<KW>, &'static str> =
+          exprs.iter().map(|sentence| eval(env, sentence.clone())).collect();
+        match res {
+          Ok(res) => Ok(vec![w1, res.last().unwrap().clone(), w3, w4]),
           Err(e) => Err(e),
         }
       }
@@ -967,90 +946,39 @@ fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
     .expect("infinite iterator can't be empty")
 }
 
-fn parse_function_def(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
-  // Result<(queue, KW::Function{...})
-  // Parse a function definition off the back of the queue, Eg:
-  // parse_function_def([f: {x*2}]) => Ok(([f:], KW::Function{body:"x*2", args: vec![]}))
-  let mut depth = 0; // nested functions depth
-  debug!("queue: {:?}", queue);
-  for i in (0..queue.len()).rev() {
-    debug!("queue: {:?}, depth: {}, i: {}", queue, depth, i);
-    match queue.get(i) {
-      Some(KW::RCB) => depth += 1,
-      Some(KW::LCB) => match depth {
-        0 => {
-          let (args, body) = parse_function_args(queue.range(i + 1..).cloned().collect())?;
-          return Ok((queue.range(0..i).cloned().collect(), KW::Function { body, args }));
-        }
-        _ => depth -= 1,
-      },
-      Some(_) => continue,
-      None => panic!("impossible"),
-    }
-  }
-  Err("parse error: mismatched brackets")
-}
-
-fn parse_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static str> {
-  if let Some(KW::LB) = body.first() {
-    // TODO
-    // - {[a;b] {x+y}[a;b]} // nested functions also need to work
-    match body.iter().position(|kw| matches!(kw, KW::RB)) {
-      // - {[a;b;c] a+b+c}
-      Some(i) => {
-        if body[1..i].iter().all(|kw| matches!(kw, KW::SC | KW::Noun(K::Name(_)))) {
-          let args: Vec<String> = body[1..i]
-            .iter()
-            .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
-            .collect();
-          Ok((args, body[i + 1..].to_vec()))
+fn parse_cond(env: &mut Env, kw: KW) -> Result<KW, &'static str> {
+  match kw {
+    KW::Cond(exprs) => {
+      // $[if;then;elif;then;...;else]
+      // all values are truthy except: 0, 0x00 or ().
+      for pv in exprs.chunks(2) {
+        if pv.len() == 2 {
+          let pred = &pv[0];
+          let val = &pv[1];
+          match eval(env, pred.to_vec()) {
+            Ok(KW::Noun(K::Bool(0))) => continue,
+            Ok(KW::Noun(K::Int(Some(0)))) => continue,
+            Ok(_) => return eval(env, val.to_vec()),
+            Err(e) => return Err(e),
+          }
+        } else if pv.len() == 1 {
+          return eval(env, pv[0].clone()); // final else case
         } else {
-          Err("parse error: invalid function args")
+          panic!("impossible")
         }
       }
-      None => Err("parse error: mismatched square brackets"),
+      panic!("impossible")
     }
-  } else {
-    // - {x + y + z} or {z * x + y} => vec!["x","y","z"]
-    if body.contains(&KW::LCB) {
-      todo!("handle nested functions properly");
-    }
-    let mut args: Vec<String> = body
-      .iter()
-      .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
-      .unique()
-      .collect();
-    args.sort();
-    Ok((args, body))
+    _ => panic!("impossible"),
   }
-}
-
-fn parse_exprs(queue: VecDeque<KW>) -> Result<(VecDeque<KW>, KW), &'static str> {
-  // [expr;list;in;square;brackets] => KW::Exprs(vec![expr,list,in,square,brackets])
-  // TODO Nested exprs [[1;2;3];`a;`b]
-  let mut depth = 0; // nested functions depth
-  debug!("queue: {:?}", queue);
-  for i in (0..queue.len()).rev() {
-    debug!("queue: {:?}, depth: {}, i: {}", queue, depth, i);
-    match queue.get(i) {
-      Some(KW::RB) => depth += 1,
-      Some(KW::LB) => match depth {
-        0 => {
-          return Ok((
-            queue.range(0..i).cloned().collect(),
-            KW::Exprs(queue.range(i + 1..).cloned().collect()),
-          ))
-        }
-        _ => depth -= 1,
-      },
-      Some(_) => continue,
-      None => panic!("impossible"),
-    }
-  }
-  Err("parse error: mismatched square brackets")
 }
 
 pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
+  scan_pass3(scan_pass2(scan_pass1(code)?)?)
+}
+
+pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
+  // First tokenization pass.
   let mut words = vec![];
   let mut skip: usize = 0;
   for (i, c) in code.char_indices() {
@@ -1063,9 +991,23 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
       ')' => words.push(KW::RP),
       '{' => words.push(KW::LCB),
       '}' => words.push(KW::RCB),
-      '[' => words.push(KW::LB),
+      '[' if i == 0 => words.push(KW::LB),
+      '[' => match code.chars().nth(i - 1) {
+        Some(c) => {
+          if " ()[]{".contains(c) {
+            words.push(KW::LB)
+          } else {
+            words.push(KW::FuncArgsStart)
+          }
+        }
+        None => words.push(KW::LB),
+      },
       ']' => words.push(KW::RB),
       ';' => words.push(KW::SC),
+      '$' if code.chars().nth(i + 1) == Some('[') => {
+        words.push(KW::CondStart);
+        skip = 1;
+      }
       '-' => {
         // couple different cases here:
         // 1-1 or a-1: dyadic
@@ -1127,6 +1069,160 @@ pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
     };
   }
   Ok(words)
+}
+
+pub fn split_on(
+  tokens: Vec<KW>, delim: KW, end_tok: KW,
+) -> Result<(Vec<Vec<KW>>, Vec<KW>), &'static str> {
+  // Split tokens on delim token until end token.
+  // Depth of 0 meaning we keep track of nested parens, brackets, funcs etc
+  let mut depth = 0;
+  let mut splits: Vec<Vec<KW>> = vec![];
+  let mut start = 0;
+  for i in 0..tokens.len() {
+    if depth < 0 {
+      return Err("mismatched parens, brackets or curly brackets"); // TODO better message
+    }
+    if start > i {
+      continue;
+    }
+    let t = tokens.get(i).unwrap();
+    // println!("t:{t}, depth:{depth}");
+    match t {
+      KW::LB | KW::LCB | KW::LP | KW::CondStart | KW::FuncArgsStart => {
+        depth += 1;
+      }
+      KW::RB | KW::RCB | KW::RP if depth > 0 => {
+        depth -= 1;
+      }
+      t if depth == 0 => {
+        if *t == delim {
+          splits.extend(vec![tokens[start..i].to_vec()]);
+          start = i + 1;
+          // println!("delim found: t:{t}, start:{start}");
+        } else if *t == end_tok {
+          splits.extend(vec![tokens[start..i].to_vec()]);
+          start = i + 1;
+          // println!("end_tok found: t:{t}, start:{start}");
+          break;
+        }
+      }
+      _ => continue,
+    }
+  }
+  // println!("split_on() done");
+  Ok((splits, tokens[start..].to_vec()))
+}
+
+pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
+  // Second tokenization pass, raw tokens into basic parsed tokens.
+  // Parse out raw tokens into "pass2" form:
+  // - Function{_}
+  // - Exprs()
+  // - FuncArgs()
+  // - Cond()
+  // ie. Strip out all LB, RB, LCB, RCB, SC, CondStart, FuncArgsStart tokens
+
+  let mut tkns = vec![];
+  let mut skip = 0;
+  for i in 0..tokens.len() {
+    if skip > 0 {
+      skip -= 1;
+      continue;
+    }
+    let t = tokens.get(i).unwrap();
+    match t {
+      KW::LB => {
+        let (exprs, rest) = split_on(tokens[i + 1..].to_vec(), KW::SC, KW::RB).unwrap();
+        tkns.push(KW::Exprs(exprs.iter().map(|v| scan_pass2(v.clone()).unwrap()).collect()));
+        skip = tokens.len() - rest.len() - i;
+      }
+      KW::CondStart => {
+        let (condargs, rest) = split_on(tokens[i + 1..].to_vec(), KW::SC, KW::RB).unwrap();
+        tkns.push(KW::Cond(condargs.iter().map(|v| scan_pass2(v.clone()).unwrap()).collect()));
+        skip = tokens.len() - rest.len() - i;
+      }
+      KW::LCB => {
+        let (f, rest) = scan_function(tokens[i + 1..].to_vec()).unwrap();
+        tkns.push(f);
+        skip = tokens.len() - rest.len() - i;
+      }
+      KW::FuncArgsStart => {
+        let (funcargs, rest) = split_on(tokens[i + 1..].to_vec(), KW::SC, KW::RB).unwrap();
+        tkns.push(KW::FuncArgs(funcargs.iter().map(|v| scan_pass2(v.clone()).unwrap()).collect()));
+        skip = tokens.len() - rest.len() - i;
+      }
+      _ => tkns.push(t.clone()),
+    }
+  }
+  Ok(tkns)
+}
+
+pub fn scan_pass3(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
+  // wrap un bracketed exprs in brackets
+  // "a:2;a+2" => "[a:2;a+2]"
+
+  // At this stage there should be no KW::SC at depth 0 unless the whole line is an unbracketed Expr
+  if tokens.contains(&KW::SC) {
+    scan_pass2(
+      vec![KW::LB].iter().chain(tokens.iter().chain(vec![KW::RB].iter())).cloned().collect(),
+    )
+  } else {
+    Ok(tokens)
+  }
+}
+
+fn scan_function(tokens: Vec<KW>) -> Result<(KW, Vec<KW>), &'static str> {
+  let mut depth = 0; // nested functions depth
+  for i in 0..tokens.len() {
+    match tokens.get(i) {
+      Some(KW::LCB) => depth += 1,
+      Some(KW::RCB) => match depth {
+        0 => {
+          let (args, body) = scan_function_args(tokens[0..i].to_vec())?;
+          return Ok((KW::Function { body, args }, tokens[i..].to_vec()));
+        }
+        _ => depth -= 1,
+      },
+      Some(_) => continue,
+      None => panic!("impossible"),
+    }
+  }
+  Err("parse error: mismatched brackets")
+}
+
+fn scan_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static str> {
+  if let Some(KW::LB) = body.first() {
+    // TODO
+    // - {[a;b] {x+y}[a;b]} // nested functions also need to work
+    match body.iter().position(|kw| matches!(kw, KW::RB)) {
+      // - {[a;b;c] a+b+c}
+      Some(i) => {
+        if body[1..i].iter().all(|kw| matches!(kw, KW::SC | KW::Noun(K::Name(_)))) {
+          let args: Vec<String> = body[1..i]
+            .iter()
+            .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+            .collect();
+          Ok((args, body[i + 1..].to_vec()))
+        } else {
+          Err("parse error: invalid function args")
+        }
+      }
+      None => Err("parse error: mismatched square brackets"),
+    }
+  } else {
+    // - {x + y + z} or {z * x + y} => vec!["x","y","z"]
+    if body.contains(&KW::LCB) {
+      todo!("handle nested functions properly");
+    }
+    let mut args: Vec<String> = body
+      .iter()
+      .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+      .unique()
+      .collect();
+    args.sort();
+    Ok((args, body))
+  }
 }
 
 pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
@@ -1192,6 +1288,7 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
       } else if code.chars().nth(i) == Some('\\') {
         match code.chars().nth(i + 1) {
           Some('\\') => s.push('\\'),
+          Some('"') => s.push('"'),
           Some('t') => s.push('\t'),
           Some('n') => s.push('\n'),
           // TODO: handle the rest

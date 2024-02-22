@@ -32,13 +32,81 @@ fn test_scan() {
 #[test]
 fn test_scan_lambda() {
   let tokens = vec![
-    KW::LCB,
     KW::Noun(K::Name("x".into())),
     KW::Verb { name: "+".to_string() },
     KW::Noun(K::Name("y".into())),
-    KW::RCB,
   ];
-  assert_eq!(scan("{x+y}").unwrap(), tokens);
+  let f = KW::Function { body: tokens, args: vec!["x".to_string(), "y".to_string()] };
+  assert_eq!(scan("{x+y}").unwrap(), vec![f]);
+}
+
+#[test]
+fn test_scan_exprs() {
+  let tokens = vec![vec![KW::Noun(K::Name("x".into()))], vec![KW::Noun(K::Name("y".into()))]];
+  let e = KW::Exprs(tokens);
+  assert_eq!(scan("[x;y]").unwrap(), vec![e]);
+}
+
+#[test]
+fn test_scan_cond() {
+  let tokens = vec![
+    vec![KW::Noun(K::Bool(1))],
+    vec![KW::Noun(K::Int(Some(2)))],
+    vec![KW::Noun(K::Int(Some(3)))],
+  ];
+  let e = KW::Cond(tokens);
+  assert_eq!(scan("$[1;2;3]").unwrap(), vec![e]);
+}
+
+#[test]
+fn test_split_on() {
+  let tokens = vec![
+    // KW::CondStart, // don't pass open token through
+    KW::Noun(K::Bool(1)),
+    KW::SC,
+    KW::Noun(K::Int(Some(2))),
+    KW::SC,
+    KW::Noun(K::Int(Some(3))),
+    KW::RB,
+    KW::Noun(K::Bool(1)),
+  ];
+  assert_eq!(
+    split_on(tokens, KW::SC, KW::RB),
+    Ok((
+      vec![
+        vec![KW::Noun(K::Bool(1))],
+        vec![KW::Noun(K::Int(Some(2)))],
+        vec![KW::Noun(K::Int(Some(3)))]
+      ],
+      vec![KW::Noun(K::Bool(1)),]
+    ))
+  );
+
+  let tokens = vec![
+    // KW::CondStart, // don't pass open token through
+    KW::Noun(K::Bool(1)),
+    KW::SC,
+    KW::LB,
+    KW::Noun(K::Int(Some(2))),
+    KW::SC,
+    KW::Noun(K::Int(Some(3))),
+    KW::RB,
+    KW::SC,
+    KW::Noun(K::Int(Some(4))),
+    KW::RB,
+    KW::Noun(K::Bool(1)),
+  ];
+  assert_eq!(
+    split_on(tokens, KW::SC, KW::RB),
+    Ok((
+      vec![
+        vec![KW::Noun(K::Bool(1))],
+        vec![KW::LB, KW::Noun(K::Int(Some(2))), KW::SC, KW::Noun(K::Int(Some(3))), KW::RB],
+        vec![KW::Noun(K::Int(Some(4)))]
+      ],
+      vec![KW::Noun(K::Bool(1)),]
+    ))
+  );
 }
 
 #[test]
@@ -601,12 +669,24 @@ fn test_expr_funcargs() {
 }
 
 #[test]
-#[ignore]
 fn test_expr_order() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  // AA TODO exprs in k are evaluated right to left but semicolon effectively acts as NewLine
-  assert_eq!(eval(&mut env, scan("a:2;a+2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+  // exprs in k are evaluated right to left but semicolon effectively acts as NewLine
+  assert_eq!(eval(&mut env, scan("[a:2;a+2]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+  // unbracketed exprs also should work
+  assert_eq!(eval(&mut env, scan("b:2;b+2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+
+  assert_eq!(eval(&mut env, scan("2 + [c:2;c]").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+}
+
+#[ignore]
+#[test]
+fn test_expr() {
+  // TODO these should work but seem low priority
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(eval(&mut env, scan("[a:2;a] + 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+  assert_eq!(eval(&mut env, scan("2 + [a:2;a] + 0").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 }
 
 #[test]
