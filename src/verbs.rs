@@ -1,4 +1,5 @@
 use crate::*;
+use itertools::Itertools;
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
@@ -144,7 +145,17 @@ pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_randfloat(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_unique(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_unique(r: K) -> Result<K, &'static str> {
+  match r {
+    K::SymbolArray(a) => Ok(K::SymbolArray(a.unique().unwrap())),
+    K::BoolArray(a) => Ok(K::BoolArray(a.unique().unwrap())),
+    K::IntArray(a) => Ok(K::IntArray(a.unique().unwrap())),
+    K::FloatArray(a) => Ok(K::FloatArray(a.unique().unwrap())),
+    K::CharArray(a) => Ok(K::CharArray(a.unique().unwrap())),
+    // K::List(v) => Ok(K::List(v.into_iter().unique().collect())),
+    _ => todo!(),
+  }
+}
 pub fn v_rand(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }

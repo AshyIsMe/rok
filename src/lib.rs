@@ -33,6 +33,9 @@ pub enum K {
   SymbolArray(Series),
   BoolArray(Series),
   IntArray(Series),
+  // Int8Array(Series), // TODO maybe later?
+  // Int16Array(Series), // TODO maybe later?
+  // Int128Array(Series), // TODO maybe later?
   FloatArray(Series),
   CharArray(Series),
   Nil, // Is Nil a noun?
@@ -42,6 +45,7 @@ pub enum K {
   //Quote(Box<K>) // Is Quote a noun?
   Name(String),
 }
+impl Eq for K {}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
