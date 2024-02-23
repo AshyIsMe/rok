@@ -146,6 +146,8 @@ pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_randfloat(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_unique(r: K) -> Result<K, &'static str> {
+  debug!("v_unique({:?})", r);
+
   match r {
     K::SymbolArray(a) => Ok(K::SymbolArray(a.unique().unwrap())),
     K::BoolArray(a) => Ok(K::BoolArray(a.unique().unwrap())),
@@ -154,6 +156,7 @@ pub fn v_unique(r: K) -> Result<K, &'static str> {
     K::CharArray(a) => Ok(K::CharArray(a.unique().unwrap())),
     // TODO ?(3.14;"abc";3.14) works in ngn/k but k9 throws domain error if the list has any float item and otherwise works.
     // K::List(v) => Ok(K::List(v.into_iter().unique().collect())),
+    K::List(_v) => Err("nyi"),
     _ => Err("domain"), //
   }
 }

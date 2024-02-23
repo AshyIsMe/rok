@@ -77,6 +77,7 @@ impl K {
     use K::*;
     match self {
       Nil => 0,
+      SymbolArray(a) => a.len(),
       BoolArray(a) => a.len(),
       IntArray(a) => a.len(),
       FloatArray(a) => a.len(),
