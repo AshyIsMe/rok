@@ -45,7 +45,7 @@ pub enum K {
   //Quote(Box<K>) // Is Quote a noun?
   Name(String),
 }
-impl Eq for K {}
+// impl Eq for K {} // TODO for the v_unique() K::List() case
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
