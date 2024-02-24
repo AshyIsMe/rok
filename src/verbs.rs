@@ -156,7 +156,7 @@ pub fn v_unique(r: K) -> Result<K, &'static str> {
     K::CharArray(a) => Ok(K::CharArray(a.unique().unwrap())),
     // TODO ?(3.14;"abc";3.14) works in ngn/k but k9 throws domain error if the list has any float item and otherwise works.
     // K::List(v) => Ok(K::List(v.into_iter().unique().collect())),
-    K::List(_v) => Err("nyi"),
+    K::List(_v) => Err("nyi: v_unique(K::List(_))"),
     _ => Err("domain"), //
   }
 }

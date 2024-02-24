@@ -794,11 +794,15 @@ fn test_unique() {
     Noun(K::SymbolArray(
       Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
     ))
-  )
+  );
 
-  // TODO this actually works but the result is not sorted and randomized, fix test once we have sort
+  // This works but the result is not sorted.
   // assert_eq!(
   //   eval(&mut env, scan("? \"aabbcc\"").unwrap()).unwrap(),
   //   Noun(K::CharArray(Series::new("", "abc").cast(&DataType::Utf8).unwrap()))
   // )
+  let res = eval(&mut env, scan("? \"aabb\"").unwrap()).unwrap();
+  let ab = Noun(K::CharArray(Series::new("", "ab").cast(&DataType::Utf8).unwrap()));
+  let ba = Noun(K::CharArray(Series::new("", "ba").cast(&DataType::Utf8).unwrap()));
+  assert!(res == ab || res == ba);
 }
