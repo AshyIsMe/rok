@@ -806,3 +806,13 @@ fn test_unique() {
   let ba = Noun(K::CharArray(Series::new("", "ba").cast(&DataType::Utf8).unwrap()));
   assert!(res == ab || res == ba);
 }
+
+#[test]
+fn test_array_indexing() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  let res = eval(&mut env, scan("1 2 3 4 @ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Int(Some(1i64))));
+
+  let res = eval(&mut env, scan("1 2 3 4 @ 0 1 2").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+}

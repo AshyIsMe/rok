@@ -165,7 +165,17 @@ pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_type(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_at(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::SymbolArray(a) | K::BoolArray(a) | K::IntArray(a) | K::FloatArray(a) | K::CharArray(a) => {
+      todo!("v_at")
+    }
+    K::List(v) => todo!("v_at"),
+    K::Dictionary(r) => todo!("v_at"),
+    K::Table(df) => todo!("v_at"),
+    _ => Err("type"),
+  }
+}
 // https://k.miraheze.org/wiki/Amend
 pub fn v_amend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_amend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
