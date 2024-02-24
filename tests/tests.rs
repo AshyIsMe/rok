@@ -812,7 +812,24 @@ fn test_array_indexing() {
   let mut env = Env { names: HashMap::new(), parent: None };
   let res = eval(&mut env, scan("1 2 3 4 @ 0").unwrap()).unwrap();
   assert_eq!(res, Noun(K::Int(Some(1i64))));
+  let res = eval(&mut env, scan("1 2 3.14 4 @ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Float(1.0f64)));
+
+  let res = eval(&mut env, scan("\"abc\" @ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Char('a')));
+
+  let res = eval(&mut env, scan("\"abc\" @ 1").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Char('b')));
+
+  let res = eval(&mut env, scan("\"abc\" @ 2").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Char('c')));
+
+  let res = eval(&mut env, scan("\"abc\" @ 2 1 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::CharArray(Series::new("", "cba").cast(&DataType::Utf8).unwrap())));
 
   let res = eval(&mut env, scan("1 2 3 4 @ 0 1 2").unwrap()).unwrap();
   assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+
+  let res = eval(&mut env, scan("1 2 3.14 4 @ 0 1 2").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::FloatArray(arr!([1.0, 2.0, 3.14f64]))));
 }

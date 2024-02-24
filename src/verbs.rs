@@ -166,14 +166,101 @@ pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_type(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
-  match l {
-    K::SymbolArray(a) | K::BoolArray(a) | K::IntArray(a) | K::FloatArray(a) | K::CharArray(a) => {
-      todo!("v_at")
+  match r {
+    K::Int(None) => match l.clone() {
+      K::SymbolArray(_) | K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) => {
+        l.fill(0)
+      }
+      K::List(_v) => todo!("v_at"),
+      K::Dictionary(_d) => todo!("v_at"),
+      K::Table(_df) => todo!("v_at"),
+      _ => Err("type"),
+    },
+    K::Bool(i) => {
+      // TODO remove this code duplication of K::Int(_) case below
+      if (i as usize) < l.len() {
+        match l.clone() {
+          K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(i as usize).unwrap()))),
+          K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(i as usize).unwrap())),
+          K::CharArray(a) => {
+            // TODO std::str::from_utf8()...
+            // let s = a.utf8().unwrap().get(i as usize).unwrap();
+            let s = std::str::from_utf8(
+              &a.cast(&DataType::UInt8)
+                .unwrap()
+                .u8()
+                .unwrap()
+                .into_iter()
+                .map(|u| match u {
+                  Some(u) => u,
+                  None => panic!("impossible"),
+                })
+                .collect::<Vec<u8>>(),
+            )
+            .unwrap()
+            .to_string();
+            let c: char = s.chars().nth(i.into()).unwrap();
+            Ok(K::Char(c))
+          }
+          _ => todo!("index into l"),
+        }
+      } else {
+        l.fill(0)
+      }
     }
-    K::List(v) => todo!("v_at"),
-    K::Dictionary(r) => todo!("v_at"),
-    K::Table(df) => todo!("v_at"),
-    _ => Err("type"),
+    K::Int(Some(i)) => {
+      if i >= 0 && (i as usize) < l.len() {
+        match l.clone() {
+          K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(i as usize).unwrap()))),
+          K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(i as usize).unwrap())),
+          K::CharArray(a) => {
+            // TODO std::str::from_utf8()...
+            // let s = a.utf8().unwrap().get(i as usize).unwrap();
+            let s = std::str::from_utf8(
+              &a.cast(&DataType::UInt8)
+                .unwrap()
+                .u8()
+                .unwrap()
+                .into_iter()
+                .map(|u| match u {
+                  Some(u) => u,
+                  None => panic!("impossible"),
+                })
+                .collect::<Vec<u8>>(),
+            )
+            .unwrap()
+            .to_string();
+            let c: char = s.chars().nth(i as usize).unwrap();
+            Ok(K::Char(c))
+          }
+          _ => todo!("index into l"),
+        }
+      } else {
+        l.fill(0)
+      }
+    }
+    K::IntArray(i) => {
+      // https://docs.rs/polars/latest/polars/series/struct.Series.html#method.take_threaded
+      // Notes: Out of bounds access doesn’t Error but will return a Null value
+      // TODO Add fills not Nulls
+      let i = Series::new(
+        "",
+        i.i64()
+          .unwrap()
+          .into_iter()
+          .map(|i| i.unwrap_or(4_294_967_295) as u32)
+          .collect::<Vec<u32>>(),
+      );
+      match l.clone() {
+        K::SymbolArray(a) => Ok(K::SymbolArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
+        K::BoolArray(a) => Ok(K::BoolArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
+        K::IntArray(a) => Ok(K::IntArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
+        K::FloatArray(a) => Ok(K::FloatArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
+        K::CharArray(a) => Ok(K::CharArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
+        _ => todo!("v_at"),
+      }
+    }
+    _ => todo!("v_at"),
   }
 }
 // https://k.miraheze.org/wiki/Amend

@@ -87,6 +87,48 @@ impl K {
       _ => 1,
     }
   }
+  pub fn fill(&self, n: usize) -> Result<K, &'static str> {
+    use K::*;
+    match n {
+      0 => match self {
+        Nil => Ok(Nil.clone()),
+        SymbolArray(_) | Symbol(_) => Ok(Symbol("".to_string())),
+        BoolArray(_) | Bool(_) => Ok(Bool(0)),
+        IntArray(_) | Int(_) => Ok(Int(Some(0))),
+        FloatArray(_) | Float(_) => Ok(Float(0.0)),
+        CharArray(_) | Char(_) => Ok(Char(' ')),
+        Dictionary(_) => Err("type"), // TODO right?
+        Table(_) => Err("type"),      // TODO right?
+        List(_) => Ok(List(vec![])),
+        Name(_) => Err("type"), // TODO right?
+      },
+      _ => match self {
+        Nil => todo!("List(vec![Nil, Nil, ...]) ???"),
+        SymbolArray(_) => {
+          // if n > a.len() {
+          //   Ok(SymbolArray(a.iter().chain(repeat("")).take(n).collect()))
+          // } else {
+          //   todo!("just take?")
+          // }
+          todo!("SymbolArray")
+        }
+        BoolArray(_) => todo!("fill"),
+        IntArray(a) => {
+          if n > a.len() {
+            // Ok(IntArray(a.i64().unwrap().into_iter().chain(repeat(Some(0i64))).take(n).collect()))
+            Ok(IntArray(a.extend_constant(AnyValue::Int64(0i64), n - a.len()).unwrap()))
+          } else {
+            todo!("just take?")
+          }
+        }
+        FloatArray(_) => todo!("fill"),
+        CharArray(_) => todo!("fill"),
+        Dictionary(_) => todo!("fill"),
+        List(_) => todo!("fill"),
+        _ => todo!("fill"),
+      },
+    }
+  }
 }
 
 impl fmt::Display for K {
