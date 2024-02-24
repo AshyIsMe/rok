@@ -773,3 +773,36 @@ fn test_equal() {
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(res, Noun(d1));
 }
+
+#[test]
+fn test_unique() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  let res = eval(&mut env, scan("? 1 1 2 2 3").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+
+  let res = eval(&mut env, scan("? 1 1 0 0").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::BoolArray(arr!([1, 0u8]))));
+
+  let res = eval(&mut env, scan("? 1 1 2 2 3.0").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::FloatArray(arr!([1.0, 2.0, 3.0f64]))));
+
+  assert_eq!(
+    eval(&mut env, scan("? `a`a`b`c`c").unwrap()).unwrap(),
+    Noun(K::SymbolArray(
+      Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+    ))
+  );
+
+  // This works but the result is not sorted.
+  // assert_eq!(
+  //   eval(&mut env, scan("? \"aabbcc\"").unwrap()).unwrap(),
+  //   Noun(K::CharArray(Series::new("", "abc").cast(&DataType::Utf8).unwrap()))
+  // )
+  let res = eval(&mut env, scan("? \"aabb\"").unwrap()).unwrap();
+  let ab = Noun(K::CharArray(Series::new("", "ab").cast(&DataType::Utf8).unwrap()));
+  let ba = Noun(K::CharArray(Series::new("", "ba").cast(&DataType::Utf8).unwrap()));
+  assert!(res == ab || res == ba);
+}

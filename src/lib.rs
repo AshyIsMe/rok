@@ -33,6 +33,9 @@ pub enum K {
   SymbolArray(Series),
   BoolArray(Series),
   IntArray(Series),
+  // Int8Array(Series), // TODO maybe later?
+  // Int16Array(Series), // TODO maybe later?
+  // Int128Array(Series), // TODO maybe later?
   FloatArray(Series),
   CharArray(Series),
   Nil, // Is Nil a noun?
@@ -42,6 +45,7 @@ pub enum K {
   //Quote(Box<K>) // Is Quote a noun?
   Name(String),
 }
+// impl Eq for K {} // TODO for the v_unique() K::List() case
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
@@ -73,6 +77,7 @@ impl K {
     use K::*;
     match self {
       Nil => 0,
+      SymbolArray(a) => a.len(),
       BoolArray(a) => a.len(),
       IntArray(a) => a.len(),
       FloatArray(a) => a.len(),
@@ -439,7 +444,7 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
-    ("!", (v_iota, v_odometer, v_d_bang, v_none2, v_d_bang, v_d_bang, v_none3, v_none4)),
+    ("!", (v_iota, v_odometer, v_d_bang, v_d_bang, v_d_bang, v_d_bang, v_none3, v_none4)),
     ("&", (v_where, v_where, v_min, v_min, v_min, v_min, v_none3, v_none4)),
     ("|", (v_reverse, v_reverse, v_max, v_max, v_max, v_max, v_none3, v_none4)),
     ("<", (v_asc, v_asc, v_lesser, v_lesser, v_lesser, v_lesser, v_none3, v_none4)),
