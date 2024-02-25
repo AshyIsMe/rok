@@ -832,4 +832,13 @@ fn test_array_indexing() {
 
   let res = eval(&mut env, scan("1 2 3.14 4 @ 0 1 2").unwrap()).unwrap();
   assert_eq!(res, Noun(K::FloatArray(arr!([1.0, 2.0, 3.14f64]))));
+
+  let res = eval(&mut env, scan("(`a`b!(1 2 3;\"abc\")) @ `a").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+
+  let res = eval(&mut env, scan("(`a`b!(1 2 3;\"abc\")) @ `b").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::CharArray(Series::new("", "abc").cast(&DataType::Utf8).unwrap())));
+
+  let res = eval(&mut env, scan("(`a`b!(1 2 3;1 0 1)) @ `b").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::BoolArray(arr!([1, 0, 1u8]))));
 }

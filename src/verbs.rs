@@ -260,6 +260,34 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
         _ => todo!("v_at"),
       }
     }
+    K::Symbol(s) => match l.clone() {
+      K::Dictionary(d) => {
+        if d.contains_key(&s) {
+          Ok(d.get(&s).unwrap().clone())
+        } else {
+          Ok(K::Nil) // TODO Is this the same behaviour as ngn/k and k9?
+        }
+      }
+      K::Table(_df) => todo!("v_at table lookups"),
+      _ => Err("type"),
+    },
+    K::SymbolArray(ss) => match l.clone() {
+      K::Dictionary(d) => {
+        Ok(K::List(
+          ss.iter()
+            .map(|s| {
+              if d.contains_key(&s) {
+                Ok(d.get(&s).unwrap().clone())
+              } else {
+                Ok(K::Nil) // TODO Is this the same behaviour as ngn/k and k9?
+              }
+            })
+            .collect::<Vec<K>>(),
+        ))
+      }
+      K::Table(_df) => todo!("v_at table lookups"),
+      _ => Err("type"),
+    },
     _ => todo!("v_at"),
   }
 }
