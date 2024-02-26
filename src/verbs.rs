@@ -274,12 +274,15 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
     K::SymbolArray(ss) => match l.clone() {
       K::Dictionary(d) => {
         Ok(K::List(
-          ss.iter()
+          // ss.categorical()
+          ss.utf8()
+            .unwrap()
+            .into_iter()
             .map(|s| {
-              if d.contains_key(&s) {
-                Ok(d.get(&s).unwrap().clone())
+              if d.contains_key(s.unwrap().into()) {
+                d.get(s.unwrap().into()).unwrap().clone()
               } else {
-                Ok(K::Nil) // TODO Is this the same behaviour as ngn/k and k9?
+                K::Nil // TODO Is this the same behaviour as ngn/k and k9?
               }
             })
             .collect::<Vec<K>>(),

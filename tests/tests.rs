@@ -841,4 +841,10 @@ fn test_array_indexing() {
 
   let res = eval(&mut env, scan("(`a`b!(1 2 3;1 0 1)) @ `b").unwrap()).unwrap();
   assert_eq!(res, Noun(K::BoolArray(arr!([1, 0, 1u8]))));
+
+  let res = eval(&mut env, scan("(`a`b!(1 2 3;1 0 1)) @ `a`b").unwrap()).unwrap();
+  assert_eq!(
+    res,
+    Noun(K::List(vec![K::IntArray(arr!([1, 2, 3i64])), K::BoolArray(arr!([1, 0, 1u8]))]))
+  );
 }
