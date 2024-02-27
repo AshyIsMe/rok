@@ -274,10 +274,9 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
     K::SymbolArray(ss) => match l.clone() {
       K::Dictionary(d) => {
         Ok(K::List(
-          // ss.categorical()
-          ss.utf8()
+          ss.categorical()
             .unwrap()
-            .into_iter()
+            .iter_str()
             .map(|s| {
               if d.contains_key(s.unwrap().into()) {
                 d.get(s.unwrap().into()).unwrap().clone()
