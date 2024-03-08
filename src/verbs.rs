@@ -431,6 +431,24 @@ pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
 pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
   debug!("l: {:?}, r: {:?}", l, r);
   match (&l, &r) {
+    (K::Bool(0), KW::Noun(K::CharArray(a))) => {
+      let us = &a
+        .cast(&DataType::UInt8)
+        .unwrap()
+        .u8()
+        .unwrap()
+        .into_iter()
+        .map(|u| match u {
+          Some(u) => u,
+          None => panic!("impossible"),
+        })
+        .collect::<Vec<u8>>();
+      let s = std::str::from_utf8(us).unwrap();
+      // let v: Vec<String> = std::fs::read_to_string(s).unwrap().lines().map(String::from).collect();
+      Ok(KW::Noun(K::List(
+        std::fs::read_to_string(s).unwrap().lines().map(String::from).map(K::from).collect(),
+      )))
+    }
     (K::Int(Some(2i64)), KW::Noun(K::Symbol(s))) => {
       let p = Path::new(&s);
       if p.exists() {

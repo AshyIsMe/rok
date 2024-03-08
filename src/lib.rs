@@ -222,6 +222,7 @@ impl fmt::Display for K {
         write!(f, "{}", s)
       }
       K::CharArray(ca) => {
+        // TODO Should K::CharArray() be DataType::String instead?
         let s = std::str::from_utf8(
           &ca
             .cast(&DataType::UInt8)
@@ -281,6 +282,13 @@ impl fmt::Display for K {
       }
       K::Name(n) => write!(f, "{}", n),
     }
+  }
+}
+
+// TODO more cases
+impl From<String> for K {
+  fn from(item: String) -> Self {
+    K::CharArray(Series::new("", item).cast(&DataType::Utf8).unwrap())
   }
 }
 
