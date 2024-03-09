@@ -165,6 +165,7 @@ pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_type(_r: K) -> Result<K, &'static str> { Err("nyi") }
+
 pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
   match r {
     K::Int(None) => match l.clone() {
@@ -201,6 +202,13 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
             .to_string();
             let c: char = s.chars().nth(i.into()).unwrap();
             Ok(K::Char(c))
+          }
+          K::List(v) => {
+            if (i as usize) < v.len() {
+              Ok(v[i as usize].clone())
+            } else {
+              Err("length")
+            }
           }
           _ => todo!("index into l"),
         }
@@ -252,11 +260,26 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           .collect::<Vec<u32>>(),
       );
       match l.clone() {
-        K::SymbolArray(a) => Ok(K::SymbolArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
-        K::BoolArray(a) => Ok(K::BoolArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
-        K::IntArray(a) => Ok(K::IntArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
-        K::FloatArray(a) => Ok(K::FloatArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
-        K::CharArray(a) => Ok(K::CharArray(a.take_threaded(i.u32().unwrap(), true).unwrap())),
+        K::SymbolArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+          Ok(a) => Ok(K::SymbolArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
+        K::BoolArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+          Ok(a) => Ok(K::BoolArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
+        K::IntArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+          Ok(a) => Ok(K::IntArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
+        K::FloatArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+          Ok(a) => Ok(K::FloatArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
+        K::CharArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+          Ok(a) => Ok(K::CharArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
         _ => todo!("v_at"),
       }
     }
@@ -293,6 +316,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
     _ => todo!("v_at"),
   }
 }
+
 // https://k.miraheze.org/wiki/Amend
 pub fn v_amend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_amend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
