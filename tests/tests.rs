@@ -851,3 +851,28 @@ fn test_array_indexing() {
   let res = eval(&mut env, scan("(1 2 3; 3.14; `a) @ 0").unwrap()).unwrap();
   assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
 }
+
+#[test]
+fn test_vmod() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("2!1 2 3 4 5").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 0, 1, 0, 1i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("3!1 2 3 4 5").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 2, 0, 1, 2i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("2!1 2 3 4 5.5").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 0.0, 1.0, 0.0, 1.5f64])))
+  );
+}
+
+// #[test]
+// fn test_paren_nesting() {
+//   let mut env = Env { names: HashMap::new(), parent: None };
+//   let res = eval(&mut env, scan("+\\1-2*2!\"(()))(())()\"").unwrap()).unwrap();
+//   assert_eq!(res, Noun(K::Int(Some(0i64))));
+// }

@@ -110,7 +110,14 @@ pub fn v_times(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(*, v_times, 
 pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide,l, r) }
 pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
-pub fn v_mod(_l: K, _r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
+pub fn v_mod(l: K, r: K) -> Result<K, &'static str> {
+  match (l, r) {
+    (K::Int(Some(i)), K::IntArray(a)) => Ok(K::IntArray(a % i)),
+    (K::Int(Some(i)), K::FloatArray(a)) => Ok(K::FloatArray(a % i)),
+    (K::Int(Some(_i)), K::CharArray(_a)) => todo!("implement v_mod"),
+    _ => todo!("implement v_mod"),
+  }
+}
 
 pub fn v_where(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_min(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
