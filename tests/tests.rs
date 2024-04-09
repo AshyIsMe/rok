@@ -564,6 +564,19 @@ fn test_table() {
 }
 
 #[test]
+fn test_table_flip() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let d1 = eval(&mut env, scan("d:`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  let t1 = eval(&mut env, scan("t:+d").unwrap()).unwrap();
+  let d2 = eval(&mut env, scan("+t").unwrap()).unwrap();
+  println!("{:?}", d1);
+  println!("{:?}", t1);
+  println!("{:?}", d2);
+  assert_eq!(format!("{:?}", d1), format!("{:?}", d2))
+}
+
+#[test]
 fn test_table_reader() {
   let mut env = Env { names: HashMap::new(), parent: None };
   let mut df =
