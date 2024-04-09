@@ -171,7 +171,27 @@ pub fn v_rand(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_type(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_type(r: K) -> Result<K, &'static str> {
+  use K::*;
+  // TODO allow checking type of KW::Verb etc, see ngn/k's types help \0
+  match r {
+    Bool(_) => Ok(Symbol("i".to_string())),
+    Int(_) => Ok(Symbol("i".to_string())),
+    Float(_) => Ok(Symbol("f".to_string())),
+    Char(_) => Ok(Symbol("c".to_string())),
+    Symbol(_) => Ok(Symbol("s".to_string())),
+    SymbolArray(_) => Ok(Symbol("S".to_string())),
+    BoolArray(_) => Ok(Symbol("I".to_string())),
+    IntArray(_) => Ok(Symbol("I".to_string())),
+    FloatArray(_) => Ok(Symbol("F".to_string())),
+    CharArray(_) => Ok(Symbol("C".to_string())),
+    Nil => Ok(Symbol("A".to_string())),
+    List(_) => Ok(Symbol("A".to_string())),
+    Dictionary(_) => Ok(Symbol("m".to_string())),
+    Table(_) => Ok(Symbol("M".to_string())),
+    Name(_) => panic!("impossible"),
+  }
+}
 
 pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
   match r {
