@@ -876,3 +876,14 @@ fn test_vmod() {
 //   let res = eval(&mut env, scan("+\\1-2*2!\"(()))(())()\"").unwrap()).unwrap();
 //   assert_eq!(res, Noun(K::Int(Some(0i64))));
 // }
+
+#[ignore]
+#[test]
+fn test_str_cols() {
+  let s_chararray = Series::new("test", "foo");
+  let s_strarray = Series::new("test", ["foo", "bar", "baz"]);
+  println!("{s_chararray}");
+  println!("{s_strarray}");
+
+  assert!(false)
+}

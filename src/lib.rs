@@ -38,6 +38,9 @@ pub enum K {
   // Int128Array(Series), // TODO maybe later?
   FloatArray(Series),
   CharArray(Series),
+  // TODO do we want StringArray? +`a`b!(1 2 3;"abc") vs +`a`b!(1 2 3;("abc";"def";"123"))
+  // see test_str_cols()
+  // StringArray(Series),
   Nil, // Is Nil a noun?
   List(Vec<K>),
   Dictionary(IndexMap<String, K>),
