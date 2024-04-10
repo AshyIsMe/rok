@@ -65,6 +65,26 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
         Err("length")
       }
     }
+    K::Table(df) => {
+      let k = Series::new("a", df.get_column_names()).cast(&DataType::Categorical(None)).unwrap();
+      let v: Vec<K> = df
+        .get_columns()
+        .iter()
+        .map(|s| match s.dtype() {
+          DataType::Boolean => K::BoolArray(s.clone()),
+          DataType::Int64 => K::IntArray(s.clone()),
+          DataType::Float64 => K::FloatArray(s.clone()),
+          DataType::Utf8 => K::CharArray(s.clone()),
+          DataType::Categorical(_) => K::SymbolArray(s.clone()),
+          _ => panic!("impossible"),
+        })
+        .collect();
+
+      Ok(K::Dictionary(IndexMap::from_iter(zip(
+        k.iter().map(|s| strip_quotes(s.to_string())),
+        v.iter().cloned(),
+      ))))
+    }
     _ => todo!("flip the rest"),
   }
 }

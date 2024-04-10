@@ -567,13 +567,16 @@ fn test_table() {
 fn test_table_flip() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  let d1 = eval(&mut env, scan("d:`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
-  let t1 = eval(&mut env, scan("t:+d").unwrap()).unwrap();
+  let _d1 = eval(&mut env, scan("d:`a`b!(1 2 3;1 0 1)").unwrap()).unwrap();
+  let _t1 = eval(&mut env, scan("t:+d").unwrap()).unwrap();
   let d2 = eval(&mut env, scan("+t").unwrap()).unwrap();
-  println!("{:?}", d1);
-  println!("{:?}", t1);
-  println!("{:?}", d2);
-  assert_eq!(format!("{:?}", d1), format!("{:?}", d2))
+  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let v = K::List(vec![
+    K::IntArray(Series::new("a", [1, 2, 3i64])),
+    K::BoolArray(Series::new("b", [1, 0, 1u8])),
+  ]);
+  let d1 = KW::Noun(v_makedict(k, v).unwrap());
+  assert_eq!(d1, d2)
 }
 
 #[test]
