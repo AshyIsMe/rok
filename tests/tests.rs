@@ -886,6 +886,20 @@ fn test_vmod() {
   );
 }
 
+#[test]
+fn test_reshape() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("3 3#1").unwrap()).unwrap(),
+    Noun(K::List(vec![
+      K::BoolArray(arr!([1, 1, 1u8])),
+      K::BoolArray(arr!([1, 1, 1u8])),
+      K::BoolArray(arr!([1, 1, 1u8])),
+    ]))
+  );
+}
+
 // #[test]
 // fn test_paren_nesting() {
 //   let mut env = Env { names: HashMap::new(), parent: None };

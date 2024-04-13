@@ -41,7 +41,15 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
 
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
 pub fn v_take(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_reshape(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_reshape(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::IntArray(a) => match r {
+      K::Bool(b) => todo!("work inner dimension out"),
+      _ => Err("nyi int l, other r"),
+    },
+    _ => Err("nyi intarray l"),
+  }
+}
 
 pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
 pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
