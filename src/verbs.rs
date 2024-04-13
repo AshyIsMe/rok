@@ -1,5 +1,4 @@
 use crate::*;
-use itertools::Itertools;
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
@@ -54,8 +53,7 @@ pub fn v_reshape(l: K, r: K) -> Result<K, &'static str> {
           let v: Vec<i64> = a.i64().unwrap().to_vec().iter().rev().map(|i|i.unwrap()).collect();
           let mut result: K = K::BoolArray(arr!([b].repeat(v[0] as usize)));
           for i in v.iter().skip(1) {
-            let v = vec![result.clone()].repeat(*i as usize);
-            result = K::List(v);
+            result = K::List((0..*i).map(|_|result.clone()).collect_vec());
           }
           Ok(result)
         },
