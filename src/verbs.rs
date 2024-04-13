@@ -44,10 +44,26 @@ pub fn v_take(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_reshape(l: K, r: K) -> Result<K, &'static str> {
   match l {
     K::IntArray(a) => match r {
-      K::Bool(b) => todo!("work inner dimension out"),
+      K::Bool(b) => match a.len() {
+        // this will never happen, <atom>#<array> is not reshape
+        1 => {
+          let i = a.i64().unwrap().get(0).unwrap();
+          Ok(K::BoolArray(arr!([b].repeat(i as usize))))
+        },
+        _ => {
+          let v: Vec<i64> = a.i64().unwrap().to_vec().iter().rev().map(|i|i.unwrap()).collect();
+          let mut result: K = K::BoolArray(arr!([b].repeat(v[0] as usize)));
+          for i in v.iter().skip(1) {
+            let v = vec![result.clone()].repeat(*i as usize);
+            result = K::List(v);
+          }
+          Ok(result)
+        },
+      },
       _ => Err("nyi int l, other r"),
     },
-    _ => Err("nyi intarray l"),
+    K::BoolArray(_) => Err("nyi"),
+    _ => Err("type"),
   }
 }
 
