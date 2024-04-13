@@ -42,24 +42,48 @@ pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_int
 pub fn v_take(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_reshape(l: K, r: K) -> Result<K, &'static str> {
   match l {
-    K::IntArray(a) => match r {
-      K::Bool(b) => match a.len() {
-        // this will never happen, <atom>#<array> is not reshape
-        1 => {
-          let i = a.i64().unwrap().get(0).unwrap();
-          Ok(K::BoolArray(arr!([b].repeat(i as usize))))
-        },
-        _ => {
-          let v: Vec<i64> = a.i64().unwrap().to_vec().iter().rev().map(|i|i.unwrap()).collect();
-          let mut result: K = K::BoolArray(arr!([b].repeat(v[0] as usize)));
-          for i in v.iter().skip(1) {
-            result = K::List((0..*i).map(|_|result.clone()).collect_vec());
+    K::IntArray(a) => {
+      let rev_shape: Vec<i64> =
+        a.i64().unwrap().to_vec().iter().rev().map(|i| i.unwrap()).collect();
+      match r {
+        // TODO macro to shorten this repetition
+        K::Bool(b) => {
+          let mut result: K = K::BoolArray(arr!([b].repeat(rev_shape[0] as usize)));
+          for i in rev_shape.iter().skip(1) {
+            result = K::List((0..*i).map(|_| result.clone()).collect_vec());
           }
           Ok(result)
-        },
-      },
-      _ => Err("nyi int l, other r"),
-    },
+        }
+        K::Int(None) => Err("nyi"),
+        K::Int(Some(i)) => {
+          let mut result: K = K::IntArray(arr!([i].repeat(rev_shape[0] as usize)));
+          for i in rev_shape.iter().skip(1) {
+            result = K::List((0..*i).map(|_| result.clone()).collect_vec());
+          }
+          Ok(result)
+        }
+        K::Float(f) => {
+          let mut result: K = K::FloatArray(arr!([f].repeat(rev_shape[0] as usize)));
+          for i in rev_shape.iter().skip(1) {
+            result = K::List((0..*i).map(|_| result.clone()).collect_vec());
+          }
+          Ok(result)
+        }
+        K::Char(_) => Err("nyi"),
+        K::Symbol(_) => Err("nyi"),
+
+        K::SymbolArray(_)
+        | K::BoolArray(_)
+        | K::IntArray(_)
+        | K::FloatArray(_)
+        | K::CharArray(_)
+        | K::List(_)
+        | K::Dictionary(_)
+        | K::Table(_)
+        | K::Nil => Err("nyi"),
+        K::Name(_) => panic!("impossible"),
+      }
+    }
     K::BoolArray(_) => Err("nyi"),
     _ => Err("type"),
   }

@@ -898,6 +898,30 @@ fn test_reshape() {
       K::BoolArray(arr!([1, 1, 1u8])),
     ]))
   );
+  assert_eq!(
+    eval(&mut env, scan("3 3#2").unwrap()).unwrap(),
+    Noun(K::List(vec![
+      K::IntArray(arr!([2, 2, 2i64])),
+      K::IntArray(arr!([2, 2, 2i64])),
+      K::IntArray(arr!([2, 2, 2i64])),
+    ]))
+  );
+  assert_eq!(
+    eval(&mut env, scan("3 3#3.14").unwrap()).unwrap(),
+    Noun(K::List(vec![
+      K::FloatArray(arr!([3.14, 3.14, 3.14f64])),
+      K::FloatArray(arr!([3.14, 3.14, 3.14f64])),
+      K::FloatArray(arr!([3.14, 3.14, 3.14f64])),
+    ]))
+  );
+  // assert_eq!(
+  //   eval(&mut env, scan("3 3#\"a\"").unwrap()).unwrap(),
+  //   Noun(K::List(vec![
+  //     K::CharArray(arr!(['a', 'a', 'a'])),
+  //     K::CharArray(arr!(['a', 'a', 'a'])),
+  //     K::CharArray(arr!(['a', 'a', 'a'])),
+  //   ]))
+  // );
 }
 
 // #[test]
