@@ -40,34 +40,33 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
 
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
 pub fn v_take(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+#[macro_export]
+macro_rules! reshape_atom_by_type {
+  ($a:ident, $type:path, $rev_shape:ident) => {{
+    let mut result: K = $type(arr!([$a].repeat($rev_shape[0] as usize)));
+    for i in $rev_shape.iter().skip(1) {
+      result = K::List((0..*i).map(|_| result.clone()).collect_vec());
+    }
+    Ok(result)
+  }};
+}
+
 pub fn v_reshape(l: K, r: K) -> Result<K, &'static str> {
   match l {
     K::IntArray(a) => {
       let rev_shape: Vec<i64> =
         a.i64().unwrap().to_vec().iter().rev().map(|i| i.unwrap()).collect();
       match r {
-        // TODO macro to shorten this repetition
         K::Bool(b) => {
-          let mut result: K = K::BoolArray(arr!([b].repeat(rev_shape[0] as usize)));
-          for i in rev_shape.iter().skip(1) {
-            result = K::List((0..*i).map(|_| result.clone()).collect_vec());
-          }
-          Ok(result)
+          reshape_atom_by_type!(b, K::BoolArray, rev_shape)
         }
         K::Int(None) => Err("nyi"),
         K::Int(Some(i)) => {
-          let mut result: K = K::IntArray(arr!([i].repeat(rev_shape[0] as usize)));
-          for i in rev_shape.iter().skip(1) {
-            result = K::List((0..*i).map(|_| result.clone()).collect_vec());
-          }
-          Ok(result)
+          reshape_atom_by_type!(i, K::IntArray, rev_shape)
         }
         K::Float(f) => {
-          let mut result: K = K::FloatArray(arr!([f].repeat(rev_shape[0] as usize)));
-          for i in rev_shape.iter().skip(1) {
-            result = K::List((0..*i).map(|_| result.clone()).collect_vec());
-          }
-          Ok(result)
+          reshape_atom_by_type!(f, K::FloatArray, rev_shape)
         }
         K::Char(_) => Err("nyi"),
         K::Symbol(_) => Err("nyi"),
