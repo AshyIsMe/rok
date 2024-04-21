@@ -38,9 +38,6 @@ pub enum K {
   // Int128Array(Series), // TODO maybe later?
   FloatArray(Series),
   CharArray(Series),
-  // TODO do we want StringArray? +`a`b!(1 2 3;"abc") vs +`a`b!(1 2 3;("abc";"def";"123"))
-  // see test_str_cols()
-  // StringArray(Series),
   Nil, // Is Nil a noun?
   List(Vec<K>),
   Dictionary(IndexMap<String, K>),
@@ -225,23 +222,16 @@ impl fmt::Display for K {
         write!(f, "{}", s)
       }
       K::CharArray(ca) => {
-        // TODO Should K::CharArray() be DataType::String instead?
-        let s = std::str::from_utf8(
-          &ca
-            .cast(&DataType::UInt8)
-            .unwrap()
-            .u8()
-            .unwrap()
-            .into_iter()
-            .take(cols - 2)
-            .map(|u| match u {
-              Some(u) => u,
-              None => panic!("impossible"),
-            })
-            .collect::<Vec<u8>>(),
-        )
-        .unwrap()
-        .to_string();
+        let s: String = ca
+          .str()
+          .unwrap()
+          .into_iter()
+          .take(cols - 2)
+          .map(|u| match u {
+            Some(u) => u,
+            None => panic!("impossible"),
+          })
+          .collect();
         if s.len() < (cols - 2) {
           write!(f, "\"{}\"", s)
         } else {
