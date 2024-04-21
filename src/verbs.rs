@@ -124,7 +124,9 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
       }
     }
     K::Table(df) => {
-      let k = Series::new("a", df.get_column_names()).cast(&DataType::Categorical(None)).unwrap();
+      let k = Series::new("a", df.get_column_names())
+        .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+        .unwrap();
       let v: Vec<K> = df
         .get_columns()
         .iter()
@@ -132,8 +134,8 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
           DataType::Boolean => K::BoolArray(s.clone()),
           DataType::Int64 => K::IntArray(s.clone()),
           DataType::Float64 => K::FloatArray(s.clone()),
-          DataType::Utf8 => K::CharArray(s.clone()),
-          DataType::Categorical(_) => K::SymbolArray(s.clone()),
+          DataType::String => K::CharArray(s.clone()),
+          DataType::Categorical { .. } => K::SymbolArray(s.clone()),
           _ => panic!("impossible"),
         })
         .collect();
@@ -444,8 +446,8 @@ pub fn v_iota(r: K) -> Result<K, &'static str> {
 }
 pub fn v_sum(x: K) -> Result<K, &'static str> {
   match x {
-    K::BoolArray(a) => Ok(K::Int(a.sum())),
-    K::IntArray(a) => Ok(K::Int(a.sum())),
+    K::BoolArray(a) => Ok(K::Int(a.sum().ok())),
+    K::IntArray(a) => Ok(K::Int(a.sum().ok())),
     K::FloatArray(a) => Ok(K::Float(a.sum().unwrap_or(f64::NAN))),
     _ => todo!("other types of K"),
   }

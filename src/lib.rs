@@ -159,7 +159,7 @@ impl fmt::Display for K {
           Series::new(
             "",
             str_concat(
-              &s.cast(&DataType::Utf8).unwrap().utf8().unwrap().slice(0, max_n),
+              &s.cast(&DataType::String).unwrap().str().unwrap().slice(0, max_n),
               "`",
               false,
             ),
@@ -291,7 +291,7 @@ impl fmt::Display for K {
 // TODO more cases
 impl From<String> for K {
   fn from(item: String) -> Self {
-    K::CharArray(Series::new("", item).cast(&DataType::Utf8).unwrap())
+    K::CharArray(Series::new("", item).cast(&DataType::String).unwrap())
   }
 }
 
@@ -792,11 +792,11 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::CharArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
 
     (K::List(_), K::Dictionary(r_inner)) => (
-      v_makedict(K::SymbolArray(Series::new("", r_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), l,) .unwrap(),
+      v_makedict(K::SymbolArray(Series::new("", r_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical)) .unwrap(),), l,) .unwrap(),
       r),
     (K::Dictionary(l_inner), K::List(_)) => (
       l.clone(),
-      v_makedict(K::SymbolArray(Series::new("", l_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), r,) .unwrap()),
+      v_makedict(K::SymbolArray(Series::new("", l_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical)) .unwrap(),), r,) .unwrap()),
     (_l, K::Dictionary(_)) if !matches!(_l, K::Dictionary(_)) => match (l.len(), r.len()) {
       (0,0) => todo!("promote_nouns empties"),
       (1,_) => todo!("promote_nouns atom"),
@@ -1341,7 +1341,7 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
         return Ok(match s.len() {
           // Does k really have char atoms?
           1 => (i, KW::Noun(K::Char(s.chars().next().unwrap()))),
-          _ => (i, KW::Noun(K::CharArray(Series::new("", &s).cast(&DataType::Utf8).unwrap()))),
+          _ => (i, KW::Noun(K::CharArray(Series::new("", &s).cast(&DataType::String).unwrap()))),
         });
       } else if code.chars().nth(i) == Some('\\') {
         match code.chars().nth(i + 1) {
@@ -1413,7 +1413,11 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
       1 => Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
       _ => Ok((
         i - 1,
-        KW::Noun(K::SymbolArray(Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap())),
+        KW::Noun(K::SymbolArray(
+          Series::new("a", ss)
+            .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+            .unwrap(),
+        )),
       )),
     }
   }
