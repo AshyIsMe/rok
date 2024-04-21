@@ -579,6 +579,31 @@ fn test_table_flip() {
   assert_eq!(d1, d2)
 }
 
+#[ignore]
+#[test]
+fn test_table_flip2() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let t1 = K::Table(
+    DataFrame::new(vec![Series::new("a", [1, 2, 3i64]), Series::new("b", ["foo", "abcd", "yo"])])
+      .unwrap(),
+  );
+  println!("t1: {:?}", t1);
+
+  // let t2 = eval(&mut env, scan("+`a`b!(1 2 3; (\"foo\";\"abcd\";\"yo\"))").unwrap()).unwrap();
+  let k = eval(&mut env, scan("k:`a`b").unwrap()).unwrap();
+  println!("k: {:?}", k);
+  let v = eval(&mut env, scan("v:(1 2 3; (\"foo\";\"abcd\";\"yo\"))").unwrap()).unwrap();
+  println!("v: {:?}", v);
+  let t2 = eval(&mut env, scan("t:+k!v").unwrap()).unwrap();
+  println!("t2: {:?}", t2);
+  // assert_eq!(format!("{:?}", KW::Noun(t1)), format!("{:?}", t2));
+  assert_eq!(KW::Noun(t1), t2);
+  // assert!(true)
+
+  // todo!("++`a`b!(1 2 3; (\"foo\";\"abcd\";\"yo\"))")
+}
+
 #[test]
 fn test_table_reader() {
   let mut env = Env { names: HashMap::new(), parent: None };
@@ -924,20 +949,21 @@ fn test_reshape() {
   // );
 }
 
-// #[test]
-// fn test_paren_nesting() {
-//   let mut env = Env { names: HashMap::new(), parent: None };
-//   let res = eval(&mut env, scan("+\\1-2*2!\"(()))(())()\"").unwrap()).unwrap();
-//   assert_eq!(res, Noun(K::Int(Some(0i64))));
-// }
-
 #[ignore]
 #[test]
 fn test_str_cols() {
-  let s_chararray = Series::new("test", "foo");
-  let s_strarray = Series::new("test", ["foo", "bar", "baz"]);
-  println!("{s_chararray}");
-  println!("{s_strarray}");
+  // TODO Figure out what to do about chars vs strings vs lists of strings
+  // Is this enough?
+  // K::Char("a")
+  // K::CharArray("abcdef")
+  // K::List(["abc", "foobar"])
+  // Can we build dataframes on this?
+  let s_chararray = Series::new("test", "foo"); //.cast(&DataType::String).unwrap();
+  let s_strarray = Series::new("test", ["foo", "barabc", "bazdef"]);
+  println!("s_chararray: {s_chararray}");
+  println!("s_strarray: {s_strarray}");
+
+  let ab = Noun(K::CharArray(Series::new("", "ab").cast(&DataType::Utf8).unwrap()));
 
   assert!(false)
 }

@@ -102,6 +102,19 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
             | K::IntArray(s)
             | K::FloatArray(s)
             | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
+            K::List(v) => {
+              if v.iter().all(|i| match i {
+                K::CharArray(_) => true,
+                // K::Char(_) => true, // TODO
+                _ => false,
+              }) {
+                let vs: Vec<String> = v.iter().map(|s| s.to_string()).collect();
+                Series::new(&k.to_string(), vs.clone())
+              } else {
+                // Err("type")
+                panic!("type error?")
+              }
+            }
             _ => todo!("handle atoms"),
           })
           .collect();
@@ -333,6 +346,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
             let c: char = s.chars().nth(i as usize).unwrap();
             Ok(K::Char(c))
           }
+          K::List(_v) => todo!("v_at List"),
           _ => todo!("index into l"),
         }
       } else {
@@ -372,6 +386,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           Ok(a) => Ok(K::CharArray(a)),
           _ => todo!("index out of bounds - this shouldn't be an error"),
         },
+        K::List(_) => todo!("v_at K::List"),
         _ => todo!("v_at"),
       }
     }
