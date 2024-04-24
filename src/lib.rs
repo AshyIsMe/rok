@@ -232,6 +232,8 @@ impl fmt::Display for K {
             None => panic!("impossible"),
           })
           .collect();
+        // let s: String = ca.str().unwrap().to_string();
+
         if s.len() < (cols - 2) {
           write!(f, "\"{}\"", s)
         } else {

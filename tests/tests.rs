@@ -1024,7 +1024,6 @@ fn test_reshape() {
   // );
 }
 
-#[ignore]
 #[test]
 fn test_str_cols() {
   // TODO Figure out what to do about chars vs strings vs lists of strings
@@ -1033,9 +1032,11 @@ fn test_str_cols() {
   // K::CharArray("abcdef")
   // K::List(["abc", "foobar"])
   // Can we build dataframes on this?
-  let s_chararray = Series::new("test", "foo"); //.cast(&DataType::String).unwrap();
+  let s_chararray1 = Series::new("test", "foo").cast(&DataType::String).unwrap();
+  let s_chararray2 = Series::new("test", ["foo"]).cast(&DataType::String).unwrap();
   let s_strarray = Series::new("test", ["foo", "barabc", "bazdef"]);
-  println!("s_chararray: {s_chararray}");
+  println!("s_chararray1: {s_chararray1}");
+  println!("s_chararray2: {s_chararray2}");
   println!("s_strarray: {s_strarray}");
 
   let ab = Noun(K::CharArray(Series::new("", "ab").cast(&DataType::String).unwrap()));
