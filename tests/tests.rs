@@ -286,11 +286,11 @@ fn test_strings() {
   );
   assert_eq!(
     format!("{:?}", eval(&mut env, scan("\"\"").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::CharArray(Series::new("", "").cast(&DataType::String).unwrap())))
+    format!("{:?}", Noun(K::CharArray("".to_string())))
   );
   assert_eq!(
     format!("{:?}", eval(&mut env, scan("\"abcABC\"").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::CharArray(Series::new("", "abcABC").cast(&DataType::String).unwrap())))
+    format!("{:?}", Noun(K::CharArray("abcABC".to_string())))
   );
 }
 
@@ -401,7 +401,7 @@ fn test_lists() {
   );
   assert_eq!(
     format!("{:?}", eval(&mut env, scan("(\"a\";\"b\";\"c\")").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::CharArray(Series::new("", "abc"))))
+    format!("{:?}", Noun(K::CharArray("abc".to_string())))
   );
   // TODO SymbolArray promotion
   // assert_eq!(
@@ -918,8 +918,8 @@ fn test_unique() {
   //   Noun(K::CharArray(Series::new("", "abc").cast(&DataType::Utf8).unwrap()))
   // )
   let res = eval(&mut env, scan("? \"aabb\"").unwrap()).unwrap();
-  let ab = Noun(K::CharArray(Series::new("", "ab").cast(&DataType::String).unwrap()));
-  let ba = Noun(K::CharArray(Series::new("", "ba").cast(&DataType::String).unwrap()));
+  let ab = Noun(K::CharArray("ab".to_string()));
+  let ba = Noun(K::CharArray("ba".to_string()));
   assert!(res == ab || res == ba);
 }
 
@@ -941,7 +941,7 @@ fn test_array_indexing() {
   assert_eq!(res, Noun(K::Char('c')));
 
   let res = eval(&mut env, scan("\"abc\" @ 2 1 0").unwrap()).unwrap();
-  assert_eq!(res, Noun(K::CharArray(Series::new("", "cba").cast(&DataType::String).unwrap())));
+  assert_eq!(res, Noun(K::CharArray("cba".to_string())));
 
   let res = eval(&mut env, scan("1 2 3 4 @ 0 1 2").unwrap()).unwrap();
   assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
@@ -953,7 +953,7 @@ fn test_array_indexing() {
   assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
 
   let res = eval(&mut env, scan("(`a`b!(1 2 3;\"abc\")) @ `b").unwrap()).unwrap();
-  assert_eq!(res, Noun(K::CharArray(Series::new("", "abc").cast(&DataType::String).unwrap())));
+  assert_eq!(res, Noun(K::CharArray("abc".to_string())));
 
   let res = eval(&mut env, scan("(`a`b!(1 2 3;1 0 1)) @ `b").unwrap()).unwrap();
   assert_eq!(res, Noun(K::BoolArray(arr!([1, 0, 1u8]))));
@@ -1022,24 +1022,4 @@ fn test_reshape() {
   //     K::CharArray(arr!(['a', 'a', 'a'])),
   //   ]))
   // );
-}
-
-#[test]
-fn test_str_cols() {
-  // TODO Figure out what to do about chars vs strings vs lists of strings
-  // Is this enough?
-  // K::Char("a")
-  // K::CharArray("abcdef")
-  // K::List(["abc", "foobar"])
-  // Can we build dataframes on this?
-  let s_chararray1 = Series::new("test", "foo").cast(&DataType::String).unwrap();
-  let s_chararray2 = Series::new("test", ["foo"]).cast(&DataType::String).unwrap();
-  let s_strarray = Series::new("test", ["foo", "barabc", "bazdef"]);
-  println!("s_chararray1: {s_chararray1}");
-  println!("s_chararray2: {s_chararray2}");
-  println!("s_strarray: {s_strarray}");
-
-  let ab = Noun(K::CharArray(Series::new("", "ab").cast(&DataType::String).unwrap()));
-
-  assert!(false)
 }

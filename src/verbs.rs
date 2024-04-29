@@ -97,11 +97,11 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
         let cols: Vec<Series> = d
           .iter()
           .map(|(k, v)| match v {
-            K::SymbolArray(s)
-            | K::BoolArray(s)
-            | K::IntArray(s)
-            | K::FloatArray(s)
-            | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
+            K::SymbolArray(s) | K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) => {
+              Series::new(&k.to_string(), s.clone())
+            }
+            // | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
+            K::CharArray(s) => Series::new(&k.to_string(), s),
             K::List(v) => {
               if v.iter().all(|i| match i {
                 K::CharArray(_) => true,
@@ -134,7 +134,7 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
           DataType::Boolean => K::BoolArray(s.clone()),
           DataType::Int64 => K::IntArray(s.clone()),
           DataType::Float64 => K::FloatArray(s.clone()),
-          DataType::String => K::CharArray(s.clone()),
+          // DataType::String => K::CharArray(s.clone()), // TODO K::List([K::CharArray(), ...])
           DataType::Categorical { .. } => K::SymbolArray(s.clone()),
           _ => panic!("impossible"),
         })
@@ -240,7 +240,7 @@ pub fn v_unique(r: K) -> Result<K, &'static str> {
     K::BoolArray(a) => Ok(K::BoolArray(a.unique().unwrap())),
     K::IntArray(a) => Ok(K::IntArray(a.unique().unwrap())),
     K::FloatArray(a) => Ok(K::FloatArray(a.unique().unwrap())),
-    K::CharArray(a) => Ok(K::CharArray(a.unique().unwrap())),
+    K::CharArray(a) => Ok(K::CharArray(a.chars().unique().collect())),
     // TODO ?(3.14;"abc";3.14) works in ngn/k but k9 throws domain error if the list has any float item and otherwise works.
     // K::List(v) => Ok(K::List(v.into_iter().unique().collect())),
     K::List(_v) => Err("nyi: v_unique(K::List(_))"),
@@ -291,23 +291,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(i as usize).unwrap()))),
           K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(i as usize).unwrap())),
           K::CharArray(a) => {
-            // TODO std::str::from_utf8()...
-            // let s = a.utf8().unwrap().get(i as usize).unwrap();
-            let s = std::str::from_utf8(
-              &a.cast(&DataType::UInt8)
-                .unwrap()
-                .u8()
-                .unwrap()
-                .into_iter()
-                .map(|u| match u {
-                  Some(u) => u,
-                  None => panic!("impossible"),
-                })
-                .collect::<Vec<u8>>(),
-            )
-            .unwrap()
-            .to_string();
-            let c: char = s.chars().nth(i.into()).unwrap();
+            let c: char = a.chars().nth(i.into()).unwrap();
             Ok(K::Char(c))
           }
           K::List(v) => {
@@ -329,23 +313,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(i as usize).unwrap()))),
           K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(i as usize).unwrap())),
           K::CharArray(a) => {
-            // TODO std::str::from_utf8()...
-            // let s = a.utf8().unwrap().get(i as usize).unwrap();
-            let s = std::str::from_utf8(
-              &a.cast(&DataType::UInt8)
-                .unwrap()
-                .u8()
-                .unwrap()
-                .into_iter()
-                .map(|u| match u {
-                  Some(u) => u,
-                  None => panic!("impossible"),
-                })
-                .collect::<Vec<u8>>(),
-            )
-            .unwrap()
-            .to_string();
-            let c: char = s.chars().nth(i as usize).unwrap();
+            let c: char = a.chars().nth(i as usize).unwrap();
             Ok(K::Char(c))
           }
           K::List(_v) => todo!("v_at List"),
@@ -384,10 +352,16 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           Ok(a) => Ok(K::FloatArray(a)),
           _ => todo!("index out of bounds - this shouldn't be an error"),
         },
-        K::CharArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
-          Ok(a) => Ok(K::CharArray(a)),
-          _ => todo!("index out of bounds - this shouldn't be an error"),
-        },
+        K::CharArray(a) => Ok(K::CharArray(
+          i.u32()
+            .unwrap()
+            .iter()
+            .map(|i| match a.chars().nth(i.unwrap() as usize) {
+              Some(c) => c,
+              None => ' ',
+            })
+            .collect(),
+        )),
         K::List(_) => todo!("v_at K::List"),
         _ => todo!("v_at"),
       }
@@ -564,24 +538,9 @@ pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
 pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
   debug!("l: {:?}, r: {:?}", l, r);
   match (&l, &r) {
-    (K::Bool(0), KW::Noun(K::CharArray(a))) => {
-      let us = &a
-        .cast(&DataType::UInt8)
-        .unwrap()
-        .u8()
-        .unwrap()
-        .into_iter()
-        .map(|u| match u {
-          Some(u) => u,
-          None => panic!("impossible"),
-        })
-        .collect::<Vec<u8>>();
-      let s = std::str::from_utf8(us).unwrap();
-      // let v: Vec<String> = std::fs::read_to_string(s).unwrap().lines().map(String::from).collect();
-      Ok(KW::Noun(K::List(
-        std::fs::read_to_string(s).unwrap().lines().map(String::from).map(K::from).collect(),
-      )))
-    }
+    (K::Bool(0), KW::Noun(K::CharArray(a))) => Ok(KW::Noun(K::List(
+      std::fs::read_to_string(a).unwrap().lines().map(String::from).map(K::from).collect(),
+    ))),
     (K::Int(Some(2i64)), KW::Noun(K::Symbol(s))) => {
       let p = Path::new(&s);
       if p.exists() {

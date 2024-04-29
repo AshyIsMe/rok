@@ -37,7 +37,7 @@ pub enum K {
   // Int16Array(Series), // TODO maybe later?
   // Int128Array(Series), // TODO maybe later?
   FloatArray(Series),
-  CharArray(Series),
+  CharArray(String),
   Nil, // Is Nil a noun?
   List(Vec<K>),
   Dictionary(IndexMap<String, K>),
@@ -222,17 +222,18 @@ impl fmt::Display for K {
         write!(f, "{}", s)
       }
       K::CharArray(ca) => {
-        let s: String = ca
-          .str()
-          .unwrap()
-          .into_iter()
-          .take(cols - 2)
-          .map(|u| match u {
-            Some(u) => u,
-            None => panic!("impossible"),
-          })
-          .collect();
-        // let s: String = ca.str().unwrap().to_string();
+        // let s: String = ca
+        //   .str()
+        //   .unwrap()
+        //   .into_iter()
+        //   .take(cols - 2)
+        //   .map(|u| match u {
+        //     Some(u) => u,
+        //     None => panic!("impossible"),
+        //   })
+        //   .collect();
+        // // let s: String = ca.str().unwrap().to_string();
+        let s = ca;
 
         if s.len() < (cols - 2) {
           write!(f, "\"{}\"", s)
@@ -282,9 +283,7 @@ impl fmt::Display for K {
 
 // TODO more cases
 impl From<String> for K {
-  fn from(item: String) -> Self {
-    K::CharArray(Series::new("", item).cast(&DataType::String).unwrap())
-  }
+  fn from(item: String) -> Self { K::CharArray(item) }
 }
 
 impl KW {
@@ -389,15 +388,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
         })
         .collect(),
     ),
-    K::CharArray(v) => Ok(
-      v.cast(&DataType::UInt8)
-        .unwrap()
-        .u8()
-        .unwrap()
-        .into_iter()
-        .map(|c| K::Char(c.unwrap() as char))
-        .collect(),
-    ),
+    K::CharArray(v) => Ok(v.chars().map(|c| K::Char(c)).collect()),
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
     }
@@ -448,7 +439,7 @@ pub fn vec_to_list(nouns: Vec<KW>) -> Result<K, &'static str> {
         _ => panic!("impossible"),
       })
       .collect();
-    Ok(K::CharArray(arr!(v)))
+    Ok(K::CharArray(v))
   } else if nouns.iter().all(|w| matches!(w, KW::Noun(_))) {
     // check they're all nouns and make a List of the K objects within
     let v = nouns
@@ -1333,7 +1324,7 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
         return Ok(match s.len() {
           // Does k really have char atoms?
           1 => (i, KW::Noun(K::Char(s.chars().next().unwrap()))),
-          _ => (i, KW::Noun(K::CharArray(Series::new("", &s).cast(&DataType::String).unwrap()))),
+          _ => (i, KW::Noun(K::CharArray(s))),
         });
       } else if code.chars().nth(i) == Some('\\') {
         match code.chars().nth(i + 1) {
