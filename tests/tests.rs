@@ -1023,3 +1023,30 @@ fn test_reshape() {
   //   ]))
   // );
 }
+
+#[test]
+fn test_split() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("\",\"\\\"lol,bang,biff\"").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(
+    res1,
+    Noun(K::List(vec![
+      K::CharArray("lol".to_string()),
+      K::CharArray("bang".to_string()),
+      K::CharArray("biff".to_string())
+    ]))
+  );
+
+  let res2 = eval(&mut env, scan("\"SPLIT\"\\\"lolSPLITbangSPLITbiff\"").unwrap()).unwrap();
+  println!("res2: {:?}", res2);
+  assert_eq!(
+    res2,
+    Noun(K::List(vec![
+      K::CharArray("lol".to_string()),
+      K::CharArray("bang".to_string()),
+      K::CharArray("biff".to_string())
+    ]))
+  );
+}

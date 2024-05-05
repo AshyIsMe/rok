@@ -495,6 +495,8 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("?", (v_randfloat, v_unique, v_rand, v_find, v_rand, v_find, v_splice, v_none4,)),
     ("@", (v_type, v_type, v_at, v_at, v_at, v_at, v_amend3, v_amend4,)),
     (".", (v_eval, v_eval, v_dot, v_dot, v_dot, v_dot, v_deepamend3, v_deepamend4,)),
+    ("/", (v_none1, v_none1, v_none2, v_none2, v_pack, v_pack, v_none3, v_none4,)),
+    ("\\", (v_none1, v_none1, v_none2, v_unpack, v_split, v_split, v_none3, v_none4,)),
   ])
 }
 
@@ -930,6 +932,10 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
       (any_l, x @ KW::Verb { .. }, KW::Adverb { name }, any_r) => {
         // 3 adverb
         apply_adverb(&name, x.clone()).map(|r| vec![any_l, r, any_r])
+      }
+      (any, x @ KW::Noun(_), KW::Adverb { name }, y @ KW::Noun(_)) => {
+        // 4 dyad adverb (special cases, they're actually verbs)
+        apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
       (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
