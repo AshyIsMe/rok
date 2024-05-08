@@ -356,10 +356,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           i.u32()
             .unwrap()
             .iter()
-            .map(|i| match a.chars().nth(i.unwrap() as usize) {
-              Some(c) => c,
-              None => ' ',
-            })
+            .map(|i| a.chars().nth(i.unwrap() as usize).unwrap_or(' '))
             .collect(),
         )),
         K::List(_) => todo!("v_at K::List"),
@@ -384,8 +381,8 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
             .unwrap()
             .iter_str()
             .map(|s| {
-              if d.contains_key(s.unwrap().into()) {
-                d.get(s.unwrap().into()).unwrap().clone()
+              if d.contains_key(s.unwrap()) {
+                d.get(s.unwrap()).unwrap().clone()
               } else {
                 K::Nil // TODO Is this the same behaviour as ngn/k and k9?
               }

@@ -388,7 +388,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
         })
         .collect(),
     ),
-    K::CharArray(v) => Ok(v.chars().map(|c| K::Char(c)).collect()),
+    K::CharArray(v) => Ok(v.chars().map(K::Char).collect()),
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
     }
@@ -1213,7 +1213,7 @@ pub fn scan_pass3(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
   // At this stage there should be no KW::SC at depth 0 unless the whole line is an unbracketed Expr
   if tokens.contains(&KW::SC) {
     scan_pass2(
-      vec![KW::LB].iter().chain(tokens.iter().chain(vec![KW::RB].iter())).cloned().collect(),
+      [KW::LB].iter().chain(tokens.iter().chain([KW::RB].iter())).cloned().collect(),
     )
   } else {
     Ok(tokens)
