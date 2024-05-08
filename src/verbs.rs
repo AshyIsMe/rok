@@ -415,14 +415,12 @@ pub fn v_join(l: K, r: K) -> Result<K, &'static str> {
   match l {
     K::Char(l) => match r {
       K::List(v) => {
-        //let v: Vec<Option<String>> =
         let v: Option<Vec<String>> =
-          v.iter().map(|k| if let K::CharArray(s) = k { Some(s.clone()) } else { None }).flatten().collect();
+          v.iter().map(|k| if let K::CharArray(s) = k { Some(s.clone()) } else { None }).collect();
         match v {
-          Some(v) => Err("nyi"),
-          None => Err("type")
+          Some(v) => Ok(K::CharArray(v.join(&l.to_string()))),
+          None => Err("type"),
         }
-
       }
       _ => Err("type"),
     },
