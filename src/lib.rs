@@ -495,7 +495,8 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("?", (v_randfloat, v_unique, v_rand, v_find, v_rand, v_find, v_splice, v_none4,)),
     ("@", (v_type, v_type, v_at, v_at, v_at, v_at, v_amend3, v_amend4,)),
     (".", (v_eval, v_eval, v_dot, v_dot, v_dot, v_dot, v_deepamend3, v_deepamend4,)),
-    ("/", (v_none1, v_none1, v_none2, v_none2, v_pack, v_pack, v_none3, v_none4,)),
+  //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
+    ("/", (v_none1, v_none1, v_none2, v_none2, v_join, v_join, v_none3, v_none4,)),
     ("\\", (v_none1, v_none1, v_none2, v_unpack, v_split, v_split, v_none3, v_none4,)),
   ])
 }

@@ -1050,3 +1050,13 @@ fn test_split() {
     ]))
   );
 }
+
+#[test]
+fn test_join() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("\",\"/(\"lol\";\"bang\";\"biff\")").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, Noun(K::CharArray("lol,bang,biff".to_string())));
+
+}

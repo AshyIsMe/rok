@@ -411,7 +411,24 @@ pub fn v_deepamend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi")
 pub fn v_deepamend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_try(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_pack(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_join(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::Char(l) => match r {
+      K::List(v) => {
+        //let v: Vec<Option<String>> =
+        let v: Option<Vec<String>> =
+          v.iter().map(|k| if let K::CharArray(s) = k { Some(s.clone()) } else { None }).flatten().collect();
+        match v {
+          Some(v) => Err("nyi"),
+          None => Err("type")
+        }
+
+      }
+      _ => Err("type"),
+    },
+    _ => Err("type"),
+  }
+}
 pub fn v_unpack(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_split(l: K, r: K) -> Result<K, &'static str> {
   match l {
