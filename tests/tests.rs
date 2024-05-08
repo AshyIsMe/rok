@@ -352,6 +352,15 @@ fn test_symbols() {
 }
 
 #[test]
+fn test_quoted_symbols() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(
+    format!("{:?}", eval(&mut env, scan("`\"abc def\"").unwrap()).unwrap()),
+    format!("{:?}", Noun(K::Symbol("abc def".to_string())))
+  );
+}
+
+#[test]
 fn test_length_errors() {
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("1 2 3 + 4 5").unwrap()), Err::<KW, &'static str>("length"));
@@ -1058,5 +1067,4 @@ fn test_join() {
   let res1 = eval(&mut env, scan("\",\"/(\"lol\";\"bang\";\"biff\")").unwrap()).unwrap();
   println!("res1: {:?}", res1);
   assert_eq!(res1, Noun(K::CharArray("lol,bang,biff".to_string())));
-
 }

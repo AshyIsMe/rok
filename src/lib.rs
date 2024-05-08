@@ -1212,9 +1212,7 @@ pub fn scan_pass3(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
 
   // At this stage there should be no KW::SC at depth 0 unless the whole line is an unbracketed Expr
   if tokens.contains(&KW::SC) {
-    scan_pass2(
-      [KW::LB].iter().chain(tokens.iter().chain([KW::RB].iter())).cloned().collect(),
-    )
+    scan_pass2([KW::LB].iter().chain(tokens.iter().chain([KW::RB].iter())).cloned().collect())
   } else {
     Ok(tokens)
   }
@@ -1357,6 +1355,7 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
   //
   // read until first char outside [a-z0-9._`]
   // split on ` or space`
+  // TODO: `"foo )(*&^%!@#$%_" should be a valid symbol.
   //
   // a SymbolArray *potentially* extends until the first symbol character
   let sentence = match code.find(|c: char| {
