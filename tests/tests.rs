@@ -354,9 +354,22 @@ fn test_symbols() {
 #[test]
 fn test_quoted_symbols() {
   let mut env = Env { names: HashMap::new(), parent: None };
+  let res = eval(&mut env, scan("`\"abc def\"").unwrap()).unwrap();
+  println!("{:?}", res);
+  assert_eq!(format!("{:?}", res), format!("{:?}", Noun(K::Symbol("abc def".to_string()))));
+
+  let res = eval(&mut env, scan("`a`\"abc def\"").unwrap()).unwrap();
+  println!("{:?}", res);
   assert_eq!(
-    format!("{:?}", eval(&mut env, scan("`\"abc def\"").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::Symbol("abc def".to_string())))
+    format!("{:?}", res),
+    format!(
+      "{:?}",
+      Noun(K::SymbolArray(
+        Series::new("a", ["a", "abc def"])
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap()
+      ))
+    )
   );
 }
 

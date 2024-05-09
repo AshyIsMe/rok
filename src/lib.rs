@@ -1359,7 +1359,7 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
   //
   // a SymbolArray *potentially* extends until the first symbol character
   let sentence = match code.find(|c: char| {
-    !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '_', '`'].contains(&c))
+    !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '_', '`', '"'].contains(&c))
   }) {
     Some(c) => &code[..c],
     None => code,
@@ -1367,6 +1367,13 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
 
   if !sentence.starts_with('`') {
     panic!("called scan_symbol() on invalid input")
+  } else if sentence.len() > 1 && sentence.chars().nth(1) == Some('"') {
+    match scan_string(&code[1..]) {
+      Ok((i, KW::Noun(K::CharArray(s)))) => Ok((1 + i, KW::Noun(K::Symbol(s)))),
+      Ok((i, KW::Noun(K::Char(c)))) => Ok((1 + i, KW::Noun(K::Symbol(c.to_string())))),
+      Err(e) => Err(e),
+      _ => panic!("impossible"),
+    }
   } else {
     let mut i: usize = 1;
     let mut s = String::new();
