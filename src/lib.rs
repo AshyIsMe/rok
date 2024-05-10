@@ -1355,52 +1355,63 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
   //
   // read until first char outside [a-z0-9._`]
   // split on ` or space`
-  // TODO: `"foo )(*&^%!@#$%_" should be a valid symbol.
-  //
-  // a SymbolArray *potentially* extends until the first symbol character
-  let sentence = match code.find(|c: char| {
-    !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '_', '`', '"'].contains(&c))
-  }) {
-    Some(c) => &code[..c],
-    None => code,
-  };
+  // symbols can also be quoted strings: `"foo bar! baz"
 
-  if !sentence.starts_with('`') {
+  if !code.starts_with('`') {
     panic!("called scan_symbol() on invalid input")
-  } else if sentence.len() > 1 && sentence.chars().nth(1) == Some('"') {
-    match scan_string(&code[1..]) {
-      Ok((i, KW::Noun(K::CharArray(s)))) => Ok((1 + i, KW::Noun(K::Symbol(s)))),
-      Ok((i, KW::Noun(K::Char(c)))) => Ok((1 + i, KW::Noun(K::Symbol(c.to_string())))),
-      Err(e) => Err(e),
-      _ => panic!("impossible"),
-    }
   } else {
     let mut i: usize = 1;
     let mut s = String::new();
     let mut ss: Vec<String> = vec![];
     let mut b_in_sym = true;
     // TODO: Yeah this is awful...
-    while i < sentence.len() {
-      if sentence.chars().nth(i) == Some(' ') {
-        if b_in_sym {
-          ss.extend(vec![s.clone()]);
-          s.clear();
+    while i < code.len() {
+      match code.chars().nth(i) {
+        Some(' ') => {
+          if b_in_sym {
+            ss.extend(vec![s.clone()]);
+            s.clear();
+          }
+          b_in_sym = false;
         }
-        b_in_sym = false;
-      } else if sentence.chars().nth(i) == Some('`') {
-        if b_in_sym {
-          ss.extend(vec![s.clone()]);
-          s.clear();
+        Some('`') => {
+          if b_in_sym {
+            ss.extend(vec![s.clone()]);
+            s.clear();
+          }
+          b_in_sym = true;
         }
-        b_in_sym = true;
-      } else if b_in_sym {
-        s.extend(sentence.chars().nth(i));
-      } else {
-        break;
+        Some('"') if b_in_sym => match scan_string(&code[i..]) {
+          Ok((len, KW::Noun(K::CharArray(s)))) => {
+            ss.extend(vec![s]);
+            i += len + 1
+          }
+          Ok((len, KW::Noun(K::Char(c)))) => {
+            ss.extend(vec![c.to_string()]);
+            i += len + 1
+          }
+          Err(e) => return Err(e),
+          _ => panic!("impossible"),
+        },
+        Some('"') if !b_in_sym => return Err("parse error"),
+        Some(c) => {
+          if !(c.is_ascii_alphanumeric()
+            || c.is_ascii_whitespace()
+            || ['.', '_', '`', '"'].contains(&c))
+          {
+            ss.extend(vec![s.clone()]);
+            s.clear();
+            break;
+          }
+          if b_in_sym {
+            s.extend(code.chars().nth(i));
+          }
+        }
+        None => panic!("impossible"),
       }
       i += 1;
     }
-    if !s.is_empty() || sentence.chars().nth(sentence.len() - 1) == Some('`') {
+    if !s.is_empty() || code.chars().nth(code.len() - 1) == Some('`') {
       // catch trailing empty symbol eg: `a`b`c` (SymbolArray(["a","b","c",""]))
       ss.extend(vec![s.clone()]);
     }
@@ -1418,6 +1429,7 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     }
   }
 }
+
 pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
   // read a single Name
   // a Name extends until the first symbol character or space
