@@ -149,12 +149,19 @@ impl fmt::Display for K {
         }
       }
       K::Char(c) => write!(f, "{}", c),
-      K::Symbol(s) => write!(f, "`{}", s),
+      K::Symbol(s) => {
+        if s.chars().any(|c| c.is_whitespace() | c.is_ascii_punctuation()) {
+          write!(f, "`\"{}\"", s)
+        } else {
+          write!(f, "`{}", s)
+        }
+      }
       K::SymbolArray(s) => {
         let max_n = cols / 2; // symbols take min 2 chars, we could fit this many max on a row
         let s = strip_quotes(
           Series::new(
             "",
+            // TODO quote quoted symbols proprely  eg: `"foo bar baz"
             str_concat(
               &s.cast(&DataType::String).unwrap().str().unwrap().slice(0, max_n),
               "`",
