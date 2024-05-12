@@ -158,20 +158,26 @@ impl fmt::Display for K {
       }
       K::SymbolArray(s) => {
         let max_n = cols / 2; // symbols take min 2 chars, we could fit this many max on a row
-        let s = strip_quotes(
-          Series::new(
-            "",
-            // TODO quote quoted symbols proprely  eg: `"foo bar baz"
-            str_concat(
-              &s.cast(&DataType::String).unwrap().str().unwrap().slice(0, max_n),
-              "`",
-              false,
-            ),
-          )
-          .iter()
-          .next()
+        let s = s.cast(&DataType::String).unwrap();
+        let indices: Vec<u32> = s
+          .str()
           .unwrap()
-          .to_string(),
+          .contains("[\t `~_!@#$%^&*(){}+-=?.,<>:;\\[\\]'/\\\\]", true)
+          .unwrap()
+          .into_iter()
+          .enumerate()
+          .map(|(i, b)| if matches!(b, Some(true)) { Some(i as u32) } else { None })
+          .flatten()
+          .collect();
+        // quote symbols that require it
+        let s =
+          s.str().unwrap().scatter_with(indices, |s| Some(format!("\"{}\"", s.unwrap()))).unwrap();
+        let s = strip_quotes(
+          Series::new("", str_concat(&s.slice(0, max_n), "`", false))
+            .iter()
+            .next()
+            .unwrap()
+            .to_string(),
         );
         let s = if s.len() < cols { s } else { s[..(cols - 3)].to_string() + ".." };
         write!(f, "`{}", s)

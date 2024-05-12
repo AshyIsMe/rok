@@ -371,6 +371,20 @@ fn test_quoted_symbols() {
       ))
     )
   );
+
+  let res = eval(&mut env, scan("`a`\"abc def\"`\"foo!bar_baz\"").unwrap()).unwrap();
+  println!("{:?}", res);
+  assert_eq!(
+    format!("{:?}", res),
+    format!(
+      "{:?}",
+      Noun(K::SymbolArray(
+        Series::new("a", ["a", "abc def", "foo!bar_baz"])
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap()
+      ))
+    )
+  );
 }
 
 #[test]
