@@ -1153,6 +1153,17 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
                     words.push(KW::Verb { name: ':'.to_string() })
                   }
                 }
+                // digraph adverbs ': /: \:
+                Some(KW::Adverb { name }) => {
+                  let s: &str = &name;
+                  if adverbs_table().keys().contains(&s) {
+                    let mn = format!("{}:", name);
+                    let _ = words.pop();
+                    words.push(KW::Adverb { name: mn });
+                  } else {
+                    words.push(KW::Verb { name: ':'.to_string() })
+                  }
+                }
                 _ => words.push(KW::Verb { name: ':'.to_string() }),
               }
             } else {
@@ -1164,7 +1175,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
       }
       '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_' | '$'
       | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
-      '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }), // TODO ': /: \:
+      '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }),
       ' ' | '\t' | '\n' => continue,
       'a'..='z' | 'A'..='Z' => {
         let (j, k) = scan_name(&code[i..]).unwrap();

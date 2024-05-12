@@ -32,6 +32,7 @@ fn main() {
         let _ = rl.add_history_entry(&line);
         if line.trim_end() == "\\" {
           //help
+          // TODO better help, up to date with NYI
           println!("verbs: {}", primitives_table().keys().join(" "));
           println!("adverbs: {}", adverbs_table().keys().join(" "));
         } else if line.trim_end() == "\\\\" {
