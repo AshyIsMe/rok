@@ -166,8 +166,7 @@ impl fmt::Display for K {
           .unwrap()
           .into_iter()
           .enumerate()
-          .map(|(i, b)| if matches!(b, Some(true)) { Some(i as u32) } else { None })
-          .flatten()
+          .filter_map(|(i, b)| if matches!(b, Some(true)) { Some(i as u32) } else { None })
           .collect();
         // quote symbols that require it
         let s =
