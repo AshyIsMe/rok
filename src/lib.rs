@@ -508,7 +508,27 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("?", (v_randfloat, v_unique, v_rand, v_find, v_rand, v_find, v_splice, v_none4,)),
     ("@", (v_type, v_type, v_at, v_at, v_at, v_at, v_amend3, v_amend4,)),
     (".", (v_eval, v_eval, v_dot, v_dot, v_dot, v_dot, v_deepamend3, v_deepamend4,)),
-  //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
+    // forced monad versions of the above
+    ("+:", (v_flip, v_flip, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("-:", (v_negate, v_negate, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("*:", (v_first, v_first, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("%:", (v_sqrt, v_sqrt, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("!:", (v_iota, v_odometer, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("&:", (v_where, v_where, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("|:", (v_reverse, v_reverse, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("<:", (v_asc, v_asc, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    (">:", (v_desc, v_desc, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("=:", (v_imat, v_group, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("~:", (v_not, v_not, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    (",:", (v_enlist, v_enlist, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("^:", (v_isnull, v_isnull, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("#:", (v_count, v_count, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("_:", (v_floor, v_floor, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("$:", (v_string, v_string, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("?:", (v_randfloat, v_unique, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("@:", (v_type, v_type, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    (".:", (v_eval, v_eval, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    // adverbs / and \ are also overloaded as verbs:
     ("/", (v_none1, v_none1, v_none2, v_none2, v_join, v_join, v_none3, v_none4,)),
     ("\\", (v_none1, v_none1, v_none2, v_unpack, v_split, v_split, v_none3, v_none4,)),
   ])
@@ -1117,8 +1137,34 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
         words.push(k);
         skip = j;
       }
-      ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
-      | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }), // TODO forced monads +: -: etc
+      ':' => {
+        let prev = if i > 0 { code.chars().nth(i - 1) } else { None };
+        match prev {
+          Some(prev_c) => {
+            if !prev_c.is_whitespace() {
+              // forced monads +: -: etc
+              match words.last() {
+                Some(KW::Verb { name }) => {
+                  let s: &str = &name;
+                  if primitives_table().keys().contains(&s) {
+                    let mn = format!("{}:", name);
+                    let _ = words.pop();
+                    words.push(KW::Verb { name: mn });
+                  } else {
+                    words.push(KW::Verb { name: ':'.to_string() })
+                  }
+                }
+                _ => words.push(KW::Verb { name: ':'.to_string() }),
+              }
+            } else {
+              words.push(KW::Verb { name: ':'.to_string() })
+            }
+          }
+          None => words.push(KW::Verb { name: ':'.to_string() }),
+        }
+      }
+      '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_' | '$'
+      | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
       '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }), // TODO ': /: \:
       ' ' | '\t' | '\n' => continue,
       'a'..='z' | 'A'..='Z' => {

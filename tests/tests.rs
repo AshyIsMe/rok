@@ -1095,3 +1095,13 @@ fn test_join() {
   println!("res1: {:?}", res1);
   assert_eq!(res1, Noun(K::CharArray("lol,bang,biff".to_string())));
 }
+
+#[test]
+fn test_forced_monads() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("+:`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  let res2 = eval(&mut env, scan("+`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  assert_eq!(res1, res2);
+}
