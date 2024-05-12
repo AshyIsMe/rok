@@ -7,6 +7,33 @@ use rok::*;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 
+fn help() -> &'static str {
+  // TODO better help, up to date with nyi list
+  let help = "verbs:
+: set return
++ plus flip
+- negate minus
+* first times
+% sqrt divide
+! iota|odometer|keys dict|mod
+& where min
+| reverse max
+< asc lesser
+> desc greater
+= imat|group equal
+~ not match
+, enlist concat
+^ isnull except|fill
+# count take|reshape
+_ floor|lowercase drop|delete|cut
+$ string pad|cast              $[c;t;f] cond
+? unique|randfloat find|random splice
+@ type at
+. eval|values dot
+";
+  return help;
+}
+
 fn main() {
   env_logger::init();
   println!("rok {}, type \\ for more info", env!("CARGO_PKG_VERSION"));
@@ -32,8 +59,7 @@ fn main() {
         let _ = rl.add_history_entry(&line);
         if line.trim_end() == "\\" {
           //help
-          // TODO better help, up to date with NYI
-          println!("verbs: {}", primitives_table().keys().join(" "));
+          println!("{}", help());
           println!("adverbs: {}", adverbs_table().keys().join(" "));
         } else if line.trim_end() == "\\\\" {
           //quit
