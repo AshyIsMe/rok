@@ -169,6 +169,9 @@ macro_rules! atomicdyad {
       (l, K::Dictionary(rd)) => {
         Ok(K::Dictionary(IndexMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
       }
+      (K::Table(_lt), K::Table(_rt)) => todo!("table"),
+      (K::Table(_lt), _r) => todo!("table"),
+      (_l, K::Table(_rt)) => todo!("table"),
       (K::List(lv), K::List(rv)) => {
         Ok(K::List(zip(lv, rv).map(|(x, y)| $v(x.clone(), y.clone()).unwrap()).collect()))
       }
