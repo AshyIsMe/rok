@@ -338,20 +338,21 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           .map(|i| i.unwrap_or(4_294_967_295) as u32)
           .collect::<Vec<u32>>(),
       );
+      let idcs: Vec<u32> = i.u32().unwrap().into_iter().map(|i| i.unwrap()).collect::<Vec<u32>>();
       match l.clone() {
-        K::SymbolArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+        K::SymbolArray(a) => match a.take_slice(&idcs) {
           Ok(a) => Ok(K::SymbolArray(a)),
           _ => todo!("index out of bounds - this shouldn't be an error"),
         },
-        K::BoolArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+        K::BoolArray(a) => match a.take_slice(&idcs) {
           Ok(a) => Ok(K::BoolArray(a)),
           _ => todo!("index out of bounds - this shouldn't be an error"),
         },
-        K::IntArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+        K::IntArray(a) => match a.take_slice(&idcs) {
           Ok(a) => Ok(K::IntArray(a)),
           _ => todo!("index out of bounds - this shouldn't be an error"),
         },
-        K::FloatArray(a) => match a.take_threaded(i.u32().unwrap(), true) {
+        K::FloatArray(a) => match a.take_slice(&idcs) {
           Ok(a) => Ok(K::FloatArray(a)),
           _ => todo!("index out of bounds - this shouldn't be an error"),
         },
@@ -579,7 +580,12 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
           Some(e) => {
             if e == "csv" {
               Ok(KW::Noun(K::Table(
-                CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap(),
+                CsvReadOptions::default()
+                  .with_has_header(true)
+                  .try_into_reader_with_file_path(Some(p.to_path_buf()))
+                  .unwrap()
+                  .finish()
+                  .unwrap(),
               )))
             } else if e == "parquet" {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();

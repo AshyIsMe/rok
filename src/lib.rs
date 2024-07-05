@@ -172,7 +172,7 @@ impl fmt::Display for K {
         let s =
           s.str().unwrap().scatter_with(indices, |s| Some(format!("\"{}\"", s.unwrap()))).unwrap();
         let s = strip_quotes(
-          Series::new("", str_concat(&s.slice(0, max_n), "`", false))
+          Series::new("", str_join(&s.slice(0, max_n), "`", false))
             .iter()
             .next()
             .unwrap()
@@ -838,9 +838,9 @@ macro_rules! impl_op {
             (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
             (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None))=> K::Int(None),
             (K::Float(l), K::Float(r)) => K::Float(l $op r),
-            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()),
-            (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
-            (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
+            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray((l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()).unwrap()),
+            (K::IntArray(l), K::IntArray(r)) => K::IntArray((l $op r).unwrap()),
+            (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray((l $op r).unwrap()),
             (_, K::Dictionary(_)) => todo!("dict"),
             (K::Dictionary(_), _) => todo!("dict"),
             (_, K::Table(_)) => todo!("table"),

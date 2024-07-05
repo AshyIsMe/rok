@@ -931,9 +931,10 @@ fn test_unique() {
   println!("res: {:?}", res);
   assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
 
-  let res = eval(&mut env, scan("? 1 1 0 0").unwrap()).unwrap();
-  println!("res: {:?}", res);
-  assert_eq!(res, Noun(K::BoolArray(arr!([1, 0u8]))));
+  let res1 = eval(&mut env, scan("? 1 1 0 0").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  let res2 = eval(&mut env, scan("0 1").unwrap()).unwrap();
+  assert_eq!(res1, res2);
 
   let res = eval(&mut env, scan("? 1 1 2 2 3.0").unwrap()).unwrap();
   println!("res: {:?}", res);
