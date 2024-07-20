@@ -149,7 +149,7 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
   }
 }
 macro_rules! atomicdyad {
-  ($op:tt, $v:ident, $l:ident, $r:ident) => {
+  ($op:tt, $v:ident, $named_op:ident, $l:ident, $r:ident) => {
     match ($l, $r) {
       (K::Dictionary(ld), K::Dictionary(rd)) => {
         Ok(K::Dictionary(IndexMap::from_iter(ld.keys().chain(rd.keys()).unique().map(|k| {
@@ -170,8 +170,28 @@ macro_rules! atomicdyad {
         Ok(K::Dictionary(IndexMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
       }
       (K::Table(_lt), K::Table(_rt)) => todo!("table"),
-      (K::Table(_lt), _r) => todo!("table"),
-      (_l, K::Table(_rt)) => todo!("table"),
+      (K::Table(df), K::Bool(i)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| s $op i ).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Table(df), K::Int(i)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| s $op i.unwrap()).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Table(df), K::Float(f)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| s.to_float().unwrap() $op f).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Table(_df), _r) => todo!("nyi"),
+      (K::Bool(i), K::Table(df)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| i.$named_op(&s)).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Int(i), K::Table(df)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| i.unwrap().$named_op(&s)).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Float(f), K::Table(df)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| f.$named_op(&s.to_float().unwrap())).collect::<Vec<Series>>()).unwrap()))
+      }
+      (_l, K::Table(_df)) => {
+        todo!("nyi")
+      }
       (K::List(lv), K::List(rv)) => {
         Ok(K::List(zip(lv, rv).map(|(x, y)| $v(x.clone(), y.clone()).unwrap()).collect()))
       }
@@ -185,13 +205,21 @@ macro_rules! atomicdyad {
     }
   };
 }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, l, r) }
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, add, l, r) }
 pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
-pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, l, r) }
+pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, sub, l, r) }
 pub fn v_first(_x: K) -> Result<K, &'static str> { todo!("implement first") }
-pub fn v_times(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(*, v_times, l, r) }
+pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
+  match (l.clone(), r.clone()) {
+    // TODO can we make this less repetitive and explicit?
+    (K::Int(i), K::Table(df)) => Ok(K::Table(
+      DataFrame::new(df.iter().map(|s| i.unwrap().mul(&s)).collect::<Vec<Series>>()).unwrap(),
+    )),
+    _ => atomicdyad!(*, v_times, mul, l, r),
+  }
+}
 pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
-pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide,l, r) }
+pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide, div, l, r) }
 pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
 pub fn v_mod(l: K, r: K) -> Result<K, &'static str> {
   match (l, r) {

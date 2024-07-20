@@ -293,9 +293,28 @@ impl fmt::Display for K {
   }
 }
 
-// TODO more cases
 impl From<String> for K {
   fn from(item: String) -> Self { K::CharArray(item) }
+}
+
+impl TryFrom<Series> for K {
+  type Error = ();
+
+  fn try_from(s: Series) -> Result<Self, Self::Error> {
+    if let Ok(_) = s.i64() {
+      if s.min().unwrap() == Some(0) && s.max().unwrap() == Some(1) {
+        Ok(K::BoolArray(s.cast(&DataType::UInt8).unwrap()))
+      } else {
+        Ok(K::IntArray(s))
+      }
+    } else if let Ok(_) = s.f64() {
+      Ok(K::FloatArray(s))
+    } else if let Ok(_) = s.categorical() {
+      Ok(K::SymbolArray(s))
+    } else {
+      todo!("nyi")
+    }
+  }
 }
 
 impl KW {

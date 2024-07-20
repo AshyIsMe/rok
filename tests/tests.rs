@@ -723,6 +723,32 @@ fn test_table_reader() {
 }
 
 #[test]
+fn test_table_maths() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  let t1 = eval(&mut env, scan("2 * + `a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  let t2 = eval(&mut env, scan("+ `a`b!(2 4 6;8 10 12)").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(format!("{:?}", t1), format!("{:?}", t2));
+
+  let t1 = eval(&mut env, scan("3.14 * + `a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  let t2 = eval(&mut env, scan("+ `a`b!(3.14 6.28 9.42;12.56 15.7 18.84)").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(format!("{:?}", t1), format!("{:?}", t2));
+
+  let t1 = eval(&mut env, scan("2 + + `a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  let t2 = eval(&mut env, scan("+ `a`b!(3 4 5;6 7 8)").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(format!("{:?}", t1), format!("{:?}", t2));
+
+  let t1 = eval(&mut env, scan("(+ `a`b!(1 2 3;4 5 6)) * 2").unwrap()).unwrap();
+  let t2 = eval(&mut env, scan("+ `a`b!(2 4 6;8 10 12)").unwrap()).unwrap();
+  assert_eq!(format!("{:?}", t1), format!("{:?}", t2));
+}
+
+#[test]
 fn test_names() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
@@ -1105,4 +1131,22 @@ fn test_forced_monads() {
   println!("res1: {:?}", res1);
   let res2 = eval(&mut env, scan("+`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
   assert_eq!(res1, res2);
+}
+
+#[ignore]
+#[test]
+fn test_df_tmp() {
+  let df: DataFrame = df!("a" => &[1,2,3], "b" => &[4, 5,6]).unwrap();
+  println!("{}", df["a"].clone() * 2);
+
+  let s = Series::new("a", [1i64, 2, 3]);
+  let k = K::try_from(s);
+  println!("{:?}", k);
+
+  let s = Series::new("a", ["abc", "foobar", "lolbangbiff"])
+    .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+    .unwrap();
+  let k = K::try_from(s);
+  println!("{:?}", k);
+  assert!(false);
 }
