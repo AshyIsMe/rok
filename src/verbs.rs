@@ -1,5 +1,4 @@
 use crate::*;
-use itertools::Itertools;
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
@@ -41,7 +40,53 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
 
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
 pub fn v_take(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_reshape(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+#[macro_export]
+macro_rules! reshape_atom_by_type {
+  ($a:ident, $type:path, $rev_shape:ident) => {{
+    let mut result: K = $type(arr!([$a].repeat($rev_shape[0] as usize)));
+    for i in $rev_shape.iter().skip(1) {
+      result = K::List((0..*i).map(|_| result.clone()).collect_vec());
+    }
+    Ok(result)
+  }};
+}
+
+pub fn v_reshape(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::IntArray(a) => {
+      let rev_shape: Vec<i64> =
+        a.i64().unwrap().to_vec().iter().rev().map(|i| i.unwrap()).collect();
+      match r {
+        K::Bool(b) => {
+          reshape_atom_by_type!(b, K::BoolArray, rev_shape)
+        }
+        K::Int(None) => Err("nyi"),
+        K::Int(Some(i)) => {
+          reshape_atom_by_type!(i, K::IntArray, rev_shape)
+        }
+        K::Float(f) => {
+          reshape_atom_by_type!(f, K::FloatArray, rev_shape)
+        }
+        K::Char(_) => Err("nyi"),
+        K::Symbol(_) => Err("nyi"),
+
+        K::SymbolArray(_)
+        | K::BoolArray(_)
+        | K::IntArray(_)
+        | K::FloatArray(_)
+        | K::CharArray(_)
+        | K::List(_)
+        | K::Dictionary(_)
+        | K::Table(_)
+        | K::Nil => Err("nyi"),
+        K::Name(_) => panic!("impossible"),
+      }
+    }
+    K::BoolArray(_) => Err("nyi"),
+    _ => Err("type"),
+  }
+}
 
 pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
 pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
@@ -52,11 +97,24 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
         let cols: Vec<Series> = d
           .iter()
           .map(|(k, v)| match v {
-            K::SymbolArray(s)
-            | K::BoolArray(s)
-            | K::IntArray(s)
-            | K::FloatArray(s)
-            | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
+            K::SymbolArray(s) | K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) => {
+              Series::new(&k.to_string(), s.clone())
+            }
+            // | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
+            K::CharArray(s) => Series::new(&k.to_string(), s),
+            K::List(v) => {
+              if v.iter().all(|i| match i {
+                K::CharArray(_) => true,
+                // K::Char(_) => true, // TODO
+                _ => false,
+              }) {
+                let vs: Vec<String> = v.iter().map(|s| s.to_string()).collect();
+                Series::new(&k.to_string(), vs.clone())
+              } else {
+                // Err("type")
+                panic!("type error?")
+              }
+            }
             _ => todo!("handle atoms"),
           })
           .collect();
@@ -65,11 +123,33 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
         Err("length")
       }
     }
+    K::Table(df) => {
+      let k = Series::new("a", df.get_column_names())
+        .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+        .unwrap();
+      let v: Vec<K> = df
+        .get_columns()
+        .iter()
+        .map(|s| match s.dtype() {
+          DataType::Boolean => K::BoolArray(s.clone()),
+          DataType::Int64 => K::IntArray(s.clone()),
+          DataType::Float64 => K::FloatArray(s.clone()),
+          // DataType::String => K::CharArray(s.clone()), // TODO K::List([K::CharArray(), ...])
+          DataType::Categorical { .. } => K::SymbolArray(s.clone()),
+          _ => panic!("impossible"),
+        })
+        .collect();
+
+      Ok(K::Dictionary(IndexMap::from_iter(zip(
+        k.iter().map(|s| strip_quotes(s.to_string())),
+        v.iter().cloned(),
+      ))))
+    }
     _ => todo!("flip the rest"),
   }
 }
 macro_rules! atomicdyad {
-  ($op:tt, $v:ident, $l:ident, $r:ident) => {
+  ($op:tt, $v:ident, $named_op:ident, $l:ident, $r:ident) => {
     match ($l, $r) {
       (K::Dictionary(ld), K::Dictionary(rd)) => {
         Ok(K::Dictionary(IndexMap::from_iter(ld.keys().chain(rd.keys()).unique().map(|k| {
@@ -89,6 +169,29 @@ macro_rules! atomicdyad {
       (l, K::Dictionary(rd)) => {
         Ok(K::Dictionary(IndexMap::from_iter(rd.iter().map(|(k,v)| (k.clone(), $v(l.clone(), v.clone()).unwrap())))))
       }
+      (K::Table(_lt), K::Table(_rt)) => todo!("table"),
+      (K::Table(df), K::Bool(i)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| s $op i ).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Table(df), K::Int(i)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| s $op i.unwrap()).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Table(df), K::Float(f)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| s.to_float().unwrap() $op f).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Table(_df), _r) => todo!("nyi"),
+      (K::Bool(i), K::Table(df)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| i.$named_op(&s)).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Int(i), K::Table(df)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| i.unwrap().$named_op(&s)).collect::<Vec<Series>>()).unwrap()))
+      }
+      (K::Float(f), K::Table(df)) => {
+        Ok(K::Table(DataFrame::new(df.iter().map(|s| f.$named_op(&s.to_float().unwrap())).collect::<Vec<Series>>()).unwrap()))
+      }
+      (_l, K::Table(_df)) => {
+        todo!("nyi")
+      }
       (K::List(lv), K::List(rv)) => {
         Ok(K::List(zip(lv, rv).map(|(x, y)| $v(x.clone(), y.clone()).unwrap()).collect()))
       }
@@ -102,15 +205,30 @@ macro_rules! atomicdyad {
     }
   };
 }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, l, r) }
+pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, add, l, r) }
 pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
-pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, l, r) }
+pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, sub, l, r) }
 pub fn v_first(_x: K) -> Result<K, &'static str> { todo!("implement first") }
-pub fn v_times(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(*, v_times, l, r) }
+pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
+  match (l.clone(), r.clone()) {
+    // TODO can we make this less repetitive and explicit?
+    (K::Int(i), K::Table(df)) => Ok(K::Table(
+      DataFrame::new(df.iter().map(|s| i.unwrap().mul(&s)).collect::<Vec<Series>>()).unwrap(),
+    )),
+    _ => atomicdyad!(*, v_times, mul, l, r),
+  }
+}
 pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
-pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide,l, r) }
+pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide, div, l, r) }
 pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
-pub fn v_mod(_l: K, _r: K) -> Result<K, &'static str> { todo!("implement v_mod") }
+pub fn v_mod(l: K, r: K) -> Result<K, &'static str> {
+  match (l, r) {
+    (K::Int(Some(i)), K::IntArray(a)) => Ok(K::IntArray(a % i)),
+    (K::Int(Some(i)), K::FloatArray(a)) => Ok(K::FloatArray(a % i)),
+    (K::Int(Some(_i)), K::CharArray(_a)) => todo!("implement v_mod"),
+    _ => todo!("implement v_mod"),
+  }
+}
 
 pub fn v_where(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_min(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
@@ -153,7 +271,7 @@ pub fn v_unique(r: K) -> Result<K, &'static str> {
     K::BoolArray(a) => Ok(K::BoolArray(a.unique().unwrap())),
     K::IntArray(a) => Ok(K::IntArray(a.unique().unwrap())),
     K::FloatArray(a) => Ok(K::FloatArray(a.unique().unwrap())),
-    K::CharArray(a) => Ok(K::CharArray(a.unique().unwrap())),
+    K::CharArray(a) => Ok(K::CharArray(a.chars().unique().collect())),
     // TODO ?(3.14;"abc";3.14) works in ngn/k but k9 throws domain error if the list has any float item and otherwise works.
     // K::List(v) => Ok(K::List(v.into_iter().unique().collect())),
     K::List(_v) => Err("nyi: v_unique(K::List(_))"),
@@ -164,8 +282,167 @@ pub fn v_rand(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_type(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_at(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_type(r: K) -> Result<K, &'static str> {
+  use K::*;
+  // TODO allow checking type of KW::Verb etc, see ngn/k's types help \0
+  match r {
+    Bool(_) => Ok(Symbol("i".to_string())),
+    Int(_) => Ok(Symbol("i".to_string())),
+    Float(_) => Ok(Symbol("f".to_string())),
+    Char(_) => Ok(Symbol("c".to_string())),
+    Symbol(_) => Ok(Symbol("s".to_string())),
+    SymbolArray(_) => Ok(Symbol("S".to_string())),
+    BoolArray(_) => Ok(Symbol("I".to_string())),
+    IntArray(_) => Ok(Symbol("I".to_string())),
+    FloatArray(_) => Ok(Symbol("F".to_string())),
+    CharArray(_) => Ok(Symbol("C".to_string())),
+    Nil => Ok(Symbol("A".to_string())),
+    List(_) => Ok(Symbol("A".to_string())),
+    Dictionary(_) => Ok(Symbol("m".to_string())),
+    Table(_) => Ok(Symbol("M".to_string())),
+    Name(_) => panic!("impossible"),
+  }
+}
+
+pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
+  match r {
+    K::Int(None) => match l.clone() {
+      K::SymbolArray(_) | K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) => {
+        l.fill(0)
+      }
+      K::List(_v) => todo!("v_at"),
+      K::Dictionary(_d) => todo!("v_at"),
+      K::Table(_df) => todo!("v_at"),
+      _ => Err("type"),
+    },
+    K::Bool(i) => {
+      // TODO remove this code duplication of K::Int(_) case below
+      if (i as usize) < l.len() {
+        match l.clone() {
+          K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(i as usize).unwrap()))),
+          K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(i as usize).unwrap())),
+          K::CharArray(a) => {
+            let c: char = a.chars().nth(i.into()).unwrap();
+            Ok(K::Char(c))
+          }
+          K::List(v) => {
+            if (i as usize) < v.len() {
+              Ok(v[i as usize].clone())
+            } else {
+              Err("length")
+            }
+          }
+          _ => todo!("index into l"),
+        }
+      } else {
+        l.fill(0)
+      }
+    }
+    K::Int(Some(i)) => {
+      if i >= 0 && (i as usize) < l.len() {
+        match l.clone() {
+          K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(i as usize).unwrap()))),
+          K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(i as usize).unwrap())),
+          K::CharArray(a) => {
+            let c: char = a.chars().nth(i as usize).unwrap();
+            Ok(K::Char(c))
+          }
+          K::List(_v) => todo!("v_at List"),
+          _ => todo!("index into l"),
+        }
+      } else {
+        l.fill(0)
+      }
+    }
+    K::BoolArray(i) => v_at(l, K::try_from(i.cast(&DataType::Int64).unwrap()).unwrap()),
+    K::IntArray(i) => {
+      // https://docs.rs/polars/latest/polars/series/struct.Series.html#method.take_threaded
+      // Notes: Out of bounds access doesn’t Error but will return a Null value
+      // TODO Add fills not Nulls
+      let i = Series::new(
+        "",
+        i.i64()
+          .unwrap()
+          .into_iter()
+          .map(|i| i.unwrap_or(4_294_967_295) as u32)
+          .collect::<Vec<u32>>(),
+      );
+      let idcs: Vec<u32> = i.u32().unwrap().into_iter().map(|i| i.unwrap()).collect::<Vec<u32>>();
+      match l.clone() {
+        K::SymbolArray(a) => match a.take_slice(&idcs) {
+          Ok(a) => Ok(K::SymbolArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
+        K::BoolArray(a) => match a.take_slice(&idcs) {
+          Ok(a) => Ok(K::BoolArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
+        K::IntArray(a) => match a.take_slice(&idcs) {
+          Ok(a) => Ok(K::IntArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
+        K::FloatArray(a) => match a.take_slice(&idcs) {
+          Ok(a) => Ok(K::FloatArray(a)),
+          _ => todo!("index out of bounds - this shouldn't be an error"),
+        },
+        K::CharArray(a) => Ok(K::CharArray(
+          i.u32()
+            .unwrap()
+            .iter()
+            .map(|i| a.chars().nth(i.unwrap() as usize).unwrap_or(' '))
+            .collect(),
+        )),
+        K::List(_) => todo!("v_at K::List"),
+        _ => todo!("v_at"),
+      }
+    }
+    K::Symbol(s) => match l.clone() {
+      K::Dictionary(d) => {
+        if d.contains_key(&s) {
+          Ok(d.get(&s).unwrap().clone())
+        } else {
+          Ok(K::Nil) // TODO Is this the same behaviour as ngn/k and k9?
+        }
+      }
+      K::Table(df) => match df.get_column_index(&s) {
+        Some(i) => K::try_from(df[i].clone()),
+        _ => todo!("nyi"),
+      },
+      K::SymbolArray(ss) => match l.clone() {
+        K::Dictionary(d) => {
+          Ok(K::List(
+            ss.categorical()
+              .unwrap()
+              .iter_str()
+              .map(|s| {
+                if d.contains_key(s.unwrap()) {
+                  d.get(s.unwrap()).unwrap().clone()
+                } else {
+                  K::Nil // TODO Is this the same behaviour as ngn/k and k9?
+                }
+              })
+              .collect::<Vec<K>>(),
+          ))
+        }
+        K::Table(_df) => todo!("nyi"),
+        _ => todo!("nyi"),
+      },
+      _ => Err("type"),
+    },
+    K::SymbolArray(s) => {
+      let keys: Vec<K> = s
+        .iter()
+        .map(|s| {
+          let s = s.to_string();
+          K::Symbol(s[1..s.len() - 1].to_string())
+        })
+        .collect();
+      Ok(K::List(keys.into_iter().map(|k| v_at(l.clone(), k).unwrap()).collect()))
+    }
+    _ => todo!("v_at({:?}, {:?})", l, r),
+  }
+}
+
 // https://k.miraheze.org/wiki/Amend
 pub fn v_amend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_amend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
@@ -177,6 +454,37 @@ pub fn v_deepamend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi")
 pub fn v_deepamend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_try(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
+pub fn v_join(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::Char(l) => match r {
+      K::List(v) => {
+        let v: Option<Vec<String>> =
+          v.iter().map(|k| if let K::CharArray(s) = k { Some(s.clone()) } else { None }).collect();
+        match v {
+          Some(v) => Ok(K::CharArray(v.join(&l.to_string()))),
+          None => Err("type"),
+        }
+      }
+      _ => Err("type"),
+    },
+    _ => Err("type"),
+  }
+}
+pub fn v_unpack(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_split(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::Char(l) => match r {
+      K::CharArray(r) => Ok(K::List(r.split(l).map(|s| K::CharArray(s.to_string())).collect())),
+      _ => Err("type"),
+    },
+    K::CharArray(l) => match r {
+      K::CharArray(r) => Ok(K::List(r.split(&l).map(|s| K::CharArray(s.to_string())).collect())),
+      _ => Err("type"),
+    },
+    _ => Err("type"),
+  }
+}
+
 pub fn v_iota(r: K) -> Result<K, &'static str> {
   debug!("v_iota");
   match r {
@@ -186,8 +494,8 @@ pub fn v_iota(r: K) -> Result<K, &'static str> {
 }
 pub fn v_sum(x: K) -> Result<K, &'static str> {
   match x {
-    K::BoolArray(a) => Ok(K::Int(a.sum())),
-    K::IntArray(a) => Ok(K::Int(a.sum())),
+    K::BoolArray(a) => Ok(K::Int(a.sum().ok())),
+    K::IntArray(a) => Ok(K::Int(a.sum().ok())),
     K::FloatArray(a) => Ok(K::Float(a.sum().unwrap_or(f64::NAN))),
     _ => todo!("other types of K"),
   }
@@ -304,6 +612,9 @@ pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
 pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
   debug!("l: {:?}, r: {:?}", l, r);
   match (&l, &r) {
+    (K::Bool(0), KW::Noun(K::CharArray(a))) => Ok(KW::Noun(K::List(
+      std::fs::read_to_string(a).unwrap().lines().map(String::from).map(K::from).collect(),
+    ))),
     (K::Int(Some(2i64)), KW::Noun(K::Symbol(s))) => {
       let p = Path::new(&s);
       if p.exists() {
@@ -311,7 +622,12 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
           Some(e) => {
             if e == "csv" {
               Ok(KW::Noun(K::Table(
-                CsvReader::from_path(p).unwrap().has_header(true).finish().unwrap(),
+                CsvReadOptions::default()
+                  .with_has_header(true)
+                  .try_into_reader_with_file_path(Some(p.to_path_buf()))
+                  .unwrap()
+                  .finish()
+                  .unwrap(),
               )))
             } else if e == "parquet" {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();

@@ -37,7 +37,7 @@ pub enum K {
   // Int16Array(Series), // TODO maybe later?
   // Int128Array(Series), // TODO maybe later?
   FloatArray(Series),
-  CharArray(Series),
+  CharArray(String),
   Nil, // Is Nil a noun?
   List(Vec<K>),
   Dictionary(IndexMap<String, K>),
@@ -87,6 +87,48 @@ impl K {
       _ => 1,
     }
   }
+  pub fn fill(&self, n: usize) -> Result<K, &'static str> {
+    use K::*;
+    match n {
+      0 => match self {
+        Nil => Ok(Nil.clone()),
+        SymbolArray(_) | Symbol(_) => Ok(Symbol("".to_string())),
+        BoolArray(_) | Bool(_) => Ok(Bool(0)),
+        IntArray(_) | Int(_) => Ok(Int(Some(0))),
+        FloatArray(_) | Float(_) => Ok(Float(0.0)),
+        CharArray(_) | Char(_) => Ok(Char(' ')),
+        Dictionary(_) => Err("type"), // TODO right?
+        Table(_) => Err("type"),      // TODO right?
+        List(_) => Ok(List(vec![])),
+        Name(_) => Err("type"), // TODO right?
+      },
+      _ => match self {
+        Nil => todo!("List(vec![Nil, Nil, ...]) ???"),
+        SymbolArray(_) => {
+          // if n > a.len() {
+          //   Ok(SymbolArray(a.iter().chain(repeat("")).take(n).collect()))
+          // } else {
+          //   todo!("just take?")
+          // }
+          todo!("SymbolArray")
+        }
+        BoolArray(_) => todo!("fill"),
+        IntArray(a) => {
+          if n > a.len() {
+            // Ok(IntArray(a.i64().unwrap().into_iter().chain(repeat(Some(0i64))).take(n).collect()))
+            Ok(IntArray(a.extend_constant(AnyValue::Int64(0i64), n - a.len()).unwrap()))
+          } else {
+            todo!("just take?")
+          }
+        }
+        FloatArray(_) => todo!("fill"),
+        CharArray(_) => todo!("fill"),
+        Dictionary(_) => todo!("fill"),
+        List(_) => todo!("fill"),
+        _ => todo!("fill"),
+      },
+    }
+  }
 }
 
 impl fmt::Display for K {
@@ -107,22 +149,34 @@ impl fmt::Display for K {
         }
       }
       K::Char(c) => write!(f, "{}", c),
-      K::Symbol(s) => write!(f, "`{}", s),
+      K::Symbol(s) => {
+        if s.chars().any(|c| c.is_whitespace() | c.is_ascii_punctuation()) {
+          write!(f, "`\"{}\"", s)
+        } else {
+          write!(f, "`{}", s)
+        }
+      }
       K::SymbolArray(s) => {
         let max_n = cols / 2; // symbols take min 2 chars, we could fit this many max on a row
-        let s = strip_quotes(
-          Series::new(
-            "",
-            str_concat(
-              &s.cast(&DataType::Utf8).unwrap().utf8().unwrap().slice(0, max_n),
-              "`",
-              false,
-            ),
-          )
-          .iter()
-          .next()
+        let s = s.cast(&DataType::String).unwrap();
+        let indices: Vec<u32> = s
+          .str()
           .unwrap()
-          .to_string(),
+          .contains("[\t `~_!@#$%^&*(){}+-=?.,<>:;\\[\\]'/\\\\]", true)
+          .unwrap()
+          .into_iter()
+          .enumerate()
+          .filter_map(|(i, b)| if matches!(b, Some(true)) { Some(i as u32) } else { None })
+          .collect();
+        // quote symbols that require it
+        let s =
+          s.str().unwrap().scatter_with(indices, |s| Some(format!("\"{}\"", s.unwrap()))).unwrap();
+        let s = strip_quotes(
+          Series::new("", str_join(&s.slice(0, max_n), "`", false))
+            .iter()
+            .next()
+            .unwrap()
+            .to_string(),
         );
         let s = if s.len() < cols { s } else { s[..(cols - 3)].to_string() + ".." };
         write!(f, "`{}", s)
@@ -180,22 +234,19 @@ impl fmt::Display for K {
         write!(f, "{}", s)
       }
       K::CharArray(ca) => {
-        let s = std::str::from_utf8(
-          &ca
-            .cast(&DataType::UInt8)
-            .unwrap()
-            .u8()
-            .unwrap()
-            .into_iter()
-            .take(cols - 2)
-            .map(|u| match u {
-              Some(u) => u,
-              None => panic!("impossible"),
-            })
-            .collect::<Vec<u8>>(),
-        )
-        .unwrap()
-        .to_string();
+        // let s: String = ca
+        //   .str()
+        //   .unwrap()
+        //   .into_iter()
+        //   .take(cols - 2)
+        //   .map(|u| match u {
+        //     Some(u) => u,
+        //     None => panic!("impossible"),
+        //   })
+        //   .collect();
+        // // let s: String = ca.str().unwrap().to_string();
+        let s = ca;
+
         if s.len() < (cols - 2) {
           write!(f, "\"{}\"", s)
         } else {
@@ -238,6 +289,40 @@ impl fmt::Display for K {
         write!(f, "{}", t) // Let polars render Tables (DataFrames)
       }
       K::Name(n) => write!(f, "{}", n),
+    }
+  }
+}
+
+impl From<String> for K {
+  fn from(item: String) -> Self { K::CharArray(item) }
+}
+
+impl TryFrom<Series> for K {
+  type Error = &'static str;
+
+  fn try_from(s: Series) -> Result<Self, Self::Error> {
+    if let Ok(_) = s.i64() {
+      if s.min().unwrap() == Some(0) && s.max().unwrap() == Some(1) {
+        Ok(K::BoolArray(s.cast(&DataType::UInt8).unwrap()))
+      } else {
+        Ok(K::IntArray(s))
+      }
+    } else if let Ok(_) = s.f64() {
+      Ok(K::FloatArray(s))
+    } else if let Ok(_) = s.categorical() {
+      Ok(K::SymbolArray(s))
+    } else {
+      Err("type")
+    }
+  }
+}
+
+impl TryInto<Vec<K>> for K {
+  type Error = &'static str;
+  fn try_into(self) -> Result<Vec<K>, Self::Error> {
+    match self {
+      K::SymbolArray(s) => Ok(s.iter().map(|s| K::try_from(s.to_string()).unwrap()).collect()),
+      _ => Err("nyi"),
     }
   }
 }
@@ -344,15 +429,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
         })
         .collect(),
     ),
-    K::CharArray(v) => Ok(
-      v.cast(&DataType::UInt8)
-        .unwrap()
-        .u8()
-        .unwrap()
-        .into_iter()
-        .map(|c| K::Char(c.unwrap() as char))
-        .collect(),
-    ),
+    K::CharArray(v) => Ok(v.chars().map(K::Char).collect()),
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
     }
@@ -403,7 +480,7 @@ pub fn vec_to_list(nouns: Vec<KW>) -> Result<K, &'static str> {
         _ => panic!("impossible"),
       })
       .collect();
-    Ok(K::CharArray(arr!(v)))
+    Ok(K::CharArray(v))
   } else if nouns.iter().all(|w| matches!(w, KW::Noun(_))) {
     // check they're all nouns and make a List of the K objects within
     let v = nouns
@@ -459,6 +536,29 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
     ("?", (v_randfloat, v_unique, v_rand, v_find, v_rand, v_find, v_splice, v_none4,)),
     ("@", (v_type, v_type, v_at, v_at, v_at, v_at, v_amend3, v_amend4,)),
     (".", (v_eval, v_eval, v_dot, v_dot, v_dot, v_dot, v_deepamend3, v_deepamend4,)),
+    // forced monad versions of the above
+    ("+:", (v_flip, v_flip, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("-:", (v_negate, v_negate, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("*:", (v_first, v_first, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("%:", (v_sqrt, v_sqrt, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("!:", (v_iota, v_odometer, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("&:", (v_where, v_where, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("|:", (v_reverse, v_reverse, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("<:", (v_asc, v_asc, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    (">:", (v_desc, v_desc, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("=:", (v_imat, v_group, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("~:", (v_not, v_not, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    (",:", (v_enlist, v_enlist, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("^:", (v_isnull, v_isnull, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("#:", (v_count, v_count, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("_:", (v_floor, v_floor, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("$:", (v_string, v_string, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("?:", (v_randfloat, v_unique, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("@:", (v_type, v_type, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    (".:", (v_eval, v_eval, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    // adverbs / and \ are also overloaded as verbs:
+    ("/", (v_none1, v_none1, v_none2, v_none2, v_join, v_join, v_none3, v_none4,)),
+    ("\\", (v_none1, v_none1, v_none2, v_unpack, v_split, v_split, v_none3, v_none4,)),
   ])
 }
 
@@ -739,11 +839,11 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::CharArray(_), K::List(_)) => (l, K::List(k_to_vec(r).unwrap())),
 
     (K::List(_), K::Dictionary(r_inner)) => (
-      v_makedict(K::SymbolArray(Series::new("", r_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), l,) .unwrap(),
+      v_makedict(K::SymbolArray(Series::new("", r_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical)) .unwrap(),), l,) .unwrap(),
       r),
     (K::Dictionary(l_inner), K::List(_)) => (
       l.clone(),
-      v_makedict(K::SymbolArray(Series::new("", l_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None)) .unwrap(),), r,) .unwrap()),
+      v_makedict(K::SymbolArray(Series::new("", l_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical)) .unwrap(),), r,) .unwrap()),
     (_l, K::Dictionary(_)) if !matches!(_l, K::Dictionary(_)) => match (l.len(), r.len()) {
       (0,0) => todo!("promote_nouns empties"),
       (1,_) => todo!("promote_nouns atom"),
@@ -767,9 +867,9 @@ macro_rules! impl_op {
             (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
             (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None))=> K::Int(None),
             (K::Float(l), K::Float(r)) => K::Float(l $op r),
-            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray(l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()),
-            (K::IntArray(l), K::IntArray(r)) => K::IntArray(l $op r),
-            (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray(l $op r),
+            (K::BoolArray(l), K::BoolArray(r)) => K::IntArray((l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()).unwrap()),
+            (K::IntArray(l), K::IntArray(r)) => K::IntArray((l $op r).unwrap()),
+            (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray((l $op r).unwrap()),
             (_, K::Dictionary(_)) => todo!("dict"),
             (K::Dictionary(_), _) => todo!("dict"),
             (_, K::Table(_)) => todo!("table"),
@@ -894,6 +994,10 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
       (any_l, x @ KW::Verb { .. }, KW::Adverb { name }, any_r) => {
         // 3 adverb
         apply_adverb(&name, x.clone()).map(|r| vec![any_l, r, any_r])
+      }
+      (any, x @ KW::Noun(_), KW::Adverb { name }, y @ KW::Noun(_)) => {
+        // 4 dyad adverb (special cases, they're actually verbs)
+        apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
       (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
@@ -1061,9 +1165,46 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
         words.push(k);
         skip = j;
       }
-      ':' | '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_'
-      | '$' | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }), // TODO forced monads +: -: etc
-      '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }), // TODO ': /: \:
+      ':' => {
+        let prev = if i > 0 { code.chars().nth(i - 1) } else { None };
+        match prev {
+          Some(prev_c) => {
+            if !prev_c.is_whitespace() {
+              // forced monads +: -: etc
+              match words.last() {
+                Some(KW::Verb { name }) => {
+                  let s: &str = &name;
+                  if primitives_table().keys().contains(&s) {
+                    let mn = format!("{}:", name);
+                    let _ = words.pop();
+                    words.push(KW::Verb { name: mn });
+                  } else {
+                    words.push(KW::Verb { name: ':'.to_string() })
+                  }
+                }
+                // digraph adverbs ': /: \:
+                Some(KW::Adverb { name }) => {
+                  let s: &str = &name;
+                  if adverbs_table().keys().contains(&s) {
+                    let mn = format!("{}:", name);
+                    let _ = words.pop();
+                    words.push(KW::Adverb { name: mn });
+                  } else {
+                    words.push(KW::Verb { name: ':'.to_string() })
+                  }
+                }
+                _ => words.push(KW::Verb { name: ':'.to_string() }),
+              }
+            } else {
+              words.push(KW::Verb { name: ':'.to_string() })
+            }
+          }
+          None => words.push(KW::Verb { name: ':'.to_string() }),
+        }
+      }
+      '+' | '*' | '%' | '!' | '&' | '|' | '<' | '>' | '=' | '~' | ',' | '^' | '#' | '_' | '$'
+      | '?' | '@' | '.' => words.push(KW::Verb { name: c.to_string() }),
+      '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }),
       ' ' | '\t' | '\n' => continue,
       'a'..='z' | 'A'..='Z' => {
         let (j, k) = scan_name(&code[i..]).unwrap();
@@ -1169,9 +1310,7 @@ pub fn scan_pass3(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
 
   // At this stage there should be no KW::SC at depth 0 unless the whole line is an unbracketed Expr
   if tokens.contains(&KW::SC) {
-    scan_pass2(
-      vec![KW::LB].iter().chain(tokens.iter().chain(vec![KW::RB].iter())).cloned().collect(),
-    )
+    scan_pass2([KW::LB].iter().chain(tokens.iter().chain([KW::RB].iter())).cloned().collect())
   } else {
     Ok(tokens)
   }
@@ -1288,7 +1427,7 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
         return Ok(match s.len() {
           // Does k really have char atoms?
           1 => (i, KW::Noun(K::Char(s.chars().next().unwrap()))),
-          _ => (i, KW::Noun(K::CharArray(Series::new("", &s).cast(&DataType::Utf8).unwrap()))),
+          _ => (i, KW::Noun(K::CharArray(s))),
         });
       } else if code.chars().nth(i) == Some('\\') {
         match code.chars().nth(i + 1) {
@@ -1314,16 +1453,9 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
   //
   // read until first char outside [a-z0-9._`]
   // split on ` or space`
-  //
-  // a SymbolArray *potentially* extends until the first symbol character
-  let sentence = match code.find(|c: char| {
-    !(c.is_ascii_alphanumeric() || c.is_ascii_whitespace() || ['.', '_', '`'].contains(&c))
-  }) {
-    Some(c) => &code[..c],
-    None => code,
-  };
+  // symbols can also be quoted strings: `"foo bar! baz"
 
-  if !sentence.starts_with('`') {
+  if !code.starts_with('`') {
     panic!("called scan_symbol() on invalid input")
   } else {
     let mut i: usize = 1;
@@ -1331,27 +1463,53 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
     let mut ss: Vec<String> = vec![];
     let mut b_in_sym = true;
     // TODO: Yeah this is awful...
-    while i < sentence.len() {
-      if sentence.chars().nth(i) == Some(' ') {
-        if b_in_sym {
-          ss.extend(vec![s.clone()]);
-          s.clear();
+    while i < code.len() {
+      match code.chars().nth(i) {
+        Some(' ') => {
+          if b_in_sym {
+            ss.extend(vec![s.clone()]);
+            s.clear();
+          }
+          b_in_sym = false;
         }
-        b_in_sym = false;
-      } else if sentence.chars().nth(i) == Some('`') {
-        if b_in_sym {
-          ss.extend(vec![s.clone()]);
-          s.clear();
+        Some('`') => {
+          if b_in_sym {
+            ss.extend(vec![s.clone()]);
+            s.clear();
+          }
+          b_in_sym = true;
         }
-        b_in_sym = true;
-      } else if b_in_sym {
-        s.extend(sentence.chars().nth(i));
-      } else {
-        break;
+        Some('"') if b_in_sym => match scan_string(&code[i..]) {
+          Ok((len, KW::Noun(K::CharArray(s)))) => {
+            ss.extend(vec![s]);
+            i += len + 1
+          }
+          Ok((len, KW::Noun(K::Char(c)))) => {
+            ss.extend(vec![c.to_string()]);
+            i += len + 1
+          }
+          Err(e) => return Err(e),
+          _ => panic!("impossible"),
+        },
+        Some('"') if !b_in_sym => return Err("parse error"),
+        Some(c) => {
+          if !(c.is_ascii_alphanumeric()
+            || c.is_ascii_whitespace()
+            || ['.', '_', '`', '"'].contains(&c))
+          {
+            ss.extend(vec![s.clone()]);
+            s.clear();
+            break;
+          }
+          if b_in_sym {
+            s.extend(code.chars().nth(i));
+          }
+        }
+        None => panic!("impossible"),
       }
       i += 1;
     }
-    if !s.is_empty() || sentence.chars().nth(sentence.len() - 1) == Some('`') {
+    if !s.is_empty() || code.chars().nth(code.len() - 1) == Some('`') {
       // catch trailing empty symbol eg: `a`b`c` (SymbolArray(["a","b","c",""]))
       ss.extend(vec![s.clone()]);
     }
@@ -1360,11 +1518,16 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
       1 => Ok((i - 1, KW::Noun(K::Symbol(ss[0].clone())))),
       _ => Ok((
         i - 1,
-        KW::Noun(K::SymbolArray(Series::new("a", ss).cast(&DataType::Categorical(None)).unwrap())),
+        KW::Noun(K::SymbolArray(
+          Series::new("a", ss)
+            .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+            .unwrap(),
+        )),
       )),
     }
   }
 }
+
 pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
   // read a single Name
   // a Name extends until the first symbol character or space

@@ -8,10 +8,10 @@ edition = "2021"
 [dependencies]
 crossterm = "0.27.0"
 directories = "5.0.1"
-env_logger = "0.10.0"
+env_logger = "0.11.3"
 indexmap = { version = "2.0.0", features = ["rayon"] }
-itertools = "0.12.0"
+itertools = "0.13.0"
 log = "0.4.19"
-# polars = { version = "0.35.4", features = ["performant", "nightly", "simd", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
-polars = { version = "0.35.4", features = ["performant", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
-rustyline = "13.0.0"
+# polars = { version = "0.41.3", features = ["performant", "nightly", "simd", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
+polars = { version = "0.41.3", features = ["performant", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
+rustyline = "14.0.0"

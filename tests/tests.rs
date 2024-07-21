@@ -286,11 +286,11 @@ fn test_strings() {
   );
   assert_eq!(
     format!("{:?}", eval(&mut env, scan("\"\"").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::CharArray(Series::new("", "").cast(&DataType::Utf8).unwrap())))
+    format!("{:?}", Noun(K::CharArray("".to_string())))
   );
   assert_eq!(
     format!("{:?}", eval(&mut env, scan("\"abcABC\"").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::CharArray(Series::new("", "abcABC").cast(&DataType::Utf8).unwrap())))
+    format!("{:?}", Noun(K::CharArray("abcABC".to_string())))
   );
 }
 
@@ -310,7 +310,9 @@ fn test_symbols() {
     format!(
       "{:?}",
       Noun(K::SymbolArray(
-        Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+        Series::new("a", ["a", "b", "c"])
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap()
       ))
     )
   );
@@ -319,7 +321,9 @@ fn test_symbols() {
     format!(
       "{:?}",
       Noun(K::SymbolArray(
-        Series::new("a", ["a", "b", "c", ""]).cast(&DataType::Categorical(None)).unwrap()
+        Series::new("a", ["a", "b", "c", ""])
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap()
       ))
     )
   );
@@ -328,7 +332,9 @@ fn test_symbols() {
     format!(
       "{:?}",
       Noun(K::SymbolArray(
-        Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+        Series::new("a", ["a", "b", "c"])
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap()
       ))
     )
   );
@@ -337,7 +343,45 @@ fn test_symbols() {
     format!(
       "{:?}",
       Noun(K::SymbolArray(
-        Series::new("a", ["a", "", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+        Series::new("a", ["a", "", "b", "c"])
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap()
+      ))
+    )
+  );
+}
+
+#[test]
+fn test_quoted_symbols() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  let res = eval(&mut env, scan("`\"abc def\"").unwrap()).unwrap();
+  println!("{:?}", res);
+  assert_eq!(format!("{:?}", res), format!("{:?}", Noun(K::Symbol("abc def".to_string()))));
+
+  let res = eval(&mut env, scan("`a`\"abc def\"").unwrap()).unwrap();
+  println!("{:?}", res);
+  assert_eq!(
+    format!("{:?}", res),
+    format!(
+      "{:?}",
+      Noun(K::SymbolArray(
+        Series::new("a", ["a", "abc def"])
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap()
+      ))
+    )
+  );
+
+  let res = eval(&mut env, scan("`a`\"abc def\"`\"foo!bar_baz\"").unwrap()).unwrap();
+  println!("{:?}", res);
+  assert_eq!(
+    format!("{:?}", res),
+    format!(
+      "{:?}",
+      Noun(K::SymbolArray(
+        Series::new("a", ["a", "abc def", "foo!bar_baz"])
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap()
       ))
     )
   );
@@ -393,7 +437,7 @@ fn test_lists() {
   );
   assert_eq!(
     format!("{:?}", eval(&mut env, scan("(\"a\";\"b\";\"c\")").unwrap()).unwrap()),
-    format!("{:?}", Noun(K::CharArray(Series::new("", "abc"))))
+    format!("{:?}", Noun(K::CharArray("abc".to_string())))
   );
   // TODO SymbolArray promotion
   // assert_eq!(
@@ -422,19 +466,29 @@ fn test_list_maths() {
 #[test]
 fn test_dict() {
   let mut env = Env { names: HashMap::new(), parent: None };
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1u8), K::Int(Some(42)), K::Float(3.14)]);
   let d1 = v_makedict(k, v);
   println!("{:?}", d1);
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1u8)]);
   let d2 = v_makedict(k, v);
   println!("{:?}", d2);
 
-  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Char('a'), K::Int(Some(42))]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
@@ -442,7 +496,11 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Int(Some(1)), K::Int(Some(2))]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
@@ -450,7 +508,11 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Int(Some(1)), K::Int(None)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
@@ -458,7 +520,11 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Float(1.5), K::Float(2.5)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
@@ -466,7 +532,11 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Char('a'), K::Char('b')]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
@@ -474,7 +544,11 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1), K::Bool(0)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
@@ -482,7 +556,11 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k = K::SymbolArray(Series::new("a", ["a"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::Bool(1);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
@@ -490,8 +568,11 @@ fn test_dict() {
     format!("{:?}", KW::Noun(d1))
   );
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1), K::Bool(1), K::Bool(1)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(
@@ -523,21 +604,30 @@ fn test_dict_maths() {
   let d2 = eval(&mut env, scan("1 0 1 + `a!1").unwrap()).unwrap();
   assert_eq!(format!("{:?}", Noun(d1)), format!("{:?}", d2));
 
-  let k = K::SymbolArray(Series::new("a", ["a", "b"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::IntArray(arr!([1, 2i64])), K::IntArray(arr!([2, 3i64]))]);
   let d1 = v_d_bang(k, v).unwrap();
   let d2 = eval(&mut env, scan("1 2 + `a`b!(0;1)").unwrap()).unwrap();
   assert_eq!(format!("{:?}", KW::Noun(d1)), format!("{:?}", d2));
 
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::IntArray(arr!([2, 4, 3i64]));
   let d1 = v_d_bang(k, v).unwrap();
   let d2 = eval(&mut env, scan("(`a`b!1 2) + `a`b`c!1 2 3").unwrap()).unwrap();
   assert_eq!(format!("{:?}", KW::Noun(d1)), format!("{:?}", d2));
 
   let k = K::SymbolArray(
-    Series::new("a", ["a", "b", "c", "d"]).cast(&DataType::Categorical(None)).unwrap(),
+    Series::new("a", ["a", "b", "c", "d"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
   );
   let v = K::IntArray(arr!([2, 4, 3, 4i64]));
   let d1 = v_d_bang(k, v).unwrap();
@@ -561,6 +651,63 @@ fn test_table() {
   println!("{:?}", t1);
   println!("{:?}", t2);
   assert_eq!(format!("{:?}", t2), format!("{:?}", KW::Noun(t1)));
+
+  let s1 = K::IntArray(Series::new("a", [1, 2, 3i64]));
+  let s2 = eval(&mut env, scan("(+ `a`b!(1 2 3;4 5 6))@`a").unwrap()).unwrap();
+  println!("{:?}", s1);
+  println!("{:?}", s2);
+  assert_eq!(format!("{:?}", s2), format!("{:?}", KW::Noun(s1)));
+
+  let s1 = eval(&mut env, scan("(1 2 3;4 5 6)").unwrap()).unwrap();
+  let s2 = eval(&mut env, scan("(+ `a`b!(1 2 3;4 5 6))@`a`b").unwrap()).unwrap();
+  println!("{:?}", s1);
+  println!("{:?}", s2);
+  assert_eq!(s1, s2);
+}
+
+#[test]
+fn test_table_flip() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let _d1 = eval(&mut env, scan("d:`a`b!(1 2 3;1 0 1)").unwrap()).unwrap();
+  let _t1 = eval(&mut env, scan("t:+d").unwrap()).unwrap();
+  let d2 = eval(&mut env, scan("+t").unwrap()).unwrap();
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
+  let v = K::List(vec![
+    K::IntArray(Series::new("a", [1, 2, 3i64])),
+    K::BoolArray(Series::new("b", [1, 0, 1u8])),
+  ]);
+  let d1 = KW::Noun(v_makedict(k, v).unwrap());
+  assert_eq!(d1, d2)
+}
+
+#[ignore]
+#[test]
+fn test_table_flip2() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let t1 = K::Table(
+    DataFrame::new(vec![Series::new("a", [1, 2, 3i64]), Series::new("b", ["foo", "abcd", "yo"])])
+      .unwrap(),
+  );
+  println!("t1: {:?}", t1);
+
+  // let t2 = eval(&mut env, scan("+`a`b!(1 2 3; (\"foo\";\"abcd\";\"yo\"))").unwrap()).unwrap();
+  let k = eval(&mut env, scan("k:`a`b").unwrap()).unwrap();
+  println!("k: {:?}", k);
+  let v = eval(&mut env, scan("v:(1 2 3; (\"foo\";\"abcd\";\"yo\"))").unwrap()).unwrap();
+  println!("v: {:?}", v);
+  let t2 = eval(&mut env, scan("t:+k!v").unwrap()).unwrap();
+  println!("t2: {:?}", t2);
+  // assert_eq!(format!("{:?}", KW::Noun(t1)), format!("{:?}", t2));
+  assert_eq!(KW::Noun(t1), t2);
+  // assert!(true)
+
+  // todo!("++`a`b!(1 2 3; (\"foo\";\"abcd\";\"yo\"))")
 }
 
 #[test]
@@ -585,6 +732,32 @@ fn test_table_reader() {
   println!("{:?}", t2);
   assert_eq!(format!("{:?}", t2), format!("{:?}", KW::Noun(t1)));
   fs::remove_file("test.parquet").unwrap();
+}
+
+#[test]
+fn test_table_maths() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  let t1 = eval(&mut env, scan("2 * + `a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  let t2 = eval(&mut env, scan("+ `a`b!(2 4 6;8 10 12)").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(format!("{:?}", t1), format!("{:?}", t2));
+
+  let t1 = eval(&mut env, scan("3.14 * + `a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  let t2 = eval(&mut env, scan("+ `a`b!(3.14 6.28 9.42;12.56 15.7 18.84)").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(format!("{:?}", t1), format!("{:?}", t2));
+
+  let t1 = eval(&mut env, scan("2 + + `a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  let t2 = eval(&mut env, scan("+ `a`b!(3 4 5;6 7 8)").unwrap()).unwrap();
+  println!("{:?}", t1);
+  println!("{:?}", t2);
+  assert_eq!(format!("{:?}", t1), format!("{:?}", t2));
+
+  let t1 = eval(&mut env, scan("(+ `a`b!(1 2 3;4 5 6)) * 2").unwrap()).unwrap();
+  let t2 = eval(&mut env, scan("+ `a`b!(2 4 6;8 10 12)").unwrap()).unwrap();
+  assert_eq!(format!("{:?}", t1), format!("{:?}", t2));
 }
 
 #[test]
@@ -735,40 +908,55 @@ fn test_equal() {
 
   let res = eval(&mut env, scan("(1;2;\"a\") = `a`b`c!(1;2;3)").unwrap()).unwrap();
   println!("res: {:?}", res);
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1u8), K::Bool(1u8), K::Bool(0u8)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(res, Noun(d1));
 
   let res = eval(&mut env, scan("(`a`b`c!(1;2;3)) = (1;2;\"a\")").unwrap()).unwrap();
   println!("res: {:?}", res);
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1u8), K::Bool(1u8), K::Bool(0u8)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(res, Noun(d1));
 
   let res = eval(&mut env, scan("1 2 3 = `a`b`c!(1;2;3)").unwrap()).unwrap();
   println!("res: {:?}", res);
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1u8), K::Bool(1u8), K::Bool(1u8)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(res, Noun(d1));
 
   let res = eval(&mut env, scan("`a`b`c!(1;2;3) = 1 2 3").unwrap()).unwrap();
   println!("res: {:?}", res);
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1u8), K::Bool(1u8), K::Bool(1u8)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(res, Noun(d1));
 
   let res = eval(&mut env, scan("`a`b`c!(1;2;3) = 1.0 2.0 3.0").unwrap()).unwrap();
   println!("res: {:?}", res);
-  let k =
-    K::SymbolArray(Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap());
+  let k = K::SymbolArray(
+    Series::new("a", ["a", "b", "c"])
+      .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+      .unwrap(),
+  );
   let v = K::List(vec![K::Bool(1u8), K::Bool(1u8), K::Bool(1u8)]);
   let d1 = v_makedict(k, v).unwrap();
   assert_eq!(res, Noun(d1));
@@ -781,9 +969,10 @@ fn test_unique() {
   println!("res: {:?}", res);
   assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
 
-  let res = eval(&mut env, scan("? 1 1 0 0").unwrap()).unwrap();
-  println!("res: {:?}", res);
-  assert_eq!(res, Noun(K::BoolArray(arr!([1, 0u8]))));
+  let res1 = eval(&mut env, scan("? 1 1 0 0").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  let res2 = eval(&mut env, scan("0 1").unwrap()).unwrap();
+  assert_eq!(res1, res2);
 
   let res = eval(&mut env, scan("? 1 1 2 2 3.0").unwrap()).unwrap();
   println!("res: {:?}", res);
@@ -792,7 +981,9 @@ fn test_unique() {
   assert_eq!(
     eval(&mut env, scan("? `a`a`b`c`c").unwrap()).unwrap(),
     Noun(K::SymbolArray(
-      Series::new("a", ["a", "b", "c"]).cast(&DataType::Categorical(None)).unwrap()
+      Series::new("a", ["a", "b", "c"])
+        .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+        .unwrap()
     ))
   );
 
@@ -802,7 +993,154 @@ fn test_unique() {
   //   Noun(K::CharArray(Series::new("", "abc").cast(&DataType::Utf8).unwrap()))
   // )
   let res = eval(&mut env, scan("? \"aabb\"").unwrap()).unwrap();
-  let ab = Noun(K::CharArray(Series::new("", "ab").cast(&DataType::Utf8).unwrap()));
-  let ba = Noun(K::CharArray(Series::new("", "ba").cast(&DataType::Utf8).unwrap()));
+  let ab = Noun(K::CharArray("ab".to_string()));
+  let ba = Noun(K::CharArray("ba".to_string()));
   assert!(res == ab || res == ba);
+}
+
+#[test]
+fn test_array_indexing() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+  let res = eval(&mut env, scan("1 2 3 4 @ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Int(Some(1i64))));
+  let res = eval(&mut env, scan("1 2 3.14 4 @ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Float(1.0f64)));
+
+  let res = eval(&mut env, scan("\"abc\" @ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Char('a')));
+
+  let res = eval(&mut env, scan("\"abc\" @ 1").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Char('b')));
+
+  let res = eval(&mut env, scan("\"abc\" @ 2").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Char('c')));
+
+  let res = eval(&mut env, scan("\"abc\" @ 2 1 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::CharArray("cba".to_string())));
+
+  let res = eval(&mut env, scan("1 2 3 4 @ 0 1 2").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+
+  let res = eval(&mut env, scan("1 2 3.14 4 @ 0 1 2").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::FloatArray(arr!([1.0, 2.0, 3.14f64]))));
+
+  let res = eval(&mut env, scan("(`a`b!(1 2 3;\"abc\")) @ `a").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+
+  let res = eval(&mut env, scan("(`a`b!(1 2 3;\"abc\")) @ `b").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::CharArray("abc".to_string())));
+
+  let res = eval(&mut env, scan("(`a`b!(1 2 3;1 0 1)) @ `b").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::BoolArray(arr!([1, 0, 1u8]))));
+
+  let res = eval(&mut env, scan("(`a`b!(1 2 3;1 0 1)) @ `a`b").unwrap()).unwrap();
+  assert_eq!(
+    res,
+    Noun(K::List(vec![K::IntArray(arr!([1, 2, 3i64])), K::BoolArray(arr!([1, 0, 1u8]))]))
+  );
+
+  let res = eval(&mut env, scan("(1 2 3; 3.14; `a) @ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+}
+
+#[test]
+fn test_vmod() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("2!1 2 3 4 5").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 0, 1, 0, 1i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("3!1 2 3 4 5").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 2, 0, 1, 2i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("2!1 2 3 4 5.5").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 0.0, 1.0, 0.0, 1.5f64])))
+  );
+}
+
+#[test]
+fn test_reshape() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("3 3#1").unwrap()).unwrap(),
+    Noun(K::List(vec![
+      K::BoolArray(arr!([1, 1, 1u8])),
+      K::BoolArray(arr!([1, 1, 1u8])),
+      K::BoolArray(arr!([1, 1, 1u8])),
+    ]))
+  );
+  assert_eq!(
+    eval(&mut env, scan("3 3#2").unwrap()).unwrap(),
+    Noun(K::List(vec![
+      K::IntArray(arr!([2, 2, 2i64])),
+      K::IntArray(arr!([2, 2, 2i64])),
+      K::IntArray(arr!([2, 2, 2i64])),
+    ]))
+  );
+  assert_eq!(
+    eval(&mut env, scan("3 3#3.14").unwrap()).unwrap(),
+    Noun(K::List(vec![
+      K::FloatArray(arr!([3.14, 3.14, 3.14f64])),
+      K::FloatArray(arr!([3.14, 3.14, 3.14f64])),
+      K::FloatArray(arr!([3.14, 3.14, 3.14f64])),
+    ]))
+  );
+  // assert_eq!(
+  //   eval(&mut env, scan("3 3#\"a\"").unwrap()).unwrap(),
+  //   Noun(K::List(vec![
+  //     K::CharArray(arr!(['a', 'a', 'a'])),
+  //     K::CharArray(arr!(['a', 'a', 'a'])),
+  //     K::CharArray(arr!(['a', 'a', 'a'])),
+  //   ]))
+  // );
+}
+
+#[test]
+fn test_split() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("\",\"\\\"lol,bang,biff\"").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(
+    res1,
+    Noun(K::List(vec![
+      K::CharArray("lol".to_string()),
+      K::CharArray("bang".to_string()),
+      K::CharArray("biff".to_string())
+    ]))
+  );
+
+  let res2 = eval(&mut env, scan("\"SPLIT\"\\\"lolSPLITbangSPLITbiff\"").unwrap()).unwrap();
+  println!("res2: {:?}", res2);
+  assert_eq!(
+    res2,
+    Noun(K::List(vec![
+      K::CharArray("lol".to_string()),
+      K::CharArray("bang".to_string()),
+      K::CharArray("biff".to_string())
+    ]))
+  );
+}
+
+#[test]
+fn test_join() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("\",\"/(\"lol\";\"bang\";\"biff\")").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, Noun(K::CharArray("lol,bang,biff".to_string())));
+}
+
+#[test]
+fn test_forced_monads() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("+:`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  let res2 = eval(&mut env, scan("+`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
+  assert_eq!(res1, res2);
 }
