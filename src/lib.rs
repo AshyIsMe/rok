@@ -298,7 +298,7 @@ impl From<String> for K {
 }
 
 impl TryFrom<Series> for K {
-  type Error = ();
+  type Error = &'static str;
 
   fn try_from(s: Series) -> Result<Self, Self::Error> {
     if let Ok(_) = s.i64() {
@@ -312,7 +312,17 @@ impl TryFrom<Series> for K {
     } else if let Ok(_) = s.categorical() {
       Ok(K::SymbolArray(s))
     } else {
-      todo!("nyi")
+      Err("type")
+    }
+  }
+}
+
+impl TryInto<Vec<K>> for K {
+  type Error = &'static str;
+  fn try_into(self) -> Result<Vec<K>, Self::Error> {
+    match self {
+      K::SymbolArray(s) => Ok(s.iter().map(|s| K::try_from(s.to_string()).unwrap()).collect()),
+      _ => Err("nyi"),
     }
   }
 }

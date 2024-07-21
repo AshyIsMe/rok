@@ -354,6 +354,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
         l.fill(0)
       }
     }
+    K::BoolArray(i) => v_at(l, K::try_from(i.cast(&DataType::Int64).unwrap()).unwrap()),
     K::IntArray(i) => {
       // https://docs.rs/polars/latest/polars/series/struct.Series.html#method.take_threaded
       // Notes: Out of bounds access doesn’t Error but will return a Null value
@@ -403,29 +404,42 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           Ok(K::Nil) // TODO Is this the same behaviour as ngn/k and k9?
         }
       }
-      K::Table(_df) => todo!("v_at table lookups"),
+      K::Table(df) => match df.get_column_index(&s) {
+        Some(i) => K::try_from(df[i].clone()),
+        _ => todo!("nyi"),
+      },
+      K::SymbolArray(ss) => match l.clone() {
+        K::Dictionary(d) => {
+          Ok(K::List(
+            ss.categorical()
+              .unwrap()
+              .iter_str()
+              .map(|s| {
+                if d.contains_key(s.unwrap()) {
+                  d.get(s.unwrap()).unwrap().clone()
+                } else {
+                  K::Nil // TODO Is this the same behaviour as ngn/k and k9?
+                }
+              })
+              .collect::<Vec<K>>(),
+          ))
+        }
+        K::Table(_df) => todo!("nyi"),
+        _ => todo!("nyi"),
+      },
       _ => Err("type"),
     },
-    K::SymbolArray(ss) => match l.clone() {
-      K::Dictionary(d) => {
-        Ok(K::List(
-          ss.categorical()
-            .unwrap()
-            .iter_str()
-            .map(|s| {
-              if d.contains_key(s.unwrap()) {
-                d.get(s.unwrap()).unwrap().clone()
-              } else {
-                K::Nil // TODO Is this the same behaviour as ngn/k and k9?
-              }
-            })
-            .collect::<Vec<K>>(),
-        ))
-      }
-      K::Table(_df) => todo!("v_at table lookups"),
-      _ => Err("type"),
-    },
-    _ => todo!("v_at"),
+    K::SymbolArray(s) => {
+      let keys: Vec<K> = s
+        .iter()
+        .map(|s| {
+          let s = s.to_string();
+          K::Symbol(s[1..s.len() - 1].to_string())
+        })
+        .collect();
+      Ok(K::List(keys.into_iter().map(|k| v_at(l.clone(), k).unwrap()).collect()))
+    }
+    _ => todo!("v_at({:?}, {:?})", l, r),
   }
 }
 

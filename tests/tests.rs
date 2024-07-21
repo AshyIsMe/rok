@@ -651,6 +651,18 @@ fn test_table() {
   println!("{:?}", t1);
   println!("{:?}", t2);
   assert_eq!(format!("{:?}", t2), format!("{:?}", KW::Noun(t1)));
+
+  let s1 = K::IntArray(Series::new("a", [1, 2, 3i64]));
+  let s2 = eval(&mut env, scan("(+ `a`b!(1 2 3;4 5 6))@`a").unwrap()).unwrap();
+  println!("{:?}", s1);
+  println!("{:?}", s2);
+  assert_eq!(format!("{:?}", s2), format!("{:?}", KW::Noun(s1)));
+
+  let s1 = eval(&mut env, scan("(1 2 3;4 5 6)").unwrap()).unwrap();
+  let s2 = eval(&mut env, scan("(+ `a`b!(1 2 3;4 5 6))@`a`b").unwrap()).unwrap();
+  println!("{:?}", s1);
+  println!("{:?}", s2);
+  assert_eq!(s1, s2);
 }
 
 #[test]
@@ -1131,22 +1143,4 @@ fn test_forced_monads() {
   println!("res1: {:?}", res1);
   let res2 = eval(&mut env, scan("+`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
   assert_eq!(res1, res2);
-}
-
-#[ignore]
-#[test]
-fn test_df_tmp() {
-  let df: DataFrame = df!("a" => &[1,2,3], "b" => &[4, 5,6]).unwrap();
-  println!("{}", df["a"].clone() * 2);
-
-  let s = Series::new("a", [1i64, 2, 3]);
-  let k = K::try_from(s);
-  println!("{:?}", k);
-
-  let s = Series::new("a", ["abc", "foobar", "lolbangbiff"])
-    .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
-    .unwrap();
-  let k = K::try_from(s);
-  println!("{:?}", k);
-  assert!(false);
 }
