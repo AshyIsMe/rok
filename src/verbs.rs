@@ -1,4 +1,5 @@
 use crate::*;
+use rand::distributions::{Distribution, Uniform};
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
@@ -278,7 +279,18 @@ pub fn v_unique(r: K) -> Result<K, &'static str> {
     _ => Err("domain"), //
   }
 }
-pub fn v_rand(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_rand(l: K, r: K) -> Result<K, &'static str> {
+  match (l, r) {
+    (K::Int(Some(x)), K::Int(Some(y))) => {
+      let mut rng = rand::thread_rng();
+      let range = Uniform::from(0..y);
+
+      let v: Vec<i64> = (0..x).map(|_i| range.sample(&mut rng)).collect();
+      Ok(K::IntArray(Series::new("", v)))
+    }
+    _ => Err("nyi"),
+  }
+}
 pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
