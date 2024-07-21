@@ -1159,4 +1159,15 @@ fn test_rand() {
     }
     _ => panic!("wrong result"),
   }
+
+  let res1 = eval(&mut env, scan("?5").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  match res1 {
+    KW::Noun(K::FloatArray(s)) => {
+      assert!(s.len() == 5);
+      assert!(s.min::<i64>().unwrap().unwrap() >= 0);
+      assert!(s.max::<i64>().unwrap().unwrap() < 1);
+    }
+    _ => panic!("wrong result"),
+  }
 }

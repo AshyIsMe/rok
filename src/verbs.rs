@@ -263,7 +263,16 @@ pub fn v_dfmt(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_randfloat(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_randfloat(r: K) -> Result<K, &'static str> {
+  match r {
+    K::Int(Some(i)) if i == 0 => Err("nyi"),
+    K::Int(Some(i)) if i < 0 => Err("domain"),
+    K::Int(Some(i)) if i > 0 => Ok(K::FloatArray(
+      ChunkedArray::<Float64Type>::rand_uniform("", i as usize, 0.0f64, 1.0f64).into_series(),
+    )),
+    _ => Err("type"),
+  }
+}
 pub fn v_unique(r: K) -> Result<K, &'static str> {
   debug!("v_unique({:?})", r);
 
