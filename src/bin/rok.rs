@@ -2,6 +2,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::time::{Duration, SystemTime};
 
 use roklang::*;
 use rustyline::error::ReadlineError;
@@ -68,6 +69,14 @@ fn main() {
           //scan tokens instead of eval
           let r = scan(&line[2..]).unwrap();
           println!("{r:?}");
+        } else if line.starts_with("\\t ") {
+          //time eval
+          let now = SystemTime::now();
+          let r = eval(&mut env, scan(&line[2..]).unwrap());
+          match r {
+            Ok(_kw) => println!("{}", now.elapsed().unwrap().as_millis()),
+            _ => println!("{:?}", r),
+          }
         } else if line.starts_with("\\d ") {
           //debug print
           println!("debug print:");
