@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 
 use polars::prelude::*;
-use rok::*;
+use roklang::*;
 
-use rok::KW::*;
+use roklang::KW::*;
 
 #[test]
 fn test_scan() {

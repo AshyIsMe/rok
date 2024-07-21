@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use rok::*;
+use roklang::*;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 

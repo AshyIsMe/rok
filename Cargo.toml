@@ -1,5 +1,5 @@
 [package]
-name = "rok"
+name = "roklang"
 version = "0.1.0"
 edition = "2021"
 description = "A K interpreter written in rust. Inspired by ok and ngn/k and built on polars."
@@ -18,3 +18,6 @@ log = "0.4.19"
 # polars = { version = "0.41.3", features = ["performant", "nightly", "simd", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
 polars = { version = "0.41.3", features = ["performant", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
 rustyline = "14.0.0"
+
+[[bin]]
+name = "rok"
