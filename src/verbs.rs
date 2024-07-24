@@ -530,6 +530,17 @@ pub fn v_sum(x: K) -> Result<K, &'static str> {
 }
 pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()) }
 
+// TODO
+// pub fn v_product(x: K) -> Result<K, &'static str> {
+//   match x {
+//     K::BoolArray(a) => Ok(K::Int(a.product().ok().into())),
+//     K::IntArray(a) => Ok(K::Int(a.product().ok())),
+//     K::FloatArray(a) => Ok(K::Float(a.product().unwrap_or(f64::NAN))),
+//     _ => todo!("other types of K"),
+//   }
+// }
+// pub fn v_d_product(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_product(r).unwrap()) }
+
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   match l {
     K::SymbolArray(_) | K::Symbol(_) => v_makedict(l, r),
@@ -537,7 +548,20 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_each(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("each") }
+pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  if let KW::Verb { name } = v {
+    k_to_vec(x).and_then(|v| {
+      let r: Vec<K> = v
+        .iter()
+        .cloned()
+        .map(|y| apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun())
+        .collect();
+      Ok(K::List(r))
+    })
+  } else {
+    Err("type")
+  }
+}
 pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce

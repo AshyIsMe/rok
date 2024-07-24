@@ -797,6 +797,8 @@ fn test_fold() {
 
   assert_eq!(eval(&mut env, scan("2 +/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(12))));
   assert_eq!(eval(&mut env, scan("2 */ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
+
+  assert_eq!(eval(&mut env, scan("{2 * x}/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
 }
 
 #[test]
@@ -1197,6 +1199,11 @@ fn test_find() {
 #[test]
 fn test_each() {
   let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("!'3 3 3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("(0 1 2;0 1 2;0 1 2)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
 
   let res1 = eval(&mut env, scan("{2*x}'1 2 3").unwrap()).unwrap();
   let res2 = eval(&mut env, scan("2 4 6").unwrap()).unwrap();
