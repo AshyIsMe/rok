@@ -1193,3 +1193,13 @@ fn test_find() {
   println!("res1: {:?}", res1);
   assert_eq!(res1, res2);
 }
+
+#[test]
+fn test_each() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("{2*x}'1 2 3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("2 4 6").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
