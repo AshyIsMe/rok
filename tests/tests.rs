@@ -1144,3 +1144,52 @@ fn test_forced_monads() {
   let res2 = eval(&mut env, scan("+`a`b!(1 2 3;4 5 6)").unwrap()).unwrap();
   assert_eq!(res1, res2);
 }
+
+#[test]
+fn test_rand() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("5?5").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  match res1 {
+    KW::Noun(K::IntArray(s)) => {
+      assert!(s.len() == 5);
+      assert!(s.min::<i64>().unwrap().unwrap() >= 0);
+      assert!(s.max::<i64>().unwrap().unwrap() < 5);
+    }
+    _ => panic!("wrong result"),
+  }
+
+  let res1 = eval(&mut env, scan("?5").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  match res1 {
+    KW::Noun(K::FloatArray(s)) => {
+      assert!(s.len() == 5);
+      assert!(s.min::<i64>().unwrap().unwrap() >= 0);
+      assert!(s.max::<i64>().unwrap().unwrap() < 1);
+    }
+    _ => panic!("wrong result"),
+  }
+
+  let res1 = eval(&mut env, scan("5?1 2 3").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  match res1 {
+    KW::Noun(K::IntArray(s)) => {
+      assert!(s.len() == 5);
+      assert!(s.min::<i64>().unwrap().unwrap() >= 1);
+      assert!(s.max::<i64>().unwrap().unwrap() <= 3);
+    }
+    _ => panic!("wrong result"),
+  }
+}
+
+#[ignore]
+#[test]
+fn test_find() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("\"abc\"?\"abcdef\"").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("0 1 2 0N 0N 0N").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}

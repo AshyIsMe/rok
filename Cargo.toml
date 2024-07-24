@@ -17,6 +17,7 @@ itertools = "0.13.0"
 log = "0.4.19"
 # polars = { version = "0.41.3", features = ["performant", "nightly", "simd", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
 polars = { version = "0.41.3", features = ["performant", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
+rand = "0.8.5"
 rustyline = "14.0.0"
 
 [[bin]]

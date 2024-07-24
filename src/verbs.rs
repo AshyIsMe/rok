@@ -1,4 +1,5 @@
 use crate::*;
+use rand::distributions::{Distribution, Uniform};
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
@@ -262,7 +263,16 @@ pub fn v_dfmt(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_randfloat(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_randfloat(r: K) -> Result<K, &'static str> {
+  match r {
+    K::Int(Some(i)) if i == 0 => Err("nyi"),
+    K::Int(Some(i)) if i < 0 => Err("domain"),
+    K::Int(Some(i)) if i > 0 => Ok(K::FloatArray(
+      ChunkedArray::<Float64Type>::rand_uniform("", i as usize, 0.0f64, 1.0f64).into_series(),
+    )),
+    _ => Err("type"),
+  }
+}
 pub fn v_unique(r: K) -> Result<K, &'static str> {
   debug!("v_unique({:?})", r);
 
@@ -278,7 +288,25 @@ pub fn v_unique(r: K) -> Result<K, &'static str> {
     _ => Err("domain"), //
   }
 }
-pub fn v_rand(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_rand(l: K, r: K) -> Result<K, &'static str> {
+  match (l.clone(), r.clone()) {
+    (K::Int(Some(x)), K::Int(Some(y))) if x > 0 => {
+      let mut rng = rand::thread_rng();
+      let range = Uniform::from(0..y);
+
+      let v: Vec<i64> = (0..x).map(|_i| range.sample(&mut rng)).collect();
+      Ok(K::IntArray(Series::new("", v)))
+    }
+    (K::Int(Some(x)), K::Int(Some(_y))) if x < 0 => {
+      todo!("nyi v_rand with no repeats")
+    }
+    (K::Int(Some(_x)), y) if y.len() > 1 => {
+      let idxs = v_rand(l, K::Int(Some(y.len() as i64))).unwrap();
+      v_at(r, idxs)
+    }
+    _ => Err("nyi"),
+  }
+}
 pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
