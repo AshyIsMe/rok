@@ -289,13 +289,20 @@ pub fn v_unique(r: K) -> Result<K, &'static str> {
   }
 }
 pub fn v_rand(l: K, r: K) -> Result<K, &'static str> {
-  match (l, r) {
-    (K::Int(Some(x)), K::Int(Some(y))) => {
+  match (l.clone(), r.clone()) {
+    (K::Int(Some(x)), K::Int(Some(y))) if x > 0 => {
       let mut rng = rand::thread_rng();
       let range = Uniform::from(0..y);
 
       let v: Vec<i64> = (0..x).map(|_i| range.sample(&mut rng)).collect();
       Ok(K::IntArray(Series::new("", v)))
+    }
+    (K::Int(Some(x)), K::Int(Some(_y))) if x < 0 => {
+      todo!("nyi v_rand with no repeats")
+    }
+    (K::Int(Some(_x)), y) if y.len() > 1 => {
+      let idxs = v_rand(l, K::Int(Some(y.len() as i64))).unwrap();
+      v_at(r, idxs)
     }
     _ => Err("nyi"),
   }

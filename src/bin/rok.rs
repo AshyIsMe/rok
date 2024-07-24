@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use roklang::*;
 use rustyline::error::ReadlineError;
