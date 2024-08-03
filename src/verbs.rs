@@ -214,7 +214,7 @@ pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
   match (l.clone(), r.clone()) {
     // TODO can we make this less repetitive and explicit?
     (K::Int(i), K::Table(df)) => Ok(K::Table(
-      DataFrame::new(df.iter().map(|s| i.unwrap().mul(&s)).collect::<Vec<Series>>()).unwrap(),
+      DataFrame::new(df.iter().map(|s| i.unwrap().mul(s)).collect::<Vec<Series>>()).unwrap(),
     )),
     _ => atomicdyad!(*, v_times, mul, l, r),
   }
@@ -265,7 +265,7 @@ pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_randfloat(r: K) -> Result<K, &'static str> {
   match r {
-    K::Int(Some(i)) if i == 0 => Err("nyi"),
+    K::Int(Some(0)) => Err("nyi"),
     K::Int(Some(i)) if i < 0 => Err("domain"),
     K::Int(Some(i)) if i > 0 => Ok(K::FloatArray(
       ChunkedArray::<Float64Type>::rand_uniform("", i as usize, 0.0f64, 1.0f64).into_series(),
@@ -550,13 +550,13 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
 
 pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   if let KW::Verb { name } = v {
-    k_to_vec(x).and_then(|v| {
+    k_to_vec(x).map(|v| {
       let r: Vec<K> = v
         .iter()
         .cloned()
         .map(|y| apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun())
         .collect();
-      Ok(K::List(r))
+      K::List(r)
     })
   } else {
     Err("type")

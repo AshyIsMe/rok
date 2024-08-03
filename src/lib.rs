@@ -321,7 +321,7 @@ impl TryInto<Vec<K>> for K {
   type Error = &'static str;
   fn try_into(self) -> Result<Vec<K>, Self::Error> {
     match self {
-      K::SymbolArray(s) => Ok(s.iter().map(|s| K::try_from(s.to_string()).unwrap()).collect()),
+      K::SymbolArray(s) => Ok(s.iter().map(|s| K::from(s.to_string())).collect()),
       _ => Err("nyi"),
     }
   }
@@ -1173,7 +1173,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
               // forced monads +: -: etc
               match words.last() {
                 Some(KW::Verb { name }) => {
-                  let s: &str = &name;
+                  let s: &str = name;
                   if primitives_table().keys().contains(&s) {
                     let mn = format!("{}:", name);
                     let _ = words.pop();
@@ -1184,7 +1184,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
                 }
                 // digraph adverbs ': /: \:
                 Some(KW::Adverb { name }) => {
-                  let s: &str = &name;
+                  let s: &str = name;
                   if adverbs_table().keys().contains(&s) {
                     let mn = format!("{}:", name);
                     let _ = words.pop();
