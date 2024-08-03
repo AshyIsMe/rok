@@ -36,7 +36,7 @@ fn test_scan_lambda() {
     KW::Verb { name: "+".to_string() },
     KW::Noun(K::Name("y".into())),
   ];
-  let f = KW::Function { body: tokens, args: vec!["x".to_string(), "y".to_string()] };
+  let f = KW::Function { body: tokens, args: vec!["x".to_string(), "y".to_string()], adverb: None };
   assert_eq!(scan("{x+y}").unwrap(), vec![f]);
 }
 
@@ -812,6 +812,7 @@ fn test_parse_functions() {
       KW::Noun(K::Name("x".to_string())),
     ],
     args: vec!["x".to_string()],
+    adverb: None,
   };
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("{2 * x}").unwrap()).unwrap(), f);

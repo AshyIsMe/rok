@@ -51,11 +51,12 @@ pub enum K {
 pub enum KW /* KWords */ {
   Noun(K),
   // Function: {x + y}. args is Vec<K::Name>
-  Function { body: Vec<KW>, args: Vec<String> }, //, curry, env } // TODO currying and env closure?
+  Function { body: Vec<KW>, args: Vec<String>, adverb: Option<String> }, //, curry, env } // TODO currying and env closure?
   // View{ value, r, cache, depends->val }
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   Adverb { name: String },
+  // ModifiedVerb { verb: Box<KW>, adverb: String }, // TODO represent modified verbs/functions like this? eg. +/ or {2*x}'
   Exprs(Vec<Vec<KW>>),    // list of expressions: [e1;e2;e3]
   FuncArgs(Vec<Vec<KW>>), // function arguments: f[a1;a2;3]
   Cond(Vec<Vec<KW>>),     // conditional form $[p;t;f]
@@ -341,7 +342,7 @@ impl fmt::Display for KW {
     match self {
       KW::Noun(n) => write!(f, "{}", n),
       KW::Verb { name } | KW::Adverb { name } => write!(f, "{}", name),
-      KW::Function { body, args } => {
+      KW::Function { body, args, adverb } => {
         let b = body.iter().map(|kw| format!("{}", kw)).join(" ");
         if *args != vec!["x".to_string(), "y".to_string(), "z".to_string()]
           && *args != vec!["x".to_string(), "y".to_string()]
@@ -349,9 +350,9 @@ impl fmt::Display for KW {
         {
           let a = ["[".to_string(), args.iter().map(|n| n.to_string()).join(";"), "]".to_string()]
             .join("");
-          write!(f, "{{{} {}}}", a, b)
+          write!(f, "{{{} {}}}{}", a, b, adverb.clone().unwrap_or("".to_string()))
         } else {
-          write!(f, "{{{}}}", b)
+          write!(f, "{{{}}}{}", b, adverb.clone().unwrap_or("".to_string()))
         }
       }
       KW::Exprs(e) => {
@@ -723,17 +724,35 @@ pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
   // Return a new Verb that implements the appropriate adverb behaviour
   match l {
     KW::Verb { name } => match a {
-      "\'" => Ok(KW::Verb { name: name + a }),
-      "/" => Ok(KW::Verb { name: name + a }),
-      "\\" => Ok(KW::Verb { name: name + a }),
+      "\'" | "/" | "\\" => Ok(KW::Verb { name: name + a }),
       _ => panic!("invalid adverb"),
     },
+    KW::Function { body, args, adverb: None } => match a {
+      "\'" | "/" | "\\" => Ok(KW::Function { body, args, adverb: Some(a.to_string()) }),
+      _ => panic!("invalid adverb"),
+    },
+    KW::Function { body: _, args: _, adverb: Some(_adverb) } => todo!("function nested adverbs"),
     _ => panic!("verb required"),
   }
 }
 pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str> {
   match f {
-    KW::Function { body, args } => match arg {
+    KW::Function { body, args, adverb: Some(adverb) } => {
+      let adverbs = adverbs_table();
+      let adverb: &str = &adverb;
+      match adverbs.get(adverb) {
+        Some((m_a, _d_a)) => match arg {
+          KW::Noun(x) => m_a(env, KW::Function { body, args, adverb: None }, x).map(KW::Noun),
+          KW::FuncArgs(_exprs) => {
+            todo!("dyad/triad/etc adverb modified functions")
+            // d_a(env, f , l, r).map(KW::Noun)
+          }
+          _ => todo!("other adverb cases"),
+        },
+        None => todo!("NotYetImplemented {}", adverb),
+      }
+    }
+    KW::Function { body, args, adverb: None } => match arg {
       KW::Noun(x) => {
         match args.len() {
           1 => {
@@ -991,7 +1010,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         // 2 dyad (including assignment)
         apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }
-      (any_l, x @ KW::Verb { .. }, KW::Adverb { name }, any_r) => {
+      (any_l, x @ KW::Verb { .. } | x @ KW::Function { .. }, KW::Adverb { name }, any_r) => {
         // 3 adverb
         apply_adverb(&name, x.clone()).map(|r| vec![any_l, r, any_r])
       }
@@ -1324,7 +1343,7 @@ fn scan_function(tokens: Vec<KW>) -> Result<(KW, Vec<KW>), &'static str> {
       Some(KW::RCB) => match depth {
         0 => {
           let (args, body) = scan_function_args(tokens[0..i].to_vec())?;
-          return Ok((KW::Function { body, args }, tokens[i..].to_vec()));
+          return Ok((KW::Function { body, args, adverb: None }, tokens[i..].to_vec()));
         }
         _ => depth -= 1,
       },
