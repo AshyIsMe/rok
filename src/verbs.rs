@@ -565,22 +565,24 @@ pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
 }
 pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
-  // TODO support Function too just like v_each()
   // split into list, then reduce
-  if let KW::Verb { name } = v {
-    k_to_vec(x).and_then(|v| {
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).and_then(|v| {
       let r = v.iter().cloned().reduce(|x, y| {
-        apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
-          .unwrap()
-          .unwrap_noun()
+        // apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone())).unwrap().unwrap_noun()
+        eval(
+          env,
+          vec![f.clone(), KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]])],
+        )
+        .unwrap()
+        .unwrap_noun()
       });
       match r {
         Some(k) => Ok(k.clone()),
         None => Err("TODO not sure what this error case is"),
       }
-    })
-  } else {
-    Err("type")
+    }),
+    _ => Err("type"),
   }
 }
 pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {

@@ -798,7 +798,7 @@ fn test_fold() {
   assert_eq!(eval(&mut env, scan("2 +/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(12))));
   assert_eq!(eval(&mut env, scan("2 */ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
 
-  assert_eq!(eval(&mut env, scan("{2 * x}/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
+  assert_eq!(eval(&mut env, scan("{x + y}/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(10))));
 }
 
 #[test]
