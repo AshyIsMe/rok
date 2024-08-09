@@ -32,7 +32,7 @@ $ string pad|cast              $[c;t;f] cond
 @ type at
 . eval|values dot
 ";
-  return help;
+  help
 }
 
 fn main() {

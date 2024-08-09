@@ -36,7 +36,7 @@ fn test_scan_lambda() {
     KW::Verb { name: "+".to_string() },
     KW::Noun(K::Name("y".into())),
   ];
-  let f = KW::Function { body: tokens, args: vec!["x".to_string(), "y".to_string()] };
+  let f = KW::Function { body: tokens, args: vec!["x".to_string(), "y".to_string()], adverb: None };
   assert_eq!(scan("{x+y}").unwrap(), vec![f]);
 }
 
@@ -797,6 +797,8 @@ fn test_fold() {
 
   assert_eq!(eval(&mut env, scan("2 +/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(12))));
   assert_eq!(eval(&mut env, scan("2 */ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
+
+  assert_eq!(eval(&mut env, scan("{x + y}/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(10))));
 }
 
 #[test]
@@ -810,6 +812,7 @@ fn test_parse_functions() {
       KW::Noun(K::Name("x".to_string())),
     ],
     args: vec!["x".to_string()],
+    adverb: None,
   };
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("{2 * x}").unwrap()).unwrap(), f);
@@ -1190,6 +1193,21 @@ fn test_find() {
 
   let res1 = eval(&mut env, scan("\"abc\"?\"abcdef\"").unwrap()).unwrap();
   let res2 = eval(&mut env, scan("0 1 2 0N 0N 0N").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[test]
+fn test_each() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("!'3 3 3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("(0 1 2;0 1 2;0 1 2)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+
+  let res1 = eval(&mut env, scan("{2*x}'1 2 3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("2 4 6").unwrap()).unwrap();
   println!("res1: {:?}", res1);
   assert_eq!(res1, res2);
 }

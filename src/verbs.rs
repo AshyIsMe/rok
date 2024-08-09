@@ -214,7 +214,7 @@ pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
   match (l.clone(), r.clone()) {
     // TODO can we make this less repetitive and explicit?
     (K::Int(i), K::Table(df)) => Ok(K::Table(
-      DataFrame::new(df.iter().map(|s| i.unwrap().mul(&s)).collect::<Vec<Series>>()).unwrap(),
+      DataFrame::new(df.iter().map(|s| i.unwrap().mul(s)).collect::<Vec<Series>>()).unwrap(),
     )),
     _ => atomicdyad!(*, v_times, mul, l, r),
   }
@@ -265,7 +265,7 @@ pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_randfloat(r: K) -> Result<K, &'static str> {
   match r {
-    K::Int(Some(i)) if i == 0 => Err("nyi"),
+    K::Int(Some(0)) => Err("nyi"),
     K::Int(Some(i)) if i < 0 => Err("domain"),
     K::Int(Some(i)) if i > 0 => Ok(K::FloatArray(
       ChunkedArray::<Float64Type>::rand_uniform("", i as usize, 0.0f64, 1.0f64).into_series(),
@@ -530,6 +530,17 @@ pub fn v_sum(x: K) -> Result<K, &'static str> {
 }
 pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()) }
 
+// TODO
+// pub fn v_product(x: K) -> Result<K, &'static str> {
+//   match x {
+//     K::BoolArray(a) => Ok(K::Int(a.product().ok().into())),
+//     K::IntArray(a) => Ok(K::Int(a.product().ok())),
+//     K::FloatArray(a) => Ok(K::Float(a.product().unwrap_or(f64::NAN))),
+//     _ => todo!("other types of K"),
+//   }
+// }
+// pub fn v_d_product(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_product(r).unwrap()) }
+
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   match l {
     K::SymbolArray(_) | K::Symbol(_) => v_makedict(l, r),
@@ -537,24 +548,41 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_each(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("each") }
+pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
+      let r: Vec<K> = v
+        .iter()
+        .cloned()
+        .map(|y|
+             // apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun()
+             eval(env, vec![f.clone(), KW::Noun(y.clone())]).unwrap().unwrap_noun())
+        .collect();
+      promote_num(r.clone()).unwrap_or(K::List(r))
+    }),
+    _ => Err("type"),
+  }
+}
 pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce
-  if let KW::Verb { name } = v {
-    k_to_vec(x).and_then(|v| {
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).and_then(|v| {
       let r = v.iter().cloned().reduce(|x, y| {
-        apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
-          .unwrap()
-          .unwrap_noun()
+        // apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone())).unwrap().unwrap_noun()
+        eval(
+          env,
+          vec![f.clone(), KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]])],
+        )
+        .unwrap()
+        .unwrap_noun()
       });
       match r {
         Some(k) => Ok(k.clone()),
         None => Err("TODO not sure what this error case is"),
       }
-    })
-  } else {
-    Err("type")
+    }),
+    _ => Err("type"),
   }
 }
 pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
