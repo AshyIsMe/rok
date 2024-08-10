@@ -802,6 +802,32 @@ fn test_fold() {
 }
 
 #[test]
+fn test_fold_more() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("+/(1 2 3; 4 5 6)").unwrap()).unwrap(),
+    Noun(K::IntArray(Series::new("a", [5, 7, 9i64])))
+  );
+
+  assert_eq!(eval(&mut env, scan("+//(1 2 3; 4 5 6)").unwrap()).unwrap(), Noun(K::Int(Some(21))));
+
+  // "+/((1 2 3;4 5 6);42)" => "(43 44 45;46 47 48)"
+  assert_eq!(
+    eval(&mut env, scan("+/((1 2 3;4 5 6);42)").unwrap()).unwrap(),
+    Noun(K::List(vec![
+      K::IntArray(Series::new("", [43, 44, 45i64])),
+      K::IntArray(Series::new("", [46, 47, 48i64])),
+    ]))
+  );
+  // "+//((1 2 3;4 5 6);42)" => 273
+  assert_eq!(
+    eval(&mut env, scan("+/((1 2 3;4 5 6);42)").unwrap()).unwrap(),
+    Noun(K::Int(Some(273)))
+  );
+}
+
+#[test]
 fn test_parse_functions() {
   // See https://estradajke.github.io/k9-simples/k9/User-Functions.html
   //
