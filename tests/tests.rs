@@ -809,8 +809,16 @@ fn test_fold_more() {
     eval(&mut env, scan("+/(1 2 3; 4 5 6)").unwrap()).unwrap(),
     Noun(K::IntArray(Series::new("a", [5, 7, 9i64])))
   );
+  println!("test_fold_more() 1");
+
+  assert_eq!(
+    eval(&mut env, scan("{x+y}/(1 2 3; 4 5 6)").unwrap()).unwrap(),
+    Noun(K::IntArray(Series::new("a", [5, 7, 9i64])))
+  );
+  println!("test_fold_more() 2");
 
   assert_eq!(eval(&mut env, scan("+//(1 2 3; 4 5 6)").unwrap()).unwrap(), Noun(K::Int(Some(21))));
+  println!("test_fold_more() 3");
 
   // "+/((1 2 3;4 5 6);42)" => "(43 44 45;46 47 48)"
   assert_eq!(

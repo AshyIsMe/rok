@@ -525,7 +525,12 @@ pub fn v_sum(x: K) -> Result<K, &'static str> {
     K::BoolArray(a) => Ok(K::Int(a.sum().ok())),
     K::IntArray(a) => Ok(K::Int(a.sum().ok())),
     K::FloatArray(a) => Ok(K::Float(a.sum().unwrap_or(f64::NAN))),
-    _ => todo!("other types of K"),
+    _ => {
+      // Fall back to slow catchall. TODO Something nicer
+      let mut env = Env { names: HashMap::new(), parent: None };
+      let sum = eval(&mut env, scan("{x+y}/").unwrap()).unwrap();
+      Ok(eval(&mut env, vec![sum, KW::Noun(x.clone())]).unwrap().unwrap_noun())
+    }
   }
 }
 pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()) }
