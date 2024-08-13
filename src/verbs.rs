@@ -571,6 +571,10 @@ pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
 pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce
+  // TODO check the rank of v and handle the different meanings of /
+  // https://k.miraheze.org/wiki/Fold
+  // https://k.miraheze.org/wiki/Fixedpoint
+  //
   match v {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).and_then(|v| {
       let r = v.iter().cloned().reduce(|x, y| {
@@ -591,6 +595,11 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   }
 }
 pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+  // TODO check the rank of v and type of x and handle the different meanings of /
+  // https://k.miraheze.org/wiki/For
+  // https://k.miraheze.org/wiki/While
+  // https://k.miraheze.org/wiki/Join
+  // https://k.miraheze.org/wiki/Base_encode
   if let KW::Verb { ref name } = v {
     let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
     Ok(

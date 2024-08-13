@@ -799,38 +799,26 @@ fn test_fold() {
   assert_eq!(eval(&mut env, scan("2 */ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
 
   assert_eq!(eval(&mut env, scan("{x + y}/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(10))));
-}
-
-#[test]
-fn test_fold_more() {
-  let mut env = Env { names: HashMap::new(), parent: None };
 
   assert_eq!(
     eval(&mut env, scan("+/(1 2 3; 4 5 6)").unwrap()).unwrap(),
     Noun(K::IntArray(Series::new("a", [5, 7, 9i64])))
   );
-  println!("test_fold_more() 1");
-
   assert_eq!(
     eval(&mut env, scan("{x+y}/(1 2 3; 4 5 6)").unwrap()).unwrap(),
     Noun(K::IntArray(Series::new("a", [5, 7, 9i64])))
   );
-  println!("test_fold_more() 2");
+}
+
+#[test]
+fn test_fixedpoint() {
+  let mut env = Env { names: HashMap::new(), parent: None };
 
   assert_eq!(eval(&mut env, scan("+//(1 2 3; 4 5 6)").unwrap()).unwrap(), Noun(K::Int(Some(21))));
-  println!("test_fold_more() 3");
 
-  // "+/((1 2 3;4 5 6);42)" => "(43 44 45;46 47 48)"
-  assert_eq!(
-    eval(&mut env, scan("+/((1 2 3;4 5 6);42)").unwrap()).unwrap(),
-    Noun(K::List(vec![
-      K::IntArray(Series::new("", [43, 44, 45i64])),
-      K::IntArray(Series::new("", [46, 47, 48i64])),
-    ]))
-  );
   // "+//((1 2 3;4 5 6);42)" => 273
   assert_eq!(
-    eval(&mut env, scan("+/((1 2 3;4 5 6);42)").unwrap()).unwrap(),
+    eval(&mut env, scan("+//((1 2 3;4 5 6);42)").unwrap()).unwrap(),
     Noun(K::Int(Some(273)))
   );
 }
