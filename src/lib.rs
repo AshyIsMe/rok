@@ -56,7 +56,7 @@ pub enum KW /* KWords */ {
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   Adverb { name: String },
-  // ModifiedVerb { verb: Box<KW>, adverb: String }, // TODO represent modified verbs/functions like this? eg. +/ or {2*x}'
+  // DerivedVerb { verb: Box<KW>, adverb: String }, // TODO represent modified verbs/functions like this? eg. +/ or {2*x}'
   Exprs(Vec<Vec<KW>>),    // list of expressions: [e1;e2;e3]
   FuncArgs(Vec<Vec<KW>>), // function arguments: f[a1;a2;3]
   Cond(Vec<Vec<KW>>),     // conditional form $[p;t;f]
