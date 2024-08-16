@@ -1053,7 +1053,11 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
     };
 
     stack.retain(|w| !matches!(w, KW::Nothing));
-    debug!("result: {:?} with stack: {:?}", result, stack);
+    debug!(
+      "\nresult: {} \nstack: {}",
+      format!("{:?}", result).replace("\n", " ").replace("\t", ""),
+      format!("{:?}", stack).replace("\n", " ").replace("\t", "")
+    );
     stack = [result?, stack.into()].concat().into();
   }
   stack.retain(|w| !matches!(w, KW::StartOfLine | KW::Nothing));
