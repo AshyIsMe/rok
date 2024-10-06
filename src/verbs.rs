@@ -569,6 +569,28 @@ pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   }
 }
 pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
+
+// TODO dispatch / based on inputs:  over | fixedpoint
+pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  match v.clone() {
+    KW::Verb { .. } => todo!("figure out if v:{} is monadic or dyadic", v),
+    KW::Function { body, args, adverb } => match args.len() {
+      2 => v_fold(env, v, x),
+      1 => todo!("v_fixedpoint(env, v, x)"),
+      _ => Err("rank"),
+    },
+    _ => panic!("impossible"),
+  }
+}
+
+pub fn a_d_slash(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
+  // TODO check the rank of v and type of x and handle the different meanings of /
+  // https://k.miraheze.org/wiki/For
+  // https://k.miraheze.org/wiki/While
+  // https://k.miraheze.org/wiki/Base_encode
+  todo!("for/while/join/base_encode")
+}
+
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce
   // TODO check the rank of v and handle the different meanings of /
