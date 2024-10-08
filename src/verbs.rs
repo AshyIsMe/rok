@@ -578,7 +578,7 @@ pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
       ':' | '/' | '\\' => v_fixedpoint(env, v, x),
       _ => v_fold(env, v, x),
     },
-    KW::Function { body, args, adverb } => match args.len() {
+    KW::Function { body: _, args, adverb: _ } => match args.len() {
       2 => v_fold(env, v, x),
       1 => v_fixedpoint(env, v, x),
       _ => Err("rank"),
@@ -599,7 +599,7 @@ pub fn a_d_slash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
       ':' | '/' | '\\' => todo!("monadic v: {}", v),
       _ => v_d_fold(env, v, x, y),
     },
-    KW::Function { body, args, adverb } => match args.len() {
+    KW::Function { body: _, args, adverb: _ } => match args.len() {
       2 => v_d_fold(env, v, x, y),
       1 => todo!("monadic v: {}", v),
       _ => Err("rank"),
