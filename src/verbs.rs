@@ -522,6 +522,7 @@ pub fn v_iota(r: K) -> Result<K, &'static str> {
 }
 pub fn v_sum(x: K) -> Result<K, &'static str> {
   match x {
+    K::Bool(_) | K::Int(_) | K::Float(_) => Ok(x),
     K::BoolArray(a) => Ok(K::Int(a.sum().ok())),
     K::IntArray(a) => Ok(K::Int(a.sum().ok())),
     K::FloatArray(a) => Ok(K::Float(a.sum().unwrap_or(f64::NAN))),
@@ -570,33 +571,59 @@ pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
 }
 pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
 
-// TODO dispatch / based on inputs:  over | fixedpoint
+// Dispatch / based on inputs:  fold, over, fixedpoint
 pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   match v.clone() {
-    KW::Verb { .. } => todo!("figure out if v:{} is monadic or dyadic", v),
+    KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
+      ':' | '/' | '\\' => v_fixedpoint(env, v, x),
+      _ => v_fold(env, v, x),
+    },
     KW::Function { body, args, adverb } => match args.len() {
       2 => v_fold(env, v, x),
-      1 => todo!("v_fixedpoint(env, v, x)"),
+      1 => v_fixedpoint(env, v, x),
       _ => Err("rank"),
     },
     _ => panic!("impossible"),
   }
 }
 
-pub fn a_d_slash(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
+pub fn a_d_slash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
   // TODO check the rank of v and type of x and handle the different meanings of /
   // https://k.miraheze.org/wiki/For
   // https://k.miraheze.org/wiki/While
   // https://k.miraheze.org/wiki/Base_encode
-  todo!("for/while/join/base_encode")
+  // todo!("for/while/join/base_encode")
+
+  match v.clone() {
+    KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
+      ':' | '/' | '\\' => todo!("monadic v: {}", v),
+      _ => v_d_fold(env, v, x, y),
+    },
+    KW::Function { body, args, adverb } => match args.len() {
+      2 => v_d_fold(env, v, x, y),
+      1 => todo!("monadic v: {}", v),
+      _ => Err("rank"),
+    },
+    _ => panic!("impossible"),
+  }
+}
+
+pub fn v_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  // fixedpoint and scan-fixedpoint are adverbs that apply a monadic function to
+  // a given noun y until it stops changing, or the initial value has been repeated.
+  let mut prev_r = x.clone();
+  loop {
+    let r = eval(env, vec![v.clone(), KW::Noun(prev_r.clone())]).unwrap().unwrap_noun();
+    println!("r: {:?}, \nprev_r: {:?}", r, prev_r);
+    if r == prev_r || r == x {
+      return Ok(r);
+    }
+    prev_r = r;
+  }
 }
 
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce
-  // TODO check the rank of v and handle the different meanings of /
-  // https://k.miraheze.org/wiki/Fold
-  // https://k.miraheze.org/wiki/Fixedpoint
-  //
   match v {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).and_then(|v| {
       let r = v.iter().cloned().reduce(|x, y| {
@@ -617,11 +644,6 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   }
 }
 pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
-  // TODO check the rank of v and type of x and handle the different meanings of /
-  // https://k.miraheze.org/wiki/For
-  // https://k.miraheze.org/wiki/While
-  // https://k.miraheze.org/wiki/Join
-  // https://k.miraheze.org/wiki/Base_encode
   if let KW::Verb { ref name } = v {
     let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
     Ok(

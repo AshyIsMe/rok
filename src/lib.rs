@@ -631,8 +631,8 @@ pub fn specialcombinations_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2
 pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
   IndexMap::from([
     ("'", (v_each as AV1, v_d_each as AV2)),
-    ("/", (v_fold, v_d_fold)),  // over fixedpoint for while
-    ("\\", (v_scan, v_d_scan)), // scan scan-fixedpoint scan-for scan-while
+    ("/", (a_slash, a_d_slash)), // over fixedpoint for while
+    ("\\", (v_scan, v_d_scan)),  // scan scan-fixedpoint scan-for scan-while
     ("':", (v_eachprior, v_windows)),
     ("/:", (v_eachright, v_d_none2)),
     ("\\:", (v_eachleft, v_d_none2)),
