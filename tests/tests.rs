@@ -1278,4 +1278,42 @@ fn test_max() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
   assert_eq!(eval(&mut env, scan("1|2").unwrap()).unwrap(), Noun(K::Int(Some(2))));
+  assert_eq!(
+    eval(&mut env, scan("1|1 2 3").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 2, 3i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("1 2 3|1").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 2, 3i64])))
+  );
+
+  assert_eq!(
+    eval(&mut env, scan("1.0|1 2 3").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 2.0, 3.0f64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("1 2 3|1.0").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 2.0, 3.0f64])))
+  );
+}
+
+#[test]
+fn test_promote_nouns() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(promote_nouns(l, r.clone()), (K::IntArray(arr!([1, 2, 3i64])), r));
+
+  let l = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(promote_nouns(l.clone(), r), (l, K::IntArray(arr!([1, 2, 3i64]))));
+
+  let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(promote_nouns(l, r.clone()), (K::FloatArray(arr!([1.0, 2.0, 3.0f64])), r));
+
+  let l = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(promote_nouns(l.clone(), r), (l, K::FloatArray(arr!([1.0, 2.0, 3.0f64]))));
 }

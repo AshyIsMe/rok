@@ -800,10 +800,13 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
   }
 }
 
-// promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
-// Similar to promote_num() can we combine these somehow and be more concise?
+/// promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
+///
+/// Also promotes scalars to arrays to match length of other arg.
+/// Eg. promote_nouns(1, [1 2 3]) => ([1 2 3], [1 2 3]).
+/// Similar to promote_num() can we combine these somehow and be more concise?
 #[rustfmt::skip]
-fn promote_nouns(l: K, r: K) -> (K, K) {
+pub fn promote_nouns(l: K, r: K) -> (K, K) {
   match (&l, &r) {
     (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
     (K::Bool(l), K::Float(_)) => (K::Float(*l as f64), r),
@@ -837,7 +840,7 @@ fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::IntArray(_), K::Bool(r)) => (l, K::IntArray(arr!([*r as i64]))),
     (K::IntArray(_), K::Int(Some(r))) => (l, K::IntArray(arr!([*r]))),
     (K::IntArray(_), K::Int(None)) => (l, K::IntArray(arr!([None::<i64>]))),
-    (K::IntArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r]))),
+    (K::IntArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(*r).take(l.len()).collect())),
     (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
     (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 

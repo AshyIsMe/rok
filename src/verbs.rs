@@ -1,6 +1,7 @@
 use crate::*;
 use rand::distributions::{Distribution, Uniform};
 use std::cmp;
+use std::iter::repeat;
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
@@ -231,20 +232,78 @@ pub fn v_where(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_min(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_reverse(_r: K) -> Result<K, &'static str> { Err("nyi") }
+
 pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
   len_ok(&l, &r).and_then(|_| match promote_nouns(l, r) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::max(l, r)) as u8)),
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(cmp::max(l, r)))),
     (K::Int(None), K::Int(i)) | (K::Int(i), K::Int(None)) => Ok(K::Int(i)),
     (K::Float(l), K::Float(r)) => Ok(K::Float(l.max(r))),
-    (K::BoolArray(l), K::BoolArray(r)) => Err("nyi"),
-    (K::IntArray(l), K::IntArray(r)) => Err("nyi"),
-    (K::FloatArray(l), K::FloatArray(r)) => Err("nyi"),
+    (K::BoolArray(l), K::BoolArray(r)) => Err("nyi bools"),
+    (K::IntArray(l), K::IntArray(r)) => match (l.len(), r.len()) {
+      (1, _) => Ok(K::IntArray(
+        repeat(l.i64().unwrap().iter().nth(0).unwrap())
+          .zip(r.i64().unwrap().iter())
+          .map(|(l, r)| l.max(r))
+          .collect(),
+      )),
+      (_, 1) => Ok(K::IntArray(
+        l.i64()
+          .unwrap()
+          .iter()
+          .zip(repeat(r.i64().unwrap().iter().nth(0).unwrap()))
+          .map(|(l, r)| l.max(r))
+          .collect(),
+      )),
+      _ => Ok(K::IntArray(
+        l.i64().unwrap().iter().zip(r.i64().unwrap().iter()).map(|(l, r)| l.max(r)).collect(),
+      )),
+    },
+    (K::FloatArray(l), K::FloatArray(r)) => match (l.len(), r.len()) {
+      (1, _) => Ok(K::FloatArray(
+        repeat(l.f64().unwrap().iter().nth(0).unwrap())
+          .zip(r.f64().unwrap().iter())
+          .map(|(l, r)| match (l, r) {
+            (Some(l), Some(r)) => Some(l.max(r)),
+            (Some(l), None) => Some(l),
+            (None, Some(r)) => Some(r),
+            (None, None) => None,
+          })
+          .collect(),
+      )),
+      (_, 1) => Ok(K::FloatArray(
+        l.f64()
+          .unwrap()
+          .iter()
+          .zip(repeat(r.f64().unwrap().iter().nth(0).unwrap()))
+          .map(|(l, r)| match (l, r) {
+            (Some(l), Some(r)) => Some(l.max(r)),
+            (Some(l), None) => Some(l),
+            (None, Some(r)) => Some(r),
+            (None, None) => None,
+          })
+          .collect(),
+      )),
+      _ => Ok(K::FloatArray(
+        l.f64()
+          .unwrap()
+          .iter()
+          .zip(r.f64().unwrap().iter())
+          .map(|(l, r)| match (l, r) {
+            (Some(l), Some(r)) => Some(l.max(r)),
+            (Some(l), None) => Some(l),
+            (None, Some(r)) => Some(r),
+            (None, None) => None,
+          })
+          .collect(),
+      )),
+    },
+
     (K::List(l), K::List(r)) => Err("nyi"),
     (K::Dictionary(l), K::Dictionary(r)) => Err("nyi"),
     (_, K::Table(_)) => todo!("table"),
     (K::Table(_), _) => todo!("table"),
-    _ => Err("nyi"),
+    _ => Err("nyi - wtf"),
   })
 }
 
