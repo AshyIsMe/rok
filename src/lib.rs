@@ -393,6 +393,7 @@ macro_rules! arr {
 
 pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
   match k {
+    K::Bool(_) | K::Int(_) | K::Float(_) | K::Char(_) | K::Symbol(_) => Ok(vec![k]),
     K::List(v) => Ok(v),
     // TODO: reduce this repetition with a macro
     K::BoolArray(a) => Ok(
@@ -436,7 +437,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
     }
-    _ => Err("todo"),
+    _ => todo!("k_to_vec({})", k),
   }
 }
 pub fn vec_to_list(nouns: Vec<KW>) -> Result<K, &'static str> {
@@ -1595,41 +1596,46 @@ pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
 }
 
 pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
-  if nums.iter().any(|k| matches!(k, K::Float(_))) {
-    let fa: Vec<f64> = nums
-      .iter()
-      .map(|k| match k {
-        K::Bool(i) => *i as f64,
-        K::Int(None) => f64::NAN,
-        K::Int(Some(i)) => *i as f64,
-        K::Float(f) => *f,
-        _ => panic!("invalid float"),
-      })
-      .collect();
+  if nums.iter().all(|k| matches!(k, K::Float(_) | K::Int(_) | K::Bool(_))) {
+    if nums.iter().any(|k| matches!(k, K::Float(_))) {
+      let fa: Vec<f64> = nums
+        .iter()
+        .map(|k| match k {
+          K::Bool(i) => *i as f64,
+          K::Int(None) => f64::NAN,
+          K::Int(Some(i)) => *i as f64,
+          K::Float(f) => *f,
+          _ => panic!("invalid float"),
+        })
+        .collect();
 
-    Ok(K::FloatArray(Series::new("", fa)))
-  } else if nums.iter().any(|k| matches!(k, K::Int(_))) {
-    let ia: Vec<Option<i64>> = nums
-      .iter()
-      .map(|k| match k {
-        K::Bool(i) => Some(*i as i64),
-        K::Int(i) => *i,
-        _ => panic!("invalid int"),
-      })
-      .collect();
+      Ok(K::FloatArray(Series::new("", fa)))
+    } else if nums.iter().any(|k| matches!(k, K::Int(_))) {
+      let ia: Vec<Option<i64>> = nums
+        .iter()
+        .map(|k| match k {
+          K::Bool(i) => Some(*i as i64),
+          K::Int(i) => *i,
+          _ => panic!("invalid int"),
+        })
+        .collect();
 
-    Ok(K::IntArray(Series::new("", ia)))
-  } else if nums.iter().all(|k| matches!(k, K::Bool(_))) {
-    let ba: BooleanChunked = nums
-      .iter()
-      .map(|k| match k {
-        K::Bool(0) => false,
-        K::Bool(1) => true,
-        _ => panic!("invalid bool"),
-      })
-      .collect();
+      Ok(K::IntArray(Series::new("", ia)))
+    } else if nums.iter().all(|k| matches!(k, K::Bool(_))) {
+      let ba: BooleanChunked = nums
+        .iter()
+        .map(|k| match k {
+          K::Bool(0) => false,
+          K::Bool(1) => true,
+          _ => panic!("invalid bool"),
+        })
+        .collect();
 
-    Ok(K::BoolArray(Series::new("", ba)))
+      Ok(K::BoolArray(Series::new("", ba)))
+    } else {
+      // Err("invalid nums")
+      panic!("impossible")
+    }
   } else {
     Err("invalid nums")
   }

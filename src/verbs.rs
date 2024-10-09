@@ -684,7 +684,25 @@ pub fn v_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
 }
 pub fn v_scan_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // same as v_fixedpoint() except return a K::List of all intermediate results
-  todo!("v_scan_fixedpoint()")
+  match v.clone() {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x.clone()).and_then(|_| {
+      let mut result: Vec<K> = vec![x.clone()];
+      loop {
+        let r = eval(env, vec![f.clone(), KW::Noun(result[result.len() - 1].clone())])
+          .unwrap()
+          .unwrap_noun();
+        if r == result[result.len() - 1] || r == x {
+          println!("result: {:?}", result);
+          match promote_num(result.clone()) {
+            Ok(k) => return Ok(k),
+            _ => return Ok(K::List(result)),
+          };
+        }
+        result.push(r);
+      }
+    }),
+    _ => Err("type"),
+  }
 }
 
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
