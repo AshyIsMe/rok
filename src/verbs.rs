@@ -229,10 +229,42 @@ pub fn v_mod(l: K, r: K) -> Result<K, &'static str> {
 }
 
 pub fn v_where(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_min(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_reverse(_r: K) -> Result<K, &'static str> { Err("nyi") }
 
+pub fn v_min(l: K, r: K) -> Result<K, &'static str> {
+  //TODO fix code duplication in v_min/v_max
+  len_ok(&l, &r).and_then(|_| match promote_nouns(l, r) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::min(l, r)) as u8)),
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(cmp::min(l, r)))),
+    (K::Int(None), K::Int(i)) | (K::Int(i), K::Int(None)) => Ok(K::Int(i)),
+    (K::Float(l), K::Float(r)) => Ok(K::Float(l.min(r))),
+    (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(
+      l.u8().unwrap().iter().zip(r.u8().unwrap().iter()).map(|(l, r)| l.min(r)).collect(),
+    )),
+    (K::IntArray(l), K::IntArray(r)) => Ok(K::IntArray(
+      l.i64().unwrap().iter().zip(r.i64().unwrap().iter()).map(|(l, r)| l.min(r)).collect(),
+    )),
+    (K::FloatArray(l), K::FloatArray(r)) => Ok(K::FloatArray(
+      l.f64()
+        .unwrap()
+        .iter()
+        .zip(r.f64().unwrap().iter())
+        .map(|(l, r)| match (l, r) {
+          (Some(l), Some(r)) => Some(l.min(r)),
+          (Some(l), None) => Some(l),
+          (None, Some(r)) => Some(r),
+          (None, None) => None,
+        })
+        .collect(),
+    )),
+    (K::List(_l), K::List(_r)) => Err("nyi"),
+    (K::Dictionary(_l), K::Dictionary(_r)) => Err("nyi"),
+    (_, K::Table(_)) => todo!("table"),
+    (K::Table(_), _) => todo!("table"),
+    _ => Err("nyi - wtf"),
+  })
+}
 pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
   len_ok(&l, &r).and_then(|_| match promote_nouns(l, r) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::max(l, r)) as u8)),

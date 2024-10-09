@@ -1298,6 +1298,30 @@ fn test_max() {
 }
 
 #[test]
+fn test_min() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(eval(&mut env, scan("1&2").unwrap()).unwrap(), Noun(K::Int(Some(1))));
+  assert_eq!(
+    eval(&mut env, scan("1&1 2 3").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 1, 1i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("1 2 3&1").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 1, 1i64])))
+  );
+
+  assert_eq!(
+    eval(&mut env, scan("1.0&1 2 3").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 1.0, 1.0f64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("1 2 3&1.0").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 1.0, 1.0f64])))
+  );
+}
+
+#[test]
 fn test_promote_nouns() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
