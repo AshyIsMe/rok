@@ -635,8 +635,8 @@ pub fn specialcombinations_table() -> VerbDispatchTable {
 pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
   IndexMap::from([
     ("'", (v_each as AV1, v_d_each as AV2)),
-    ("/", (a_slash, a_d_slash)), // over fixedpoint for while
-    ("\\", (v_scan, v_d_scan)),  // scan scan-fixedpoint scan-for scan-while
+    ("/", (a_slash, a_d_slash)),    // over fixedpoint for while
+    ("\\", (a_bslash, a_d_bslash)), // scan scan-fixedpoint scan-for scan-while
     ("':", (v_eachprior, v_windows)),
     ("/:", (v_eachright, v_d_none2)),
     ("\\:", (v_eachleft, v_d_none2)),

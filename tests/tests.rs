@@ -811,8 +811,20 @@ fn test_fold() {
 }
 
 #[test]
+fn test_v_scan() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("+\\ 1 2 3").unwrap()).unwrap(),
+    Noun(K::List(vec![K::Int(Some(1)), K::Int(Some(3)), K::Int(Some(6))]))
+  );
+}
+
+#[test]
 fn test_fixedpoint() {
   let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(eval(&mut env, scan("{0|x-1}/5").unwrap()).unwrap(), Noun(K::Int(Some(0))));
 
   assert_eq!(eval(&mut env, scan("+//(1 2 3; 4 5 6)").unwrap()).unwrap(), Noun(K::Int(Some(21))));
 
@@ -820,6 +832,29 @@ fn test_fixedpoint() {
   assert_eq!(
     eval(&mut env, scan("+//((1 2 3;4 5 6);42)").unwrap()).unwrap(),
     Noun(K::Int(Some(273)))
+  );
+}
+
+#[test]
+fn test_scan_fixedpoint() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("{0|x-1}\\5").unwrap()).unwrap(),
+    Noun(K::IntArray(Series::new("a", [5, 4, 3, 2, 1, 0i64])))
+  );
+
+  assert_eq!(
+    eval(&mut env, scan("+/\\(1 2 3; 4 5 6)").unwrap()).unwrap(),
+    // ((1 2 3;4 5 6);5 7 9;21)
+    Noun(K::List(vec![
+      K::List(vec![
+        K::IntArray(Series::new("", [1, 2, 3i64])),
+        K::IntArray(Series::new("", [4, 5, 6i64]))
+      ]),
+      K::IntArray(Series::new("", [5, 7, 9i64])),
+      K::Int(Some(21))
+    ]))
   );
 }
 

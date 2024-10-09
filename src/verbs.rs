@@ -621,6 +621,10 @@ pub fn v_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     prev_r = r;
   }
 }
+pub fn v_scan_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  // same as v_fixedpoint() except return a K::List of all intermediate results
+  todo!("v_scan_fixedpoint()")
+}
 
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce
@@ -660,13 +664,61 @@ pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
     Err("type")
   }
 }
-pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
+
+pub fn a_bslash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  match v.clone() {
+    KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
+      ':' | '/' | '\\' => v_scan_fixedpoint(env, v, x),
+      _ => v_scan(env, v, x),
+    },
+    KW::Function { body: _, args, adverb: _ } => match args.len() {
+      2 => v_scan(env, v, x),
+      1 => v_scan_fixedpoint(env, v, x),
+      _ => Err("rank"),
+    },
+    _ => panic!("impossible"),
+  }
+}
+
+pub fn a_d_bslash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+  // TODO check the rank of v and type of x and handle the different meanings of \
+  // https://k.miraheze.org/wiki/For
+  // https://k.miraheze.org/wiki/While
+  // https://k.miraheze.org/wiki/Base_decode
+  // todo!("a_d_bslash() - scan_for and scan_while")
+
+  match v.clone() {
+    KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
+      ':' | '/' | '\\' => todo!("monadic v: {}", v),
+      _ => v_d_scan(env, v, x, y),
+    },
+    KW::Function { body: _, args, adverb: _ } => match args.len() {
+      2 => v_d_scan(env, v, x, y),
+      1 => todo!("monadic v: {}", v),
+      _ => Err("rank"),
+    },
+    _ => panic!("impossible"),
+  }
+}
+
+pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
+  // same as v_fold() except return a K::List of intermediate results
+  todo!("scan")
+}
 pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
 
-pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
-pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
-pub fn v_eachright(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
-pub fn v_eachleft(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
+pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
+  todo!("v_eachprior()")
+}
+pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
+  todo!("v_windows()")
+}
+pub fn v_eachright(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
+  todo!("v_eachright()")
+}
+pub fn v_eachleft(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
+  todo!("v_eachleft()")
+}
 
 pub fn strip_quotes(s: String) -> String {
   if s.starts_with('\"') && s.ends_with('\"') {
