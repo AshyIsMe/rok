@@ -1268,3 +1268,10 @@ fn test_each() {
   println!("res1: {:?}", res1);
   assert_eq!(res1, res2);
 }
+
+#[test]
+fn test_max() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(eval(&mut env, scan("1|2").unwrap()).unwrap(), Noun(K::Int(Some(2))));
+}

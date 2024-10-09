@@ -1,5 +1,6 @@
 use crate::*;
 use rand::distributions::{Distribution, Uniform};
+use std::cmp;
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
@@ -235,7 +236,22 @@ pub fn v_where(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_min(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_reverse(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_max(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
+  match promote_nouns(l, r) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::max(l, r)) as u8)),
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(cmp::max(l, r)))),
+    (K::Int(None), K::Int(i)) | (K::Int(i), K::Int(None)) => Ok(K::Int(i)),
+    (K::Float(l), K::Float(r)) => Ok(K::Float(l.max(r))),
+    (K::BoolArray(l), K::BoolArray(r)) => Err("nyi"),
+    (K::IntArray(l), K::IntArray(r)) => Err("nyi"),
+    (K::FloatArray(l), K::FloatArray(r)) => Err("nyi"),
+    (K::List(l), K::List(r)) => Err("nyi"),
+    (K::Dictionary(l), K::Dictionary(r)) => Err("nyi"),
+    (_, K::Table(_)) => todo!("table"),
+    (K::Table(_), _) => todo!("table"),
+    _ => Err("nyi"),
+  }
+}
 
 pub fn v_asc(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_lesser(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
