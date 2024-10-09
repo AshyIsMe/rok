@@ -816,7 +816,7 @@ fn test_v_scan() {
 
   assert_eq!(
     eval(&mut env, scan("+\\ 1 2 3").unwrap()).unwrap(),
-    Noun(K::List(vec![K::Int(Some(1)), K::Int(Some(3)), K::Int(Some(6))]))
+    Noun(K::IntArray(Series::new("a", [1, 3, 6i64])))
   );
 }
 

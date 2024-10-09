@@ -762,9 +762,35 @@ pub fn a_d_bslash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
+pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // same as v_fold() except return a K::List of intermediate results
-  todo!("scan")
+  // split into list, then scan
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x.clone()).and_then(|v| {
+      let mut result: Vec<K> = vec![v[0].clone()];
+      for i in v[1..].iter() {
+        result.push(
+          eval(
+            env,
+            vec![
+              f.clone(),
+              KW::FuncArgs(vec![
+                vec![KW::Noun(result[result.len() - 1].clone())],
+                vec![KW::Noun(i.clone())],
+              ]),
+            ],
+          )
+          .unwrap()
+          .unwrap_noun(),
+        )
+      }
+      match promote_num(result.clone()) {
+        Ok(k) => Ok(k),
+        _ => Ok(K::List(result)),
+      }
+    }),
+    _ => Err("type"),
+  }
 }
 pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
 
