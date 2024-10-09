@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 description = "A K interpreter written in rust. Inspired by ok and ngn/k and built on polars."
 license = "ISC"
-license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

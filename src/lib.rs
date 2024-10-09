@@ -74,6 +74,8 @@ pub enum KW /* KWords */ {
 }
 
 impl K {
+  pub fn is_empty(&self) -> bool { self.len() == 0 }
+
   pub fn len(&self) -> usize {
     use K::*;
     match self {
@@ -302,15 +304,15 @@ impl TryFrom<Series> for K {
   type Error = &'static str;
 
   fn try_from(s: Series) -> Result<Self, Self::Error> {
-    if let Ok(_) = s.i64() {
+    if s.i64().is_ok() {
       if s.min().unwrap() == Some(0) && s.max().unwrap() == Some(1) {
         Ok(K::BoolArray(s.cast(&DataType::UInt8).unwrap()))
       } else {
         Ok(K::IntArray(s))
       }
-    } else if let Ok(_) = s.f64() {
+    } else if s.f64().is_ok() {
       Ok(K::FloatArray(s))
-    } else if let Ok(_) = s.categorical() {
+    } else if s.categorical().is_ok() {
       Ok(K::SymbolArray(s))
     } else {
       Err("type")
@@ -513,8 +515,10 @@ pub fn v_d_none2(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str
 type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
 type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
 
+type VerbDispatchTable = IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)>;
+
 #[rustfmt::skip]
-pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+pub fn primitives_table() -> VerbDispatchTable {
   // https://k.miraheze.org/wiki/Primitives#Verbs
   IndexMap::from([
     // (":", (v_ident as V1, v_ident as V1, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_none3 as V3, v_none4 as V4)),
@@ -564,7 +568,7 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
 }
 
 #[rustfmt::skip]
-pub fn named_primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+pub fn named_primitives_table() -> VerbDispatchTable  {
   // Note, only really need IndexMap<&str, (V1, V2)> but this way it's simpler in apply_primitive()
   IndexMap::from([
     // https://estradajke.github.io/k9-simples/k9/Named-Functions.html
@@ -620,7 +624,7 @@ pub fn named_primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V
 }
 
 #[rustfmt::skip]
-pub fn specialcombinations_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+pub fn specialcombinations_table() -> VerbDispatchTable {
   IndexMap::from([
     // Special Combinations are performance optimisations for easy known cases.
     ("+/", (v_sum as V1, v_sum as V1, v_d_sum as V2, v_d_sum as V2, v_d_sum as V2, v_d_sum as V2, v_none3 as V3, v_none4 as V4)),
@@ -787,9 +791,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
         match exprs.len() {
           0 | 1 => todo!("currying"),
           2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
-          _ => match name.as_str() {
-            _ => Err("rank error"),
-          },
+          _ => Err("rank error"),
         }
       }
       _ => panic!("impossible"),
