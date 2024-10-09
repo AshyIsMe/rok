@@ -5,39 +5,34 @@ use std::cmp;
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
-  if x.len() != y.len() {
-    debug!("x.len(): {}, y.len(): {}", x.len(), y.len());
-    Err("length")
-  } else {
-    match promote_nouns(x, y) {
-      (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
-      (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l == r) as u8)),
-      (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => Ok(K::Bool(0)),
-      (K::Float(l), K::Float(r)) => Ok(K::Bool((l == r) as u8)),
-      (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
-      (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
-      (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
-      (K::List(l), K::List(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
-        .map(|(l, r)| {
-          let (l, r) = promote_nouns(l.clone(), r.clone());
-          l == r
-        })
-        .collect::<Vec<bool>>()))),
-      (K::Dictionary(l), K::Dictionary(r)) => {
-        Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
-          if r.keys().contains(k) {
-            let (l, r) = promote_nouns(l.get(k).unwrap().clone(), r.get(k).unwrap().clone());
-            Some((k.clone(), K::Bool((l == r) as u8)))
-          } else {
-            None
-          }
-        }))))
-      }
-      (_, K::Table(_)) => todo!("table"),
-      (K::Table(_), _) => todo!("table"),
-      _ => Err("nyi"),
+  len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l == r) as u8)),
+    (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => Ok(K::Bool(0)),
+    (K::Float(l), K::Float(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+    (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+    (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+    (K::List(l), K::List(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+      .map(|(l, r)| {
+        let (l, r) = promote_nouns(l.clone(), r.clone());
+        l == r
+      })
+      .collect::<Vec<bool>>()))),
+    (K::Dictionary(l), K::Dictionary(r)) => {
+      Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
+        if r.keys().contains(k) {
+          let (l, r) = promote_nouns(l.get(k).unwrap().clone(), r.get(k).unwrap().clone());
+          Some((k.clone(), K::Bool((l == r) as u8)))
+        } else {
+          None
+        }
+      }))))
     }
-  }
+    (_, K::Table(_)) => todo!("table"),
+    (K::Table(_), _) => todo!("table"),
+    _ => Err("nyi"),
+  })
 }
 
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
@@ -237,7 +232,7 @@ pub fn v_min(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_reverse(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
-  match promote_nouns(l, r) {
+  len_ok(&l, &r).and_then(|_| match promote_nouns(l, r) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::max(l, r)) as u8)),
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(cmp::max(l, r)))),
     (K::Int(None), K::Int(i)) | (K::Int(i), K::Int(None)) => Ok(K::Int(i)),
@@ -250,7 +245,7 @@ pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
     (_, K::Table(_)) => todo!("table"),
     (K::Table(_), _) => todo!("table"),
     _ => Err("nyi"),
-  }
+  })
 }
 
 pub fn v_asc(_r: K) -> Result<K, &'static str> { Err("nyi") }
