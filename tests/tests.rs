@@ -1303,11 +1303,11 @@ fn test_promote_nouns() {
 
   let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
   let r = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun();
-  assert_eq!(promote_nouns(l, r.clone()), (K::IntArray(arr!([1, 2, 3i64])), r));
+  assert_eq!(promote_nouns(l, r.clone()), (K::IntArray(arr!([1, 1, 1i64])), r));
 
   let l = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun();
   let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
-  assert_eq!(promote_nouns(l.clone(), r), (l, K::IntArray(arr!([1, 2, 3i64]))));
+  assert_eq!(promote_nouns(l.clone(), r), (l, K::IntArray(arr!([1, 1, 1i64]))));
 
   let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
   let r = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun();
