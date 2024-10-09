@@ -828,26 +828,26 @@ pub fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
     (K::Float(l), K::BoolArray(r)) => (K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
     (K::Float(l), K::IntArray(r)) => {(K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
-    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l])), r),
+    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(repeat(l).take(r.len()).collect()), r),
 
-    (K::BoolArray(_), K::Bool(r)) => (l, K::BoolArray(arr!([*r]))),
-    (K::BoolArray(l), K::Int(Some(r))) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))}
-    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))}
-    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))}
+    (K::BoolArray(_), K::Bool(r)) => (l.clone(), K::BoolArray(repeat(*r as f64).take(l.len()).collect())),
+    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(r).take(l.len()).collect())),
+    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(None::<i64>).take(l.len()).collect()))}
+    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(r).take(l.len()).collect()))}
     (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
-    (K::IntArray(_), K::Bool(r)) => (l, K::IntArray(arr!([*r as i64]))),
-    (K::IntArray(_), K::Int(Some(r))) => (l.clone(), K::IntArray(repeat(*r as i64).take(l.len()).collect())),
-    (K::IntArray(_), K::Int(None)) => (l, K::IntArray(arr!([None::<i64>]))),
+    (K::IntArray(_), K::Bool(r)) => (l.clone(), K::IntArray(repeat(*r as i64).take(l.len()).collect())),
+    (K::IntArray(_), K::Int(Some(r))) => (l.clone(), K::IntArray(repeat(r).take(l.len()).collect())),
+    (K::IntArray(_), K::Int(None)) => (l.clone(), K::IntArray(repeat(None::<i64>).take(l.len()).collect())),
     (K::IntArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(*r).take(l.len()).collect())),
     (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
     (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
-    (K::FloatArray(_), K::Bool(r)) => (l, K::FloatArray(arr!([*r as f64]))),
-    (K::FloatArray(_), K::Int(Some(r))) => (l, K::FloatArray(arr!([*r as f64]))),
-    (K::FloatArray(_), K::Int(None)) => (l, K::FloatArray(arr!([f64::NAN]))),
-    (K::FloatArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r]))),
+    (K::FloatArray(_), K::Bool(r)) => (l.clone(), K::FloatArray(repeat(*r as f64).take(l.len()).collect())),
+    (K::FloatArray(_), K::Int(Some(r))) => (l.clone(), K::FloatArray(repeat(*r as f64).take(l.len()).collect())),
+    (K::FloatArray(_), K::Int(None)) => (l.clone(), K::FloatArray(repeat(f64::NAN).take(l.len()).collect())),
+    (K::FloatArray(_), K::Float(r)) => (l.clone(), K::FloatArray(repeat(r).take(l.len()).collect())),
     (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
     (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
 
