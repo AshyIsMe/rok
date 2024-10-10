@@ -766,7 +766,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
             e.names.extend([(args[0].clone(), KW::Noun(x.clone()))]);
             eval(&mut e, body)
           }
-          _ => todo!("currying"),
+          _ => todo!("currying - body: {:?}, args: {:?}", body, args),
         }
       }
       KW::FuncArgs(exprs) => {
@@ -774,7 +774,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
           exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
         match exprs.len().cmp(&args.len()) {
           Ordering::Greater => Err("rank error"),
-          Ordering::Less => todo!("currying"),
+          Ordering::Less => todo!("currying: args: {:?}", args),
           Ordering::Equal => {
             let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
             e.names.extend(zip(args, exprs).collect::<Vec<(String, KW)>>());
@@ -785,12 +785,12 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
       _ => todo!("apply_function other cases?"),
     },
     KW::Verb { name } => match arg {
-      KW::Noun(_) => todo!("currying"),
+      KW::Noun(_) => todo!("currying: Verb name: {}, arg: {}", name, arg),
       KW::FuncArgs(exprs) => {
         let exprs: Vec<KW> =
           exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
         match exprs.len() {
-          0 | 1 => todo!("currying"),
+          0 | 1 => todo!("currying: exprs: {:?}", exprs),
           2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
           _ => Err("rank error"),
         }

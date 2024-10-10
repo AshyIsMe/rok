@@ -1345,3 +1345,14 @@ fn test_promote_nouns() {
   let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
   assert_eq!(promote_nouns(l.clone(), r), (l, K::FloatArray(arr!([1.0, 1.0, 1.0f64]))));
 }
+
+#[test]
+fn test_function_application() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  //TODO currently triggering currying error incorrectly
+  assert_eq!(
+    eval(&mut env, scan("{x*2}!5").unwrap()).unwrap().unwrap_noun(),
+    K::IntArray(arr!([0, 2, 4, 6, 8i64]))
+  );
+}

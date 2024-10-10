@@ -675,7 +675,6 @@ pub fn v_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   let mut prev_r = x.clone();
   loop {
     let r = eval(env, vec![v.clone(), KW::Noun(prev_r.clone())]).unwrap().unwrap_noun();
-    println!("r: {:?}, \nprev_r: {:?}", r, prev_r);
     if r == prev_r || r == x {
       return Ok(r);
     }
@@ -692,7 +691,6 @@ pub fn v_scan_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> 
           .unwrap()
           .unwrap_noun();
         if r == result[result.len() - 1] || r == x {
-          println!("result: {:?}", result);
           match promote_num(result.clone()) {
             Ok(k) => return Ok(k),
             _ => return Ok(K::List(result)),
