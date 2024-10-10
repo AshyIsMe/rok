@@ -785,7 +785,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
       _ => todo!("apply_function other cases?"),
     },
     KW::Verb { name } => match arg {
-      KW::Noun(_) => todo!("currying: Verb name: {}, arg: {}", name, arg),
+      KW::Noun(_) => apply_primitive(env, &name, None, arg),
       KW::FuncArgs(exprs) => {
         let exprs: Vec<KW> =
           exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
@@ -996,6 +996,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         any,
       ) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad function
+        debug!("0 monad function");
         apply_function(env, f, x.clone()).map(|r| vec![w, r, any])
       }
       (
@@ -1005,6 +1006,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         x @ KW::Noun(_) | x @ KW::FuncArgs(_),
       ) => {
         // 1 monad function
+        debug!("1 monad function");
         apply_function(env, f, x.clone()).map(|r| vec![w, v, r])
       }
       (

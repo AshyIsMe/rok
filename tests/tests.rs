@@ -884,6 +884,11 @@ fn test_functions() {
 
   eval(&mut env, scan("f:{2 * x}").unwrap()).unwrap();
   assert_eq!(eval(&mut env, scan("f 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+
+  assert_eq!(
+    eval(&mut env, scan("{x*2}!5").unwrap()).unwrap().unwrap_noun(),
+    K::IntArray(arr!([0, 2, 4, 6, 8i64]))
+  );
 }
 
 #[test]
@@ -1346,13 +1351,3 @@ fn test_promote_nouns() {
   assert_eq!(promote_nouns(l.clone(), r), (l, K::FloatArray(arr!([1.0, 1.0, 1.0f64]))));
 }
 
-#[test]
-fn test_function_application() {
-  let mut env = Env { names: HashMap::new(), parent: None };
-
-  //TODO currently triggering currying error incorrectly
-  assert_eq!(
-    eval(&mut env, scan("{x*2}!5").unwrap()).unwrap().unwrap_noun(),
-    K::IntArray(arr!([0, 2, 4, 6, 8i64]))
-  );
-}
