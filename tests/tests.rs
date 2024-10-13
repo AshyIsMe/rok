@@ -36,7 +36,7 @@ fn test_scan_lambda() {
     KW::Verb { name: "+".to_string() },
     KW::Noun(K::Name("y".into())),
   ];
-  let f = KW::Function { body: tokens, args: vec!["x".to_string(), "y".to_string()] };
+  let f = KW::Function { body: tokens, args: vec!["x".to_string(), "y".to_string()], adverb: None };
   assert_eq!(scan("{x+y}").unwrap(), vec![f]);
 }
 
@@ -797,6 +797,65 @@ fn test_fold() {
 
   assert_eq!(eval(&mut env, scan("2 +/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(12))));
   assert_eq!(eval(&mut env, scan("2 */ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(48))));
+
+  assert_eq!(eval(&mut env, scan("{x + y}/ 1 2 3 4").unwrap()).unwrap(), Noun(K::Int(Some(10))));
+
+  assert_eq!(
+    eval(&mut env, scan("+/(1 2 3; 4 5 6)").unwrap()).unwrap(),
+    Noun(K::IntArray(Series::new("a", [5, 7, 9i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("{x+y}/(1 2 3; 4 5 6)").unwrap()).unwrap(),
+    Noun(K::IntArray(Series::new("a", [5, 7, 9i64])))
+  );
+}
+
+#[test]
+fn test_v_scan() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("+\\ 1 2 3").unwrap()).unwrap(),
+    Noun(K::IntArray(Series::new("a", [1, 3, 6i64])))
+  );
+}
+
+#[test]
+fn test_fixedpoint() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(eval(&mut env, scan("{0|x-1}/5").unwrap()).unwrap(), Noun(K::Int(Some(0))));
+
+  assert_eq!(eval(&mut env, scan("+//(1 2 3; 4 5 6)").unwrap()).unwrap(), Noun(K::Int(Some(21))));
+
+  // "+//((1 2 3;4 5 6);42)" => 273
+  assert_eq!(
+    eval(&mut env, scan("+//((1 2 3;4 5 6);42)").unwrap()).unwrap(),
+    Noun(K::Int(Some(273)))
+  );
+}
+
+#[test]
+fn test_scan_fixedpoint() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("{0|x-1}\\5").unwrap()).unwrap(),
+    Noun(K::IntArray(Series::new("a", [5, 4, 3, 2, 1, 0i64])))
+  );
+
+  assert_eq!(
+    eval(&mut env, scan("+/\\(1 2 3; 4 5 6)").unwrap()).unwrap(),
+    // ((1 2 3;4 5 6);5 7 9;21)
+    Noun(K::List(vec![
+      K::List(vec![
+        K::IntArray(Series::new("", [1, 2, 3i64])),
+        K::IntArray(Series::new("", [4, 5, 6i64]))
+      ]),
+      K::IntArray(Series::new("", [5, 7, 9i64])),
+      K::Int(Some(21))
+    ]))
+  );
 }
 
 #[test]
@@ -810,6 +869,7 @@ fn test_parse_functions() {
       KW::Noun(K::Name("x".to_string())),
     ],
     args: vec!["x".to_string()],
+    adverb: None,
   };
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("{2 * x}").unwrap()).unwrap(), f);
@@ -824,6 +884,11 @@ fn test_functions() {
 
   eval(&mut env, scan("f:{2 * x}").unwrap()).unwrap();
   assert_eq!(eval(&mut env, scan("f 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+
+  assert_eq!(
+    eval(&mut env, scan("{x*2}!5").unwrap()).unwrap().unwrap_noun(),
+    K::IntArray(arr!([0, 2, 4, 6, 8i64]))
+  );
 }
 
 #[test]
@@ -893,6 +958,10 @@ fn test_equal() {
   let res = eval(&mut env, scan("1 2 3 = 1 2 3").unwrap()).unwrap();
   println!("res: {:?}", res);
   assert_eq!(res, Noun(K::BoolArray(arr!([1, 1, 1u8]))));
+
+  let res = eval(&mut env, scan("1 = 1 2 3").unwrap()).unwrap();
+  println!("res: {:?}", res);
+  assert_eq!(res, Noun(K::BoolArray(arr!([1, 0, 0u8]))));
 
   let res = eval(&mut env, scan("(1;2;\"3\") = (1;2;\"3\")").unwrap()).unwrap();
   println!("res: {:?}", res);
@@ -1193,3 +1262,92 @@ fn test_find() {
   println!("res1: {:?}", res1);
   assert_eq!(res1, res2);
 }
+
+#[test]
+fn test_each() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("!'3 3 3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("(0 1 2;0 1 2;0 1 2)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+
+  let res1 = eval(&mut env, scan("{2*x}'1 2 3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("2 4 6").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[test]
+fn test_max() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(eval(&mut env, scan("1|2").unwrap()).unwrap(), Noun(K::Int(Some(2))));
+  assert_eq!(
+    eval(&mut env, scan("1|1 2 3").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 2, 3i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("1 2 3|1").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 2, 3i64])))
+  );
+
+  assert_eq!(
+    eval(&mut env, scan("1.0|1 2 3").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 2.0, 3.0f64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("1 2 3|1.0").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 2.0, 3.0f64])))
+  );
+}
+
+#[test]
+fn test_min() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(eval(&mut env, scan("1&2").unwrap()).unwrap(), Noun(K::Int(Some(1))));
+  assert_eq!(
+    eval(&mut env, scan("1&1 2 3").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 1, 1i64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("1 2 3&1").unwrap()).unwrap(),
+    Noun(K::IntArray(arr!([1, 1, 1i64])))
+  );
+
+  assert_eq!(
+    eval(&mut env, scan("1.0&1 2 3").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 1.0, 1.0f64])))
+  );
+  assert_eq!(
+    eval(&mut env, scan("1 2 3&1.0").unwrap()).unwrap(),
+    Noun(K::FloatArray(arr!([1.0, 1.0, 1.0f64])))
+  );
+}
+
+#[test]
+fn test_promote_nouns() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  println!("promote_nouns(1, 1 2 3)");
+  let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(promote_nouns(l, r.clone()), (K::IntArray(arr!([1, 1, 1i64])), r));
+
+  println!("promote_nouns(1 2 3, 1)");
+  let l = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(promote_nouns(l.clone(), r), (l, K::IntArray(arr!([1, 1, 1i64]))));
+
+  println!("promote_nouns(1, 1 2 3.0)");
+  let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(promote_nouns(l, r.clone()), (K::FloatArray(arr!([1.0, 1.0, 1.0f64])), r));
+
+  println!("promote_nouns(1 2 3.0, 1)");
+  let l = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(promote_nouns(l.clone(), r), (l, K::FloatArray(arr!([1.0, 1.0, 1.0f64]))));
+}
+

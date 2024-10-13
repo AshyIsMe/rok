@@ -51,11 +51,12 @@ pub enum K {
 pub enum KW /* KWords */ {
   Noun(K),
   // Function: {x + y}. args is Vec<K::Name>
-  Function { body: Vec<KW>, args: Vec<String> }, //, curry, env } // TODO currying and env closure?
+  Function { body: Vec<KW>, args: Vec<String>, adverb: Option<String> }, //, curry, env } // TODO currying and env closure?
   // View{ value, r, cache, depends->val }
   // Verb { name: String, l: Option<Box<K>>, r: Box<K>, curry: Option<Vec<K>>, },
   Verb { name: String },
   Adverb { name: String },
+  // DerivedVerb { verb: Box<KW>, adverb: String }, // TODO represent modified verbs/functions like this? eg. +/ or {2*x}'
   Exprs(Vec<Vec<KW>>),    // list of expressions: [e1;e2;e3]
   FuncArgs(Vec<Vec<KW>>), // function arguments: f[a1;a2;3]
   Cond(Vec<Vec<KW>>),     // conditional form $[p;t;f]
@@ -73,6 +74,8 @@ pub enum KW /* KWords */ {
 }
 
 impl K {
+  pub fn is_empty(&self) -> bool { self.len() == 0 }
+
   pub fn len(&self) -> usize {
     use K::*;
     match self {
@@ -301,15 +304,15 @@ impl TryFrom<Series> for K {
   type Error = &'static str;
 
   fn try_from(s: Series) -> Result<Self, Self::Error> {
-    if let Ok(_) = s.i64() {
+    if s.i64().is_ok() {
       if s.min().unwrap() == Some(0) && s.max().unwrap() == Some(1) {
         Ok(K::BoolArray(s.cast(&DataType::UInt8).unwrap()))
       } else {
         Ok(K::IntArray(s))
       }
-    } else if let Ok(_) = s.f64() {
+    } else if s.f64().is_ok() {
       Ok(K::FloatArray(s))
-    } else if let Ok(_) = s.categorical() {
+    } else if s.categorical().is_ok() {
       Ok(K::SymbolArray(s))
     } else {
       Err("type")
@@ -321,7 +324,7 @@ impl TryInto<Vec<K>> for K {
   type Error = &'static str;
   fn try_into(self) -> Result<Vec<K>, Self::Error> {
     match self {
-      K::SymbolArray(s) => Ok(s.iter().map(|s| K::try_from(s.to_string()).unwrap()).collect()),
+      K::SymbolArray(s) => Ok(s.iter().map(|s| K::from(s.to_string())).collect()),
       _ => Err("nyi"),
     }
   }
@@ -341,7 +344,7 @@ impl fmt::Display for KW {
     match self {
       KW::Noun(n) => write!(f, "{}", n),
       KW::Verb { name } | KW::Adverb { name } => write!(f, "{}", name),
-      KW::Function { body, args } => {
+      KW::Function { body, args, adverb } => {
         let b = body.iter().map(|kw| format!("{}", kw)).join(" ");
         if *args != vec!["x".to_string(), "y".to_string(), "z".to_string()]
           && *args != vec!["x".to_string(), "y".to_string()]
@@ -349,9 +352,9 @@ impl fmt::Display for KW {
         {
           let a = ["[".to_string(), args.iter().map(|n| n.to_string()).join(";"), "]".to_string()]
             .join("");
-          write!(f, "{{{} {}}}", a, b)
+          write!(f, "{{{} {}}}{}", a, b, adverb.clone().unwrap_or("".to_string()))
         } else {
-          write!(f, "{{{}}}", b)
+          write!(f, "{{{}}}{}", b, adverb.clone().unwrap_or("".to_string()))
         }
       }
       KW::Exprs(e) => {
@@ -390,6 +393,7 @@ macro_rules! arr {
 
 pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
   match k {
+    K::Bool(_) | K::Int(_) | K::Float(_) | K::Char(_) | K::Symbol(_) => Ok(vec![k]),
     K::List(v) => Ok(v),
     // TODO: reduce this repetition with a macro
     K::BoolArray(a) => Ok(
@@ -433,7 +437,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
     K::SymbolArray(_v) => {
       todo!("enlist(SymbolArray(...))")
     }
-    _ => Err("todo"),
+    _ => todo!("k_to_vec({})", k),
   }
 }
 pub fn vec_to_list(nouns: Vec<KW>) -> Result<K, &'static str> {
@@ -512,8 +516,10 @@ pub fn v_d_none2(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str
 type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
 type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
 
+type VerbDispatchTable = IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)>;
+
 #[rustfmt::skip]
-pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+pub fn primitives_table() -> VerbDispatchTable {
   // https://k.miraheze.org/wiki/Primitives#Verbs
   IndexMap::from([
     // (":", (v_ident as V1, v_ident as V1, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_d_colon as V2, v_none3 as V3, v_none4 as V4)),
@@ -563,7 +569,7 @@ pub fn primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3,
 }
 
 #[rustfmt::skip]
-pub fn named_primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+pub fn named_primitives_table() -> VerbDispatchTable  {
   // Note, only really need IndexMap<&str, (V1, V2)> but this way it's simpler in apply_primitive()
   IndexMap::from([
     // https://estradajke.github.io/k9-simples/k9/Named-Functions.html
@@ -619,7 +625,7 @@ pub fn named_primitives_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V
 }
 
 #[rustfmt::skip]
-pub fn specialcombinations_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)> {
+pub fn specialcombinations_table() -> VerbDispatchTable {
   IndexMap::from([
     // Special Combinations are performance optimisations for easy known cases.
     ("+/", (v_sum as V1, v_sum as V1, v_d_sum as V2, v_d_sum as V2, v_d_sum as V2, v_d_sum as V2, v_none3 as V3, v_none4 as V4)),
@@ -630,8 +636,8 @@ pub fn specialcombinations_table() -> IndexMap<&'static str, (V1, V1, V2, V2, V2
 pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
   IndexMap::from([
     ("'", (v_each as AV1, v_d_each as AV2)),
-    ("/", (v_fold, v_d_fold)),
-    ("\\", (v_scan, v_d_scan)),
+    ("/", (a_slash, a_d_slash)),    // over fixedpoint for while
+    ("\\", (a_bslash, a_d_bslash)), // scan scan-fixedpoint scan-for scan-while
     ("':", (v_eachprior, v_windows)),
     ("/:", (v_eachright, v_d_none2)),
     ("\\:", (v_eachleft, v_d_none2)),
@@ -723,17 +729,35 @@ pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
   // Return a new Verb that implements the appropriate adverb behaviour
   match l {
     KW::Verb { name } => match a {
-      "\'" => Ok(KW::Verb { name: name + a }),
-      "/" => Ok(KW::Verb { name: name + a }),
-      "\\" => Ok(KW::Verb { name: name + a }),
+      "\'" | "/" | "\\" => Ok(KW::Verb { name: name + a }),
       _ => panic!("invalid adverb"),
     },
+    KW::Function { body, args, adverb: None } => match a {
+      "\'" | "/" | "\\" => Ok(KW::Function { body, args, adverb: Some(a.to_string()) }),
+      _ => panic!("invalid adverb"),
+    },
+    KW::Function { body: _, args: _, adverb: Some(_adverb) } => todo!("function nested adverbs"),
     _ => panic!("verb required"),
   }
 }
 pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str> {
   match f {
-    KW::Function { body, args } => match arg {
+    KW::Function { body, args, adverb: Some(adverb) } => {
+      let adverbs = adverbs_table();
+      let adverb: &str = &adverb;
+      match adverbs.get(adverb) {
+        Some((m_a, _d_a)) => match arg {
+          KW::Noun(x) => m_a(env, KW::Function { body, args, adverb: None }, x).map(KW::Noun),
+          KW::FuncArgs(_exprs) => {
+            todo!("dyad/triad/etc adverb modified functions")
+            // d_a(env, f , l, r).map(KW::Noun)
+          }
+          _ => todo!("other adverb cases"),
+        },
+        None => todo!("NotYetImplemented {}", adverb),
+      }
+    }
+    KW::Function { body, args, adverb: None } => match arg {
       KW::Noun(x) => {
         match args.len() {
           1 => {
@@ -742,7 +766,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
             e.names.extend([(args[0].clone(), KW::Noun(x.clone()))]);
             eval(&mut e, body)
           }
-          _ => todo!("currying"),
+          _ => todo!("currying - body: {:?}, args: {:?}", body, args),
         }
       }
       KW::FuncArgs(exprs) => {
@@ -750,7 +774,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
           exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
         match exprs.len().cmp(&args.len()) {
           Ordering::Greater => Err("rank error"),
-          Ordering::Less => todo!("currying"),
+          Ordering::Less => todo!("currying: args: {:?}", args),
           Ordering::Equal => {
             let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
             e.names.extend(zip(args, exprs).collect::<Vec<(String, KW)>>());
@@ -761,16 +785,14 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
       _ => todo!("apply_function other cases?"),
     },
     KW::Verb { name } => match arg {
-      KW::Noun(_) => todo!("currying"),
+      KW::Noun(_) => apply_primitive(env, &name, None, arg),
       KW::FuncArgs(exprs) => {
         let exprs: Vec<KW> =
           exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
         match exprs.len() {
-          0 | 1 => todo!("currying"),
+          0 | 1 => todo!("currying: exprs: {:?}", exprs),
           2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
-          _ => match name.as_str() {
-            _ => Err("rank error"),
-          },
+          _ => Err("rank error"),
         }
       }
       _ => panic!("impossible"),
@@ -779,51 +801,54 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
   }
 }
 
-// promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
-// Similar to promote_num() can we combine these somehow and be more concise?
+/// promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
+///
+/// Also promotes scalars to arrays to match length of other arg.
+/// Eg. promote_nouns(1, [1 2 3]) => ([1 2 3], [1 2 3]).
+/// Similar to promote_num() can we combine these somehow and be more concise?
 #[rustfmt::skip]
-fn promote_nouns(l: K, r: K) -> (K, K) {
+pub fn promote_nouns(l: K, r: K) -> (K, K) {
   match (&l, &r) {
     (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
     (K::Bool(l), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Bool(l), K::IntArray(_)) => (K::IntArray(arr!([*l as i64])), r),
-    (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
+    (K::Bool(l), K::IntArray(_)) => (K::IntArray(repeat(*l as i64).take(r.len()).collect()), r),
+    (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(repeat(*l as f64).take(r.len()).collect()), r),
 
     (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
     (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Int(Some(l)), K::BoolArray(r)) => {(K::IntArray(arr!([*l])), K::IntArray(r.cast(&DataType::Int64).unwrap()))}
-    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(arr!([*l])), r),
-    (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(arr!([*l as f64])), r),
+    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(repeat(*l as i64).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(repeat(*l as i64).take(r.len()).collect()), r),
+    (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(repeat(*l as f64).take(r.len()).collect()), r),
     (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
-    (K::Int(None), K::BoolArray(_)) => (K::IntArray(arr!([None::<i64>])), r),
-    (K::Int(None), K::IntArray(_)) => (K::IntArray(arr!([None::<i64>])), r),
-    (K::Int(None), K::FloatArray(_)) => (K::FloatArray(arr!([f64::NAN])), r),
+    (K::Int(None), K::BoolArray(r)) => (K::IntArray(repeat(None::<i64>).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(None), K::IntArray(_)) => (K::IntArray(repeat(None::<i64>).take(r.len()).collect()), r),
+    (K::Int(None), K::FloatArray(_)) => (K::FloatArray(repeat(f64::NAN).take(r.len()).collect()), r),
 
     (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
-    (K::Float(l), K::BoolArray(r)) => {(K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
-    (K::Float(l), K::IntArray(r)) => {(K::FloatArray(arr!([*l])), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
-    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(arr!([*l])), r),
+    (K::Float(l), K::BoolArray(r)) => (K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+    (K::Float(l), K::IntArray(r)) => {(K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
+    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(repeat(l).take(r.len()).collect()), r),
 
-    (K::BoolArray(_), K::Bool(r)) => (l, K::BoolArray(arr!([*r]))),
-    (K::BoolArray(l), K::Int(Some(r))) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([*r])))}
-    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(arr!([None::<i64>])))}
-    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(arr!([*r])))}
+    (K::BoolArray(_), K::Bool(r)) => (l.clone(), K::BoolArray(repeat(*r as f64).take(l.len()).collect())),
+    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(r).take(l.len()).collect())),
+    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(None::<i64>).take(l.len()).collect()))}
+    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(r).take(l.len()).collect()))}
     (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
-    (K::IntArray(_), K::Bool(r)) => (l, K::IntArray(arr!([*r as i64]))),
-    (K::IntArray(_), K::Int(Some(r))) => (l, K::IntArray(arr!([*r]))),
-    (K::IntArray(_), K::Int(None)) => (l, K::IntArray(arr!([None::<i64>]))),
-    (K::IntArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r]))),
+    (K::IntArray(_), K::Bool(r)) => (l.clone(), K::IntArray(repeat(*r as i64).take(l.len()).collect())),
+    (K::IntArray(_), K::Int(Some(r))) => (l.clone(), K::IntArray(repeat(r).take(l.len()).collect())),
+    (K::IntArray(_), K::Int(None)) => (l.clone(), K::IntArray(repeat(None::<i64>).take(l.len()).collect())),
+    (K::IntArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(*r).take(l.len()).collect())),
     (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
     (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
-    (K::FloatArray(_), K::Bool(r)) => (l, K::FloatArray(arr!([*r as f64]))),
-    (K::FloatArray(_), K::Int(Some(r))) => (l, K::FloatArray(arr!([*r as f64]))),
-    (K::FloatArray(_), K::Int(None)) => (l, K::FloatArray(arr!([f64::NAN]))),
-    (K::FloatArray(_), K::Float(r)) => (l, K::FloatArray(arr!([*r]))),
+    (K::FloatArray(_), K::Bool(r)) => (l.clone(), K::FloatArray(repeat(*r as f64).take(l.len()).collect())),
+    (K::FloatArray(_), K::Int(Some(r))) => (l.clone(), K::FloatArray(repeat(*r as f64).take(l.len()).collect())),
+    (K::FloatArray(_), K::Int(None)) => (l.clone(), K::FloatArray(repeat(f64::NAN).take(l.len()).collect())),
+    (K::FloatArray(_), K::Float(r)) => (l.clone(), K::FloatArray(repeat(r).take(l.len()).collect())),
     (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
     (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
 
@@ -971,6 +996,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         any,
       ) if matches!(w, KW::StartOfLine | KW::LP) => {
         // 0 monad function
+        debug!("0 monad function");
         apply_function(env, f, x.clone()).map(|r| vec![w, r, any])
       }
       (
@@ -980,6 +1006,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         x @ KW::Noun(_) | x @ KW::FuncArgs(_),
       ) => {
         // 1 monad function
+        debug!("1 monad function");
         apply_function(env, f, x.clone()).map(|r| vec![w, v, r])
       }
       (
@@ -991,7 +1018,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
         // 2 dyad (including assignment)
         apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }
-      (any_l, x @ KW::Verb { .. }, KW::Adverb { name }, any_r) => {
+      (any_l, x @ KW::Verb { .. } | x @ KW::Function { .. }, KW::Adverb { name }, any_r) => {
         // 3 adverb
         apply_adverb(&name, x.clone()).map(|r| vec![any_l, r, any_r])
       }
@@ -1034,7 +1061,11 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
     };
 
     stack.retain(|w| !matches!(w, KW::Nothing));
-    debug!("result: {:?} with stack: {:?}", result, stack);
+    debug!(
+      "\nresult: {} \nstack: {}",
+      format!("{:?}", result).replace("\n", " ").replace("\t", ""),
+      format!("{:?}", stack).replace("\n", " ").replace("\t", "")
+    );
     stack = [result?, stack.into()].concat().into();
   }
   stack.retain(|w| !matches!(w, KW::StartOfLine | KW::Nothing));
@@ -1173,7 +1204,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
               // forced monads +: -: etc
               match words.last() {
                 Some(KW::Verb { name }) => {
-                  let s: &str = &name;
+                  let s: &str = name;
                   if primitives_table().keys().contains(&s) {
                     let mn = format!("{}:", name);
                     let _ = words.pop();
@@ -1184,7 +1215,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
                 }
                 // digraph adverbs ': /: \:
                 Some(KW::Adverb { name }) => {
-                  let s: &str = &name;
+                  let s: &str = name;
                   if adverbs_table().keys().contains(&s) {
                     let mn = format!("{}:", name);
                     let _ = words.pop();
@@ -1324,7 +1355,7 @@ fn scan_function(tokens: Vec<KW>) -> Result<(KW, Vec<KW>), &'static str> {
       Some(KW::RCB) => match depth {
         0 => {
           let (args, body) = scan_function_args(tokens[0..i].to_vec())?;
-          return Ok((KW::Function { body, args }, tokens[i..].to_vec()));
+          return Ok((KW::Function { body, args, adverb: None }, tokens[i..].to_vec()));
         }
         _ => depth -= 1,
       },
@@ -1567,41 +1598,46 @@ pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
 }
 
 pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
-  if nums.iter().any(|k| matches!(k, K::Float(_))) {
-    let fa: Vec<f64> = nums
-      .iter()
-      .map(|k| match k {
-        K::Bool(i) => *i as f64,
-        K::Int(None) => f64::NAN,
-        K::Int(Some(i)) => *i as f64,
-        K::Float(f) => *f,
-        _ => panic!("invalid float"),
-      })
-      .collect();
+  if nums.iter().all(|k| matches!(k, K::Float(_) | K::Int(_) | K::Bool(_))) {
+    if nums.iter().any(|k| matches!(k, K::Float(_))) {
+      let fa: Vec<f64> = nums
+        .iter()
+        .map(|k| match k {
+          K::Bool(i) => *i as f64,
+          K::Int(None) => f64::NAN,
+          K::Int(Some(i)) => *i as f64,
+          K::Float(f) => *f,
+          _ => panic!("invalid float"),
+        })
+        .collect();
 
-    Ok(K::FloatArray(Series::new("", fa)))
-  } else if nums.iter().any(|k| matches!(k, K::Int(_))) {
-    let ia: Vec<Option<i64>> = nums
-      .iter()
-      .map(|k| match k {
-        K::Bool(i) => Some(*i as i64),
-        K::Int(i) => *i,
-        _ => panic!("invalid int"),
-      })
-      .collect();
+      Ok(K::FloatArray(Series::new("", fa)))
+    } else if nums.iter().any(|k| matches!(k, K::Int(_))) {
+      let ia: Vec<Option<i64>> = nums
+        .iter()
+        .map(|k| match k {
+          K::Bool(i) => Some(*i as i64),
+          K::Int(i) => *i,
+          _ => panic!("invalid int"),
+        })
+        .collect();
 
-    Ok(K::IntArray(Series::new("", ia)))
-  } else if nums.iter().all(|k| matches!(k, K::Bool(_))) {
-    let ba: BooleanChunked = nums
-      .iter()
-      .map(|k| match k {
-        K::Bool(0) => false,
-        K::Bool(1) => true,
-        _ => panic!("invalid bool"),
-      })
-      .collect();
+      Ok(K::IntArray(Series::new("", ia)))
+    } else if nums.iter().all(|k| matches!(k, K::Bool(_))) {
+      let ba: BooleanChunked = nums
+        .iter()
+        .map(|k| match k {
+          K::Bool(0) => false,
+          K::Bool(1) => true,
+          _ => panic!("invalid bool"),
+        })
+        .collect();
 
-    Ok(K::BoolArray(Series::new("", ba)))
+      Ok(K::BoolArray(Series::new("", ba)))
+    } else {
+      // Err("invalid nums")
+      panic!("impossible")
+    }
   } else {
     Err("invalid nums")
   }

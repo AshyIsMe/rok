@@ -1,42 +1,39 @@
 use crate::*;
 use rand::distributions::{Distribution, Uniform};
+use std::cmp;
+use std::iter::repeat;
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
-  if x.len() != y.len() {
-    debug!("x.len(): {}, y.len(): {}", x.len(), y.len());
-    Err("length")
-  } else {
-    match promote_nouns(x, y) {
-      (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
-      (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l == r) as u8)),
-      (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => Ok(K::Bool(0)),
-      (K::Float(l), K::Float(r)) => Ok(K::Bool((l == r) as u8)),
-      (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
-      (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
-      (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
-      (K::List(l), K::List(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
-        .map(|(l, r)| {
-          let (l, r) = promote_nouns(l.clone(), r.clone());
-          l == r
-        })
-        .collect::<Vec<bool>>()))),
-      (K::Dictionary(l), K::Dictionary(r)) => {
-        Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
-          if r.keys().contains(k) {
-            let (l, r) = promote_nouns(l.get(k).unwrap().clone(), r.get(k).unwrap().clone());
-            Some((k.clone(), K::Bool((l == r) as u8)))
-          } else {
-            None
-          }
-        }))))
-      }
-      (_, K::Table(_)) => todo!("table"),
-      (K::Table(_), _) => todo!("table"),
-      _ => Err("nyi"),
+  len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l == r) as u8)),
+    (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => Ok(K::Bool(0)),
+    (K::Float(l), K::Float(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+    (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+    (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+    (K::List(l), K::List(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+      .map(|(l, r)| {
+        let (l, r) = promote_nouns(l.clone(), r.clone());
+        l == r
+      })
+      .collect::<Vec<bool>>()))),
+    (K::Dictionary(l), K::Dictionary(r)) => {
+      Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
+        if r.keys().contains(k) {
+          let (l, r) = promote_nouns(l.get(k).unwrap().clone(), r.get(k).unwrap().clone());
+          Some((k.clone(), K::Bool((l == r) as u8)))
+        } else {
+          None
+        }
+      }))))
     }
-  }
+    (_, K::Table(_)) => todo!("table"),
+    (K::Table(_), _) => todo!("table"),
+    _ => Err("nyi"),
+  })
 }
 
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
@@ -214,7 +211,7 @@ pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
   match (l.clone(), r.clone()) {
     // TODO can we make this less repetitive and explicit?
     (K::Int(i), K::Table(df)) => Ok(K::Table(
-      DataFrame::new(df.iter().map(|s| i.unwrap().mul(&s)).collect::<Vec<Series>>()).unwrap(),
+      DataFrame::new(df.iter().map(|s| i.unwrap().mul(s)).collect::<Vec<Series>>()).unwrap(),
     )),
     _ => atomicdyad!(*, v_times, mul, l, r),
   }
@@ -232,10 +229,74 @@ pub fn v_mod(l: K, r: K) -> Result<K, &'static str> {
 }
 
 pub fn v_where(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_min(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_reverse(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_max(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_min(l: K, r: K) -> Result<K, &'static str> {
+  //TODO fix code duplication in v_min/v_max
+  len_ok(&l, &r).and_then(|_| match promote_nouns(l, r) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::min(l, r)) as u8)),
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(cmp::min(l, r)))),
+    (K::Int(None), K::Int(i)) | (K::Int(i), K::Int(None)) => Ok(K::Int(i)),
+    (K::Float(l), K::Float(r)) => Ok(K::Float(l.min(r))),
+    (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(
+      l.u8().unwrap().iter().zip(r.u8().unwrap().iter()).map(|(l, r)| l.min(r)).collect(),
+    )),
+    (K::IntArray(l), K::IntArray(r)) => Ok(K::IntArray(
+      l.i64().unwrap().iter().zip(r.i64().unwrap().iter()).map(|(l, r)| l.min(r)).collect(),
+    )),
+    (K::FloatArray(l), K::FloatArray(r)) => Ok(K::FloatArray(
+      l.f64()
+        .unwrap()
+        .iter()
+        .zip(r.f64().unwrap().iter())
+        .map(|(l, r)| match (l, r) {
+          (Some(l), Some(r)) => Some(l.min(r)),
+          (Some(l), None) => Some(l),
+          (None, Some(r)) => Some(r),
+          (None, None) => None,
+        })
+        .collect(),
+    )),
+    (K::List(_l), K::List(_r)) => Err("nyi"),
+    (K::Dictionary(_l), K::Dictionary(_r)) => Err("nyi"),
+    (_, K::Table(_)) => todo!("table"),
+    (K::Table(_), _) => todo!("table"),
+    _ => Err("nyi - wtf"),
+  })
+}
+pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
+  len_ok(&l, &r).and_then(|_| match promote_nouns(l, r) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::max(l, r)) as u8)),
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(cmp::max(l, r)))),
+    (K::Int(None), K::Int(i)) | (K::Int(i), K::Int(None)) => Ok(K::Int(i)),
+    (K::Float(l), K::Float(r)) => Ok(K::Float(l.max(r))),
+    (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(
+      l.u8().unwrap().iter().zip(r.u8().unwrap().iter()).map(|(l, r)| l.max(r)).collect(),
+    )),
+    (K::IntArray(l), K::IntArray(r)) => Ok(K::IntArray(
+      l.i64().unwrap().iter().zip(r.i64().unwrap().iter()).map(|(l, r)| l.max(r)).collect(),
+    )),
+    (K::FloatArray(l), K::FloatArray(r)) => Ok(K::FloatArray(
+      l.f64()
+        .unwrap()
+        .iter()
+        .zip(r.f64().unwrap().iter())
+        .map(|(l, r)| match (l, r) {
+          (Some(l), Some(r)) => Some(l.max(r)),
+          (Some(l), None) => Some(l),
+          (None, Some(r)) => Some(r),
+          (None, None) => None,
+        })
+        .collect(),
+    )),
+    (K::List(_l), K::List(_r)) => Err("nyi"),
+    (K::Dictionary(_l), K::Dictionary(_r)) => Err("nyi"),
+    (_, K::Table(_)) => todo!("table"),
+    (K::Table(_), _) => todo!("table"),
+    _ => Err("nyi - wtf"),
+  })
+}
 
 pub fn v_asc(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_lesser(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
@@ -265,7 +326,7 @@ pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_randfloat(r: K) -> Result<K, &'static str> {
   match r {
-    K::Int(Some(i)) if i == 0 => Err("nyi"),
+    K::Int(Some(0)) => Err("nyi"),
     K::Int(Some(i)) if i < 0 => Err("domain"),
     K::Int(Some(i)) if i > 0 => Ok(K::FloatArray(
       ChunkedArray::<Float64Type>::rand_uniform("", i as usize, 0.0f64, 1.0f64).into_series(),
@@ -522,13 +583,30 @@ pub fn v_iota(r: K) -> Result<K, &'static str> {
 }
 pub fn v_sum(x: K) -> Result<K, &'static str> {
   match x {
+    K::Bool(_) | K::Int(_) | K::Float(_) => Ok(x),
     K::BoolArray(a) => Ok(K::Int(a.sum().ok())),
     K::IntArray(a) => Ok(K::Int(a.sum().ok())),
     K::FloatArray(a) => Ok(K::Float(a.sum().unwrap_or(f64::NAN))),
-    _ => todo!("other types of K"),
+    _ => {
+      // Fall back to slow catchall. TODO Something nicer
+      let mut env = Env { names: HashMap::new(), parent: None };
+      let sum = eval(&mut env, scan("{x+y}/").unwrap()).unwrap();
+      Ok(eval(&mut env, vec![sum, KW::Noun(x.clone())]).unwrap().unwrap_noun())
+    }
   }
 }
 pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()) }
+
+// TODO
+// pub fn v_product(x: K) -> Result<K, &'static str> {
+//   match x {
+//     K::BoolArray(a) => Ok(K::Int(a.product().ok().into())),
+//     K::IntArray(a) => Ok(K::Int(a.product().ok())),
+//     K::FloatArray(a) => Ok(K::Float(a.product().unwrap_or(f64::NAN))),
+//     _ => todo!("other types of K"),
+//   }
+// }
+// pub fn v_d_product(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_product(r).unwrap()) }
 
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   match l {
@@ -537,24 +615,113 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_each(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("each") }
+pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
+      let r: Vec<K> = v
+        .iter()
+        .cloned()
+        .map(|y|
+             // apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun()
+             eval(env, vec![f.clone(), KW::Noun(y.clone())]).unwrap().unwrap_noun())
+        .collect();
+      promote_num(r.clone()).unwrap_or(K::List(r))
+    }),
+    _ => Err("type"),
+  }
+}
 pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
+
+// Dispatch / based on inputs:  fold, over, fixedpoint
+pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  match v.clone() {
+    KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
+      ':' | '/' | '\\' => v_fixedpoint(env, v, x),
+      _ => v_fold(env, v, x),
+    },
+    KW::Function { body: _, args, adverb: _ } => match args.len() {
+      2 => v_fold(env, v, x),
+      1 => v_fixedpoint(env, v, x),
+      _ => Err("rank"),
+    },
+    _ => panic!("impossible"),
+  }
+}
+
+pub fn a_d_slash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+  // TODO check the rank of v and type of x and handle the different meanings of /
+  // https://k.miraheze.org/wiki/For
+  // https://k.miraheze.org/wiki/While
+  // https://k.miraheze.org/wiki/Base_encode
+  // todo!("for/while/join/base_encode")
+
+  match v.clone() {
+    KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
+      ':' | '/' | '\\' => todo!("monadic v: {}", v),
+      _ => v_d_fold(env, v, x, y),
+    },
+    KW::Function { body: _, args, adverb: _ } => match args.len() {
+      2 => v_d_fold(env, v, x, y),
+      1 => todo!("monadic v: {}", v),
+      _ => Err("rank"),
+    },
+    _ => panic!("impossible"),
+  }
+}
+
+pub fn v_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  // fixedpoint and scan-fixedpoint are adverbs that apply a monadic function to
+  // a given noun y until it stops changing, or the initial value has been repeated.
+  let mut prev_r = x.clone();
+  loop {
+    let r = eval(env, vec![v.clone(), KW::Noun(prev_r.clone())]).unwrap().unwrap_noun();
+    if r == prev_r || r == x {
+      return Ok(r);
+    }
+    prev_r = r;
+  }
+}
+pub fn v_scan_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  // same as v_fixedpoint() except return a K::List of all intermediate results
+  match v.clone() {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x.clone()).and_then(|_| {
+      let mut result: Vec<K> = vec![x.clone()];
+      loop {
+        let r = eval(env, vec![f.clone(), KW::Noun(result[result.len() - 1].clone())])
+          .unwrap()
+          .unwrap_noun();
+        if r == result[result.len() - 1] || r == x {
+          match promote_num(result.clone()) {
+            Ok(k) => return Ok(k),
+            _ => return Ok(K::List(result)),
+          };
+        }
+        result.push(r);
+      }
+    }),
+    _ => Err("type"),
+  }
+}
+
 pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // split into list, then reduce
-  if let KW::Verb { name } = v {
-    k_to_vec(x).and_then(|v| {
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).and_then(|v| {
       let r = v.iter().cloned().reduce(|x, y| {
-        apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone()))
-          .unwrap()
-          .unwrap_noun()
+        // apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone())).unwrap().unwrap_noun()
+        eval(
+          env,
+          vec![f.clone(), KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]])],
+        )
+        .unwrap()
+        .unwrap_noun()
       });
       match r {
         Some(k) => Ok(k.clone()),
         None => Err("TODO not sure what this error case is"),
       }
-    })
-  } else {
-    Err("type")
+    }),
+    _ => Err("type"),
   }
 }
 pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
@@ -574,13 +741,87 @@ pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
     Err("type")
   }
 }
-pub fn v_scan(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
+
+pub fn a_bslash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  match v.clone() {
+    KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
+      ':' | '/' | '\\' => v_scan_fixedpoint(env, v, x),
+      _ => v_scan(env, v, x),
+    },
+    KW::Function { body: _, args, adverb: _ } => match args.len() {
+      2 => v_scan(env, v, x),
+      1 => v_scan_fixedpoint(env, v, x),
+      _ => Err("rank"),
+    },
+    _ => panic!("impossible"),
+  }
+}
+
+pub fn a_d_bslash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+  // TODO check the rank of v and type of x and handle the different meanings of \
+  // https://k.miraheze.org/wiki/For
+  // https://k.miraheze.org/wiki/While
+  // https://k.miraheze.org/wiki/Base_decode
+  // todo!("a_d_bslash() - scan_for and scan_while")
+
+  match v.clone() {
+    KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
+      ':' | '/' | '\\' => todo!("monadic v: {}", v),
+      _ => v_d_scan(env, v, x, y),
+    },
+    KW::Function { body: _, args, adverb: _ } => match args.len() {
+      2 => v_d_scan(env, v, x, y),
+      1 => todo!("monadic v: {}", v),
+      _ => Err("rank"),
+    },
+    _ => panic!("impossible"),
+  }
+}
+
+pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  // same as v_fold() except return a K::List of intermediate results
+  // split into list, then scan
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x.clone()).and_then(|v| {
+      let mut result: Vec<K> = vec![v[0].clone()];
+      for i in v[1..].iter() {
+        result.push(
+          eval(
+            env,
+            vec![
+              f.clone(),
+              KW::FuncArgs(vec![
+                vec![KW::Noun(result[result.len() - 1].clone())],
+                vec![KW::Noun(i.clone())],
+              ]),
+            ],
+          )
+          .unwrap()
+          .unwrap_noun(),
+        )
+      }
+      match promote_num(result.clone()) {
+        Ok(k) => Ok(k),
+        _ => Ok(K::List(result)),
+      }
+    }),
+    _ => Err("type"),
+  }
+}
 pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
 
-pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
-pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
-pub fn v_eachright(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
-pub fn v_eachleft(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { todo!("scan") }
+pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
+  todo!("v_eachprior()")
+}
+pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
+  todo!("v_windows()")
+}
+pub fn v_eachright(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
+  todo!("v_eachright()")
+}
+pub fn v_eachleft(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
+  todo!("v_eachleft()")
+}
 
 pub fn strip_quotes(s: String) -> String {
   if s.starts_with('\"') && s.ends_with('\"') {

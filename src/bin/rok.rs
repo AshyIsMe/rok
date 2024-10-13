@@ -10,7 +10,8 @@ use rustyline::DefaultEditor;
 
 fn help() -> &'static str {
   // TODO better help, up to date with nyi list
-  let help = "verbs:
+
+  "verbs:
 : set return
 + plus flip
 - negate minus
@@ -31,8 +32,7 @@ $ string pad|cast              $[c;t;f] cond
 ? unique|randfloat find|random splice
 @ type at
 . eval|values dot
-";
-  return help;
+"
 }
 
 fn main() {
