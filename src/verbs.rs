@@ -1,4 +1,5 @@
 use crate::*;
+use polars::prelude::*;
 use rand::distributions::{Distribution, Uniform};
 use std::cmp;
 use std::iter::repeat;
@@ -209,12 +210,15 @@ macro_rules! atomicdyad {
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, add, l, r) }
 pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
 pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, sub, l, r) }
+
 pub fn v_first(x: K) -> Result<K, &'static str> {
   match x {
+    K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(0).unwrap().clone()))),
     K::List(l) => Ok(l.first().unwrap().clone()),
     _ => Err("nyi"),
   }
 }
+
 pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
   match (l.clone(), r.clone()) {
     // TODO can we make this less repetitive and explicit?
@@ -236,7 +240,22 @@ pub fn v_mod(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_where(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_where(x: K) -> Result<K, &'static str> {
+  match x {
+    K::BoolArray(b) => {
+      let indices: Vec<i64> = b
+        .bool()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .filter(|&(_, value)| value.unwrap())
+        .map(|(index, _)| index as i64)
+        .collect();
+      Ok(K::IntArray(arr!(indices)))
+    }
+    _ => Err("nyi"),
+  }
+}
 
 pub fn v_reverse(_r: K) -> Result<K, &'static str> { Err("nyi") }
 
