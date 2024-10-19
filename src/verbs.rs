@@ -209,7 +209,12 @@ macro_rules! atomicdyad {
 pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, add, l, r) }
 pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
 pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, sub, l, r) }
-pub fn v_first(_x: K) -> Result<K, &'static str> { todo!("implement first") }
+pub fn v_first(x: K) -> Result<K, &'static str> {
+  match x {
+    K::List(l) => Ok(l.first().unwrap().clone()),
+    _ => Err("nyi"),
+  }
+}
 pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
   match (l.clone(), r.clone()) {
     // TODO can we make this less repetitive and explicit?
