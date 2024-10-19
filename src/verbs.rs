@@ -14,6 +14,9 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
     (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
     (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
     (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
+    (K::CharArray(l), K::CharArray(r)) => {
+      Ok(K::BoolArray(arr!(l.chars().zip(r.chars()).map(|(l, r)| l == r).collect::<Vec<bool>>())))
+    }
     (K::List(l), K::List(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
       .map(|(l, r)| {
         let (l, r) = promote_nouns(l.clone(), r.clone());
