@@ -1,5 +1,4 @@
 use crate::*;
-use polars::prelude::*;
 use rand::distributions::{Distribution, Uniform};
 use std::cmp;
 use std::iter::repeat;
