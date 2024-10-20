@@ -811,6 +811,7 @@ pub fn promote_nouns(l: K, r: K) -> (K, K) {
   match (&l, &r) {
     (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
     (K::Bool(l), K::Float(_)) => (K::Float(*l as f64), r),
+    (K::Bool(l), K::BoolArray(_)) => (K::BoolArray(repeat(*l).take(r.len()).collect()), r),
     (K::Bool(l), K::IntArray(_)) => (K::IntArray(repeat(*l as i64).take(r.len()).collect()), r),
     (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(repeat(*l as f64).take(r.len()).collect()), r),
 
@@ -830,6 +831,12 @@ pub fn promote_nouns(l: K, r: K) -> (K, K) {
     (K::Float(l), K::BoolArray(r)) => (K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
     (K::Float(l), K::IntArray(r)) => {(K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
     (K::Float(l), K::FloatArray(_)) => (K::FloatArray(repeat(l).take(r.len()).collect()), r),
+
+    // (K::Char(_l), K::Int(_)) => panic!("nyi"), // TODO
+    // (K::Char(_l), K::Float(_)) => panic!("nyi"), // TODO
+    (K::Char(l), K::CharArray(_)) => (K::CharArray(repeat(*l).take(r.len()).collect()), r),
+    // (K::Char(_l), K::IntArray(_)) => panic!("nyi"), // TODO
+    // (K::Char(_l), K::FloatArray(_)) => panic!("nyi"), // TODO
 
     (K::BoolArray(_), K::Bool(r)) => (l.clone(), K::BoolArray(repeat(*r as f64).take(l.len()).collect())),
     (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(r).take(l.len()).collect())),
