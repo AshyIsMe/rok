@@ -1365,3 +1365,12 @@ fn test_split_strings() {
     ])
   );
 }
+
+#[test]
+fn test_eval_verb() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res = eval(&mut env, scan(r#"."42""#).unwrap()).unwrap().unwrap_noun();
+
+  assert_eq!(res, K::Int(Some(42)));
+}

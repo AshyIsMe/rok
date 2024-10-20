@@ -563,7 +563,16 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
 pub fn v_amend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_amend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_eval(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_eval(x: K) -> Result<K, &'static str> {
+  // TODO: does this need the current Env passed in?
+  match x {
+    K::CharArray(s) => {
+      let mut env = Env { names: HashMap::new(), parent: None };
+      Ok(eval(&mut env, scan(&s).unwrap()).unwrap().unwrap_noun())
+    }
+    _ => Err("nyi"),
+  }
+}
 pub fn v_dot(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 // https://k.miraheze.org/wiki/Deep_amend
 pub fn v_deepamend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
