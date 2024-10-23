@@ -892,6 +892,14 @@ fn test_functions() {
 }
 
 #[test]
+fn test_function_local_vars() {
+  // See https://estradajke.github.io/k9-simples/k9/User-Functions.html
+  //
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(eval(&mut env, scan("{a:2; a * x} 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+}
+
+#[test]
 fn test_expr_funcargs() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
@@ -1351,3 +1359,26 @@ fn test_promote_nouns() {
   assert_eq!(promote_nouns(l.clone(), r), (l, K::FloatArray(arr!([1.0, 1.0, 1.0f64]))));
 }
 
+#[test]
+fn test_split_strings() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res = eval(&mut env, scan(r#"","\'("1,2";"3,4")"#).unwrap()).unwrap().unwrap_noun();
+
+  assert_eq!(
+    res,
+    K::List(vec![
+      K::List(vec![K::Char('1'), K::Char('2')]),
+      K::List(vec![K::Char('3'), K::Char('4')])
+    ])
+  );
+}
+
+#[test]
+fn test_eval_verb() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res = eval(&mut env, scan(r#"."42""#).unwrap()).unwrap().unwrap_noun();
+
+  assert_eq!(res, K::Int(Some(42)));
+}
