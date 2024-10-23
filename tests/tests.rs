@@ -892,6 +892,14 @@ fn test_functions() {
 }
 
 #[test]
+fn test_function_local_vars() {
+  // See https://estradajke.github.io/k9-simples/k9/User-Functions.html
+  //
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(eval(&mut env, scan("{a:2; a * x} 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+}
+
+#[test]
 fn test_expr_funcargs() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
