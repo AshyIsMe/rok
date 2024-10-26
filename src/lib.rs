@@ -894,7 +894,7 @@ pub fn promote_nouns(l: K, r: K) -> (K, K) {
 
 macro_rules! impl_op {
     ($op:tt, $opf:ident, $self:ident, $r:ident) => {
-        match promote_nouns($self, $r) {
+        match promote_nouns($self.clone(), $r.clone()) {
             (K::Bool(l), K::Bool(r)) => K::Int(Some(l as i64 $op r as i64)),
             (K::Int(Some(l)), K::Int(Some(r))) => K::Int(Some(l as i64 $op r)),
             (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None))=> K::Int(None),
@@ -906,7 +906,7 @@ macro_rules! impl_op {
             (K::Dictionary(_), _) => todo!("dict"),
             (_, K::Table(_)) => todo!("table"),
             (K::Table(_), _) => todo!("table"),
-            _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc"),
+          _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc. self: {}, r: {}", $self, $r),
         }
     };
 }
@@ -1138,10 +1138,14 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
       ')' => words.push(KW::RP),
       '{' => words.push(KW::LCB),
       '}' => words.push(KW::RCB),
+      // '[' => words.push(KW::LB), // TODO 20241024 handle FuncArgsStart in scan_pass2
+      // TODO Remove KW::FuncArgsStart entirely.
+      // Find a nicer way to parse the difference between: +[2;3] and + [a:2;...]
+      // ie. Difference between calling a function with arguments, and evaluating an Exprs and then handling it's result
       '[' if i == 0 => words.push(KW::LB),
       '[' => match code.chars().nth(i - 1) {
         Some(c) => {
-          if " ()[]{".contains(c) {
+          if " ()[]{;".contains(c) {
             words.push(KW::LB)
           } else {
             words.push(KW::FuncArgsStart)
@@ -1362,7 +1366,14 @@ fn scan_function(tokens: Vec<KW>) -> Result<(KW, Vec<KW>), &'static str> {
       Some(KW::RCB) => match depth {
         0 => {
           let (args, body) = scan_function_args(tokens[0..i].to_vec())?;
-          return Ok((KW::Function { body, args, adverb: None }, tokens[i..].to_vec()));
+          return Ok((
+            KW::Function {
+              body: scan_pass3(scan_pass2(body).unwrap()).unwrap(),
+              args,
+              adverb: None,
+            },
+            tokens[i..].to_vec(),
+          ));
         }
         _ => depth -= 1,
       },
@@ -1399,7 +1410,18 @@ fn scan_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static 
     }
     let mut args: Vec<String> = body
       .iter()
-      .filter_map(|kw| if let KW::Noun(K::Name(n)) = kw { Some(n.clone()) } else { None })
+      // only collect literally x, y or z. Other names are locals or globals.
+      .filter_map(|kw| {
+        if let KW::Noun(K::Name(n)) = kw {
+          if matches!(n.as_str(), "x" | "y" | "z") {
+            Some(n.clone())
+          } else {
+            None
+          }
+        } else {
+          None
+        }
+      })
       .unique()
       .collect();
     args.sort();
