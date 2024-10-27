@@ -48,7 +48,6 @@ fn test_aoc2015_12_01_p2_v2() {
   );
 }
 
-#[ignore]
 #[test]
 fn test_aoc2015_12_02() {
   let mut env = Env { names: HashMap::new(), parent: None };

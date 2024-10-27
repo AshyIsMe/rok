@@ -1397,7 +1397,6 @@ fn test_promote_nouns() {
   assert_eq!(promote_nouns(l.clone(), r), (l, K::FloatArray(arr!([1.0, 1.0, 1.0f64]))));
 }
 
-#[ignore]
 #[test]
 fn test_split_strings() {
   let mut env = Env { names: HashMap::new(), parent: None };
