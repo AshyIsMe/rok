@@ -1420,3 +1420,14 @@ fn test_eval_verb() {
 
   assert_eq!(res, K::Int(Some(42)));
 }
+
+#[test]
+fn test_concat() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res = eval(&mut env, scan("2,3").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::IntArray(arr!([2, 3i64])));
+
+  let res = eval(&mut env, scan("1 2,3 4.0").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::FloatArray(arr!([1., 2., 3., 4.0f64])));
+}

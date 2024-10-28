@@ -333,8 +333,57 @@ pub fn v_greater(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_not(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_match(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_enlist(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_concat(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_enlist(x: K) -> Result<K, &'static str> {
+  match x {
+    K::Bool(x) => Ok(K::BoolArray(arr!([x]))),
+    K::Int(x) => Ok(K::IntArray(arr!([x]))),
+    K::Float(x) => Ok(K::FloatArray(arr!([x]))),
+    K::Char(x) => Ok(K::CharArray(x.to_string())),
+    K::Symbol(x) => Ok(K::SymbolArray(
+      Series::new("", [x.to_string()])
+        .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+        .unwrap(),
+    )),
+    K::BoolArray(_)
+    | K::IntArray(_)
+    | K::FloatArray(_)
+    | K::CharArray(_)
+    | K::List(_)
+    | K::Dictionary(_)
+    | K::Table(_) => Ok(K::List(vec![x])),
+    _ => Err("nyi v_enlist() other cases"),
+  }
+}
+
+pub fn v_concat(x: K, y: K) -> Result<K, &'static str> {
+  match (x.clone(), y.clone()) {
+    (K::Bool(_) | K::Int(_) | K::Float(_), K::Bool(_) | K::Int(_) | K::Float(_)) => {
+      promote_num(vec![x, y])
+    }
+    (K::BoolArray(x) | K::IntArray(x) | K::FloatArray(x), K::FloatArray(y)) => {
+      Ok(K::FloatArray(x.to_float().unwrap().extend(&y).unwrap().clone()))
+    }
+    (K::FloatArray(mut x), K::BoolArray(y) | K::IntArray(y)) => {
+      Ok(K::FloatArray(x.extend(&y.to_float().unwrap()).unwrap().clone()))
+    }
+    (K::BoolArray(x) | K::IntArray(x), K::IntArray(y)) => {
+      Ok(K::IntArray(x.cast(&DataType::Int64).unwrap().extend(&y).unwrap().clone()))
+    }
+    (K::BoolArray(mut x), K::BoolArray(y)) => {
+      Ok(K::IntArray(x.extend(&y.cast(&DataType::Boolean).unwrap()).unwrap().clone()))
+    }
+    (K::Bool(_) | K::Int(_) | K::Float(_), K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_)) => {
+      v_concat(v_enlist(x).unwrap(), y)
+    }
+    (K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_), K::Bool(_) | K::Int(_) | K::Float(_)) => {
+      v_concat(x, v_enlist(y).unwrap())
+    }
+    (K::Char(x), K::Char(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
+    (K::CharArray(x), K::Char(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
+    (K::Char(x), K::CharArray(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
+    _ => Err("nyi v_concat() other cases"),
+  }
+}
 
 pub fn v_isnull(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_fill(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }

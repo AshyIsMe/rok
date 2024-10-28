@@ -31,12 +31,9 @@ pub enum K {
   Char(char),
   Symbol(String),
   SymbolArray(Series),
-  BoolArray(Series),
-  IntArray(Series),
-  // Int8Array(Series), // TODO maybe later?
-  // Int16Array(Series), // TODO maybe later?
-  // Int128Array(Series), // TODO maybe later?
-  FloatArray(Series),
+  BoolArray(Series),  // Series<bool>
+  IntArray(Series),   // Series<i64>
+  FloatArray(Series), // Series<f64>
   CharArray(String),
   Nil, // Is Nil a noun?
   List(Vec<K>),
@@ -44,6 +41,9 @@ pub enum K {
   Table(DataFrame),
   //Quote(Box<K>) // Is Quote a noun?
   Name(String),
+  // Int8Array(Series), Int16Array(Series), Int32Array(Series), Int128Array(Series), // TODO maybe later?
+  // Float32Array(Series), // TODO maybe later?
+  // Decimal(_), DecimalArray(Series) // TODO maybe later?
 }
 // impl Eq for K {} // TODO for the v_unique() K::List() case
 
@@ -186,6 +186,8 @@ impl fmt::Display for K {
       }
       K::BoolArray(b) => {
         let s = b
+          .cast(&DataType::Boolean)
+          .unwrap()
           .bool()
           .unwrap()
           .into_iter()
@@ -202,7 +204,11 @@ impl fmt::Display for K {
         } else {
           strip_quotes(s[..(cols - 3)].to_string() + "..")
         };
-        write!(f, "{}b", s)
+        if b.len() == 1 {
+          write!(f, ",{}", s)
+        } else {
+          write!(f, "{}b", s)
+        }
       }
       K::IntArray(b) => {
         let max_n = cols / 2; // ints take min 2 chars, we could fit this many max on a row
@@ -218,7 +224,11 @@ impl fmt::Display for K {
             .collect(),
         );
         let s = if s.len() < cols { s } else { s[..(cols - 2)].to_string() + ".." };
-        write!(f, "{}", s)
+        if b.len() == 1 {
+          write!(f, ",{}", s)
+        } else {
+          write!(f, "{}", s)
+        }
       }
       K::FloatArray(b) => {
         let max_n = cols / 2; // floats also take min 2 chars, we could fit this many max on a row
@@ -234,20 +244,13 @@ impl fmt::Display for K {
             .collect(),
         );
         let s = if s.len() < cols { s } else { s[..(cols - 2)].to_string() + ".." };
-        write!(f, "{}", s)
+        if b.len() == 1 {
+          write!(f, ",{}", s)
+        } else {
+          write!(f, "{}", s)
+        }
       }
       K::CharArray(ca) => {
-        // let s: String = ca
-        //   .str()
-        //   .unwrap()
-        //   .into_iter()
-        //   .take(cols - 2)
-        //   .map(|u| match u {
-        //     Some(u) => u,
-        //     None => panic!("impossible"),
-        //   })
-        //   .collect();
-        // // let s: String = ca.str().unwrap().to_string();
         let s = ca;
 
         if s.len() < (cols - 2) {
