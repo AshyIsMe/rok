@@ -83,7 +83,6 @@ fn test_aoc2015_12_02() {
   assert_eq!(res, expected);
 }
 
-
 #[ignore]
 #[test]
 fn test_aoc2015_12_02_v2() {
@@ -99,10 +98,8 @@ fn test_aoc2015_12_02_v2() {
 fn test_aoc2015_12_02_p2() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  let s = r#"{l:x@0;w:x@1;h:x@2;d:(l*w;w*h;l*h);+/(2*d),&/d}' {.'"x"\x}'s:("2x3x4";"1x1x10")"#;
   let s = r#"{(*/x)+/2*2#x[<x]}'(2 3 4; 1 1 10)"#;
   let res = eval(&mut env, scan(s).unwrap()).unwrap();
   let expected = eval(&mut env, scan("34 14").unwrap()).unwrap();
   assert_eq!(res, expected);
-
 }

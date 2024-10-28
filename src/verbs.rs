@@ -1,6 +1,7 @@
 use crate::*;
 use rand::distributions::{Distribution, Uniform};
 use std::cmp;
+use std::collections::BTreeMap;
 use std::iter::repeat;
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
@@ -324,10 +325,59 @@ pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
   })
 }
 
-pub fn v_asc(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_asc(x: K) -> Result<K, &'static str> {
+  match x {
+    K::BoolArray(x) => {
+      let mut map: BTreeMap<Option<bool>, Vec<usize>> = BTreeMap::new();
+      for (i, v) in x.bool().unwrap().iter().enumerate() {
+        if map.contains_key(&v) {
+          let vec = map.get(&v).unwrap();
+          map.insert(v, vec.iter().chain(vec![i].iter()).cloned().collect());
+        } else {
+          map.insert(v, vec![i]);
+        }
+      }
+      let v: Vec<i64> =
+        map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
+      Ok(K::BoolArray(arr!(v)))
+    }
+    K::IntArray(x) => {
+      let mut map: BTreeMap<Option<i64>, Vec<usize>> = BTreeMap::new();
+      for (i, v) in x.i64().unwrap().iter().enumerate() {
+        if map.contains_key(&v) {
+          let vec = map.get(&v).unwrap();
+          map.insert(v, vec.iter().chain(vec![i].iter()).cloned().collect());
+        } else {
+          map.insert(v, vec![i]);
+        }
+      }
+      let v: Vec<i64> =
+        map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
+      Ok(K::IntArray(arr!(v)))
+    }
+    // K::FloatArray(x) => {
+    //   let mut map: BTreeMap<Option<f64>, Vec<usize>> = BTreeMap::new();
+    //   for (i, v) in x.f64().unwrap().iter().enumerate() {
+    //     if map.contains_key(&v) {
+    //       let vec = map.get(&v).unwrap();
+    //       map.insert(v, vec.iter().chain(vec![i].iter()).cloned().collect());
+    //     } else {
+    //       map.insert(v, vec![i]);
+    //     }
+    //   }
+    //   let v: Vec<i64> =
+    //     map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
+    //   Ok(K::IntArray(arr!(v)))
+    // }
+    _ => Err("nyi"),
+  }
+}
 pub fn v_lesser(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_desc(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_desc(x: K) -> Result<K, &'static str> {
+  // TODO: faster
+  v_reverse(v_asc(x).unwrap())
+}
 pub fn v_greater(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_not(_r: K) -> Result<K, &'static str> { Err("nyi") }
