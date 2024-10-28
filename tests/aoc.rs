@@ -71,8 +71,38 @@ fn test_aoc2015_12_02() {
     eval(&mut env, scan(r#"((60 33 220);(405 135 75);(174 203 42))"#).unwrap()).unwrap();
   assert_eq!(res, expected);
 
-  let s = r#"{l:x@0;w:x@1;h:x@2;d:(l*w;w*h;l*h);+/(2*d),&/d}' .''"x"\'s:("2x3x4";"1x1x10")"#;
+  let s = r#"{l:x@0;w:x@1;h:x@2;d:(l*w;w*h;l*h);+/(2*d),&/d}' {.'"x"\x}'s:("2x3x4";"1x1x10")"#;
   let res = eval(&mut env, scan(s).unwrap()).unwrap();
   let expected = eval(&mut env, scan("58 43").unwrap()).unwrap();
   assert_eq!(res, expected);
+
+  // TODO Why is this so slow?
+  let s = r#"+/{l:x@0;w:x@1;h:x@2;d:(l*w;w*h;l*h);+/(2*d),&/d}' {.'"x"\x}'s:0:"tests/aoc/2015/day02.txt""#;
+  let res = eval(&mut env, scan(s).unwrap()).unwrap();
+  let expected = eval(&mut env, scan("1606483").unwrap()).unwrap();
+  assert_eq!(res, expected);
+}
+
+
+#[ignore]
+#[test]
+fn test_aoc2015_12_02_v2() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let s = r#"(2*+//s)+/&/s:(*|x)*':x:`I$+"x"\'0:"tests/aoc/2015/day02.txt""#;
+  let res = eval(&mut env, scan(s).unwrap()).unwrap();
+  let expected = eval(&mut env, scan("1606483").unwrap()).unwrap();
+  assert_eq!(res, expected);
+}
+
+#[test]
+fn test_aoc2015_12_02_p2() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let s = r#"{l:x@0;w:x@1;h:x@2;d:(l*w;w*h;l*h);+/(2*d),&/d}' {.'"x"\x}'s:("2x3x4";"1x1x10")"#;
+  let s = r#"{(*/x)+/2*2#x[<x]}'(2 3 4; 1 1 10)"#;
+  let res = eval(&mut env, scan(s).unwrap()).unwrap();
+  let expected = eval(&mut env, scan("34 14").unwrap()).unwrap();
+  assert_eq!(res, expected);
+
 }
