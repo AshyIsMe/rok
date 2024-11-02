@@ -1431,3 +1431,14 @@ fn test_concat() {
   let res = eval(&mut env, scan("1 2,3 4.0").unwrap()).unwrap().unwrap_noun();
   assert_eq!(res, K::FloatArray(arr!([1., 2., 3., 4.0f64])));
 }
+
+#[test]
+fn test_grade() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res = eval(&mut env, scan("< 3 2 1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::IntArray(arr!([2, 1, 0i64])));
+
+  let res = eval(&mut env, scan("< 3.0 2.5 1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::IntArray(arr!([2, 1, 0i64])));
+}

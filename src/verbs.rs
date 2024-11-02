@@ -355,20 +355,31 @@ pub fn v_asc(x: K) -> Result<K, &'static str> {
         map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
       Ok(K::IntArray(arr!(v)))
     }
-    // K::FloatArray(x) => {
-    //   let mut map: BTreeMap<Option<f64>, Vec<usize>> = BTreeMap::new();
-    //   for (i, v) in x.f64().unwrap().iter().enumerate() {
-    //     if map.contains_key(&v) {
-    //       let vec = map.get(&v).unwrap();
-    //       map.insert(v, vec.iter().chain(vec![i].iter()).cloned().collect());
-    //     } else {
-    //       map.insert(v, vec![i]);
-    //     }
-    //   }
-    //   let v: Vec<i64> =
-    //     map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
-    //   Ok(K::IntArray(arr!(v)))
-    // }
+    K::FloatArray(x) => {
+      // f64 is only PartialOrd but we need something with Ord here.
+      // This is a terrible hack and probably terrible for performance.
+      let scaled_ints: Vec<Option<i128>> = (x * 1e9)
+        .f64()
+        .unwrap()
+        .into_iter()
+        .map(|f| match f {
+          Some(f) => Some(f as i128),
+          _ => None,
+        })
+        .collect();
+      let mut map: BTreeMap<Option<i128>, Vec<usize>> = BTreeMap::new();
+      for (i, v) in scaled_ints.iter().enumerate() {
+        if map.contains_key(&v) {
+          let vec = map.get(&v).unwrap();
+          map.insert(*v, vec.iter().chain(vec![i].iter()).cloned().collect());
+        } else {
+          map.insert(*v, vec![i]);
+        }
+      }
+      let v: Vec<i64> =
+        map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
+      Ok(K::IntArray(arr!(v)))
+    }
     _ => Err("nyi"),
   }
 }
