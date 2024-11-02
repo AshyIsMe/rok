@@ -41,7 +41,12 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
 }
 
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
-pub fn v_take(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_take(x: K, y: K) -> Result<K, &'static str> {
+  match x {
+    K::Int(_) => v_at(y, v_iota(x).unwrap()),
+    _ => Err("type"),
+  }
+}
 
 #[macro_export]
 macro_rules! reshape_atom_by_type {
