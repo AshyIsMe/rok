@@ -1298,7 +1298,6 @@ fn test_rand() {
   }
 }
 
-#[ignore]
 #[test]
 fn test_find() {
   let mut env = Env { names: HashMap::new(), parent: None };

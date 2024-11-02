@@ -509,7 +509,31 @@ pub fn v_rand(l: K, r: K) -> Result<K, &'static str> {
     _ => Err("nyi"),
   }
 }
-pub fn v_find(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_find(x: K, y: K) -> Result<K, &'static str> {
+  // find index of every item of y in x
+  match (x, y) {
+    (K::BoolArray(_x), K::BoolArray(_y)) => todo!("BoolArray "),
+    (K::IntArray(_x), K::IntArray(_y)) => todo!("IntArray "),
+    (K::FloatArray(_x), K::FloatArray(_y)) => todo!("FloatArray "),
+    (K::CharArray(x), K::CharArray(y)) => {
+      if let K::CharArray(uniq_y) = v_unique(K::CharArray(y.clone())).unwrap() {
+        let map: IndexMap<char, Option<i64>> = uniq_y
+          .chars()
+          .map(|c| (c, x.chars().position(|cc| cc == c)))
+          .map(|(c, i)| match i {
+            Some(i) => (c, Some(i as i64)),
+            _ => (c, None),
+          })
+          .collect();
+        let res: Vec<Option<i64>> = y.chars().map(|c| map.get(&c).unwrap()).cloned().collect();
+        Ok(K::IntArray(arr!(res)))
+      } else {
+        panic!("impossible")
+      }
+    }
+    _ => Err("nyi v_find"),
+  }
+}
 pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_type(r: K) -> Result<K, &'static str> {
