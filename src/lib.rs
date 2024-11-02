@@ -820,8 +820,8 @@ pub fn promote_nouns(l: K, r: K) -> (K, K) {
 
     (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
     (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(repeat(*l as i64).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
-    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(repeat(*l as i64).take(r.len()).collect()), r),
+    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(repeat(*l).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(repeat(*l).take(r.len()).collect()), r),
     (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(repeat(*l as f64).take(r.len()).collect()), r),
     (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
     (K::Int(None), K::BoolArray(r)) => (K::IntArray(repeat(None::<i64>).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),

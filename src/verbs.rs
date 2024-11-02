@@ -218,7 +218,7 @@ pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, 
 
 pub fn v_first(x: K) -> Result<K, &'static str> {
   match x {
-    K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(0).unwrap().clone()))),
+    K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(0).unwrap()))),
     K::List(l) => Ok(l.first().unwrap().clone()),
     _ => Err("nyi"),
   }
@@ -337,13 +337,12 @@ pub fn v_asc(x: K) -> Result<K, &'static str> {
       for (i, v) in x.bool().unwrap().iter().enumerate() {
         if map.contains_key(&v) {
           let vec = map.get(&v).unwrap();
-          map.insert(v, vec.iter().chain(vec![i].iter()).cloned().collect());
+          map.insert(v, vec.iter().chain([i].iter()).cloned().collect());
         } else {
           map.insert(v, vec![i]);
         }
       }
-      let v: Vec<i64> =
-        map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
+      let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
       Ok(K::BoolArray(arr!(v)))
     }
     K::IntArray(x) => {
@@ -351,38 +350,29 @@ pub fn v_asc(x: K) -> Result<K, &'static str> {
       for (i, v) in x.i64().unwrap().iter().enumerate() {
         if map.contains_key(&v) {
           let vec = map.get(&v).unwrap();
-          map.insert(v, vec.iter().chain(vec![i].iter()).cloned().collect());
+          map.insert(v, vec.iter().chain([i].iter()).cloned().collect());
         } else {
           map.insert(v, vec![i]);
         }
       }
-      let v: Vec<i64> =
-        map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
+      let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
       Ok(K::IntArray(arr!(v)))
     }
     K::FloatArray(x) => {
       // f64 is only PartialOrd but we need something with Ord here.
       // This is a terrible hack and probably terrible for performance.
-      let scaled_ints: Vec<Option<i128>> = (x * 1e9)
-        .f64()
-        .unwrap()
-        .into_iter()
-        .map(|f| match f {
-          Some(f) => Some(f as i128),
-          _ => None,
-        })
-        .collect();
+      let scaled_ints: Vec<Option<i128>> =
+        (x * 1e9).f64().unwrap().into_iter().map(|f| f.map(|f| f as i128)).collect();
       let mut map: BTreeMap<Option<i128>, Vec<usize>> = BTreeMap::new();
       for (i, v) in scaled_ints.iter().enumerate() {
-        if map.contains_key(&v) {
-          let vec = map.get(&v).unwrap();
-          map.insert(*v, vec.iter().chain(vec![i].iter()).cloned().collect());
+        if map.contains_key(v) {
+          let vec = map.get(v).unwrap();
+          map.insert(*v, vec.iter().chain([i].iter()).cloned().collect());
         } else {
           map.insert(*v, vec![i]);
         }
       }
-      let v: Vec<i64> =
-        map.iter().map(|(_k, v)| v.into_iter().map(|v| *v as i64)).flatten().collect();
+      let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
       Ok(K::IntArray(arr!(v)))
     }
     _ => Err("nyi"),
@@ -956,7 +946,7 @@ pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
   // same as v_fold() except return a K::List of intermediate results
   // split into list, then scan
   match v {
-    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x.clone()).and_then(|v| {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x.clone()).map(|v| {
       let mut result: Vec<K> = vec![v[0].clone()];
       for i in v[1..].iter() {
         result.push(
@@ -975,8 +965,8 @@ pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
         )
       }
       match promote_num(result.clone()) {
-        Ok(k) => Ok(k),
-        _ => Ok(K::List(result)),
+        Ok(k) => k,
+        _ => K::List(result),
       }
     }),
     _ => Err("type"),
