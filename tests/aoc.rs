@@ -98,8 +98,10 @@ fn test_aoc2015_12_02_v2() {
 fn test_aoc2015_12_02_p2() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  let s = r#"{(*/x)+/2*2#x[<x]}'(2 3 4; 1 1 10)"#;
+  // let s = r#"{(*/x)+/2*2#x[<x]}'(2 3 4; 1 1 10)"#;
+  // let s = r#"{(*/x)+/2*2#x@<x}'(2 3 4; 1 1 10)"#;
+  let s = r#"+/{(*/x)+/2*2#x@<x}'{.'"x"\x}'0:"tests/aoc/2015/day02.txt""#;
   let res = eval(&mut env, scan(s).unwrap()).unwrap();
-  let expected = eval(&mut env, scan("34 14").unwrap()).unwrap();
+  let expected = eval(&mut env, scan("3842356").unwrap()).unwrap();
   assert_eq!(res, expected);
 }
