@@ -43,7 +43,7 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
 pub fn v_take(x: K, y: K) -> Result<K, &'static str> {
   match x {
-    K::Int(Some(0)) => match y {
+    K::Bool(0) | K::Int(Some(0)) => match y {
       K::Bool(_) | K::BoolArray(_) => Ok(K::BoolArray(Series::new_empty("", &DataType::Boolean))),
       K::Int(_) | K::IntArray(_) => Ok(K::IntArray(Series::new_empty("", &DataType::Int64))),
       K::Float(_) | K::FloatArray(_) => {
@@ -60,7 +60,8 @@ pub fn v_take(x: K, y: K) -> Result<K, &'static str> {
       K::Nil => Ok(K::Nil),
       K::Name(_) => panic!("impossible"),
     },
-    K::Int(_) => v_at(y, v_iota(x).unwrap()),
+    K::Bool(1) | K::Int(Some(_)) => v_at(y, v_iota(x).unwrap()),
+    K::Int(None) => Ok(y),
     _ => Err("type"),
   }
 }
@@ -472,7 +473,8 @@ pub fn v_except(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_floor(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_drop(x: K, y: K) -> Result<K, &'static str> {
   match x {
-    K::Int(Some(0)) => Ok(y),
+    K::Bool(1) => v_drop(K::Int(Some(1)), y),
+    K::Int(Some(0)) | K::Bool(0) => Ok(y),
     K::Int(Some(i)) => {
       if i.abs() as usize >= y.len() {
         v_take(K::Int(Some(0)), y)
@@ -641,7 +643,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
       }
     }
     K::BoolArray(i) => v_at(l, K::IntArray(i.cast(&DataType::Int64).unwrap())),
-    K::IntArray(i) => {
+    K::IntArray(ref i) => {
       // https://docs.rs/polars/latest/polars/series/struct.Series.html#method.take_threaded
       // Notes: Out of bounds access doesn’t Error but will return a Null value
       // TODO Add fills not Nulls
@@ -653,25 +655,41 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           .map(|i| i.unwrap_or(4_294_967_295) as u32)
           .collect::<Vec<u32>>(),
       );
-      let idcs: Vec<u32> =
-        i_u32.u32().unwrap().into_iter().map(|i| i.unwrap()).collect::<Vec<u32>>();
+      let r_len = r.clone().len();
+      let idcs: Vec<u32> = i_u32
+        .u32()
+        .unwrap()
+        .into_iter()
+        .map(|i| match i {
+          Some(i) => i.min(r_len.try_into().unwrap_or(4_294_967_295)),
+          _ => r_len.try_into().unwrap_or(4_294_967_295),
+        })
+        .collect::<Vec<u32>>();
       match l.clone() {
-        K::SymbolArray(a) => match a.take_slice(&idcs) {
-          Ok(a) => Ok(K::SymbolArray(a)),
-          _ => todo!("index out of bounds - this shouldn't be an error"),
-        },
-        K::BoolArray(a) => match a.take_slice(&idcs) {
-          Ok(a) => Ok(K::BoolArray(a)),
-          _ => todo!("index out of bounds - this shouldn't be an error"),
-        },
-        K::IntArray(a) => match a.take_slice(&idcs) {
-          Ok(a) => Ok(K::IntArray(a)),
-          _ => todo!("index out of bounds - this shouldn't be an error"),
-        },
-        K::FloatArray(a) => match a.take_slice(&idcs) {
-          Ok(a) => Ok(K::FloatArray(a)),
-          _ => todo!("index out of bounds - this shouldn't be an error"),
-        },
+        K::SymbolArray(a) => {
+          match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
+            Ok(a) => Ok(K::SymbolArray(a)),
+            _ => todo!("index out of bounds - this shouldn't be an error"),
+          }
+        }
+        K::BoolArray(a) => {
+          match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
+            Ok(a) => Ok(K::BoolArray(a)),
+            _ => todo!("index out of bounds - this shouldn't be an error"),
+          }
+        }
+        K::IntArray(a) => {
+          match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
+            Ok(a) => Ok(K::IntArray(a)),
+            _ => todo!("index out of bounds - this shouldn't be an error"),
+          }
+        }
+        K::FloatArray(a) => {
+          match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
+            Ok(a) => Ok(K::FloatArray(a)),
+            _ => todo!("index out of bounds - this shouldn't be an error"),
+          }
+        }
         K::CharArray(a) => Ok(K::CharArray(
           i_u32
             .u32()
@@ -794,11 +812,14 @@ pub fn v_split(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_iota(r: K) -> Result<K, &'static str> {
+pub fn v_iota(x: K) -> Result<K, &'static str> {
   debug!("v_iota");
-  match r {
+  match x {
+    K::Bool(0) => Ok(K::IntArray(Series::new_empty("", &DataType::Int64))),
+    K::Bool(1) => v_iota(K::Int(Some(1))),
+    K::Int(Some(0)) | K::Int(None) => Ok(K::IntArray(Series::new_empty("", &DataType::Int64))),
     K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
-    _ => todo!("v_iota variants"),
+    _ => todo!("v_iota variants: {}", x),
   }
 }
 pub fn v_sum(x: K) -> Result<K, &'static str> {

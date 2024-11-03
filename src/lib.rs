@@ -97,8 +97,8 @@ impl K {
         Nil => Ok(Nil.clone()),
         SymbolArray(_) | Symbol(_) => Ok(Symbol("".to_string())),
         BoolArray(_) | Bool(_) => Ok(Bool(0)),
-        IntArray(_) | Int(_) => Ok(Int(Some(0))),
-        FloatArray(_) | Float(_) => Ok(Float(0.0)),
+        IntArray(_) | Int(_) => Ok(Int(None)),
+        FloatArray(_) | Float(_) => Ok(K::Float(f64::NAN)),
         CharArray(_) | Char(_) => Ok(Char(' ')),
         Dictionary(_) => Err("type"), // TODO right?
         Table(_) => Err("type"),      // TODO right?
@@ -224,7 +224,9 @@ impl fmt::Display for K {
             .collect(),
         );
         let s = if s.len() < cols { s } else { s[..(cols - 2)].to_string() + ".." };
-        if b.len() == 1 {
+        if b.len() == 0 {
+          write!(f, "!0")
+        } else if b.len() == 1 {
           write!(f, ",{}", s)
         } else {
           write!(f, "{}", s)

@@ -9,7 +9,9 @@ use roklang::KW::*;
 fn k_eval(s: &str) -> K {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  eval(&mut env, scan(s).unwrap()).unwrap().unwrap_noun()
+  let r = eval(&mut env, scan(s).unwrap()).unwrap().unwrap_noun();
+  println!("k_eval({}) = {}", s, r);
+  r
 }
 
 #[test]
