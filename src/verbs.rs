@@ -218,7 +218,14 @@ pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, 
 
 pub fn v_first(x: K) -> Result<K, &'static str> {
   match x {
+    K::Bool(_) => Ok(x),
+    K::Int(_) => Ok(x),
+    K::Float(_) => Ok(x),
+    K::Char(_) => Ok(x),
+    K::BoolArray(a) => Ok(K::Bool(a.bool().unwrap().get(0).unwrap() as u8)),
     K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(0).unwrap()))),
+    K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(0).unwrap())),
+    K::CharArray(a) => Ok(K::Char(a.chars().nth(0).unwrap_or(' '))),
     K::List(l) => Ok(l.first().unwrap().clone()),
     _ => Err("nyi"),
   }
@@ -986,7 +993,10 @@ pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     _ => Err("type"),
   }
 }
-pub fn v_d_scan(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("scan") }
+pub fn v_d_scan(_env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+  //
+  todo!("v_d_scan")
+}
 
 pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
   todo!("v_eachprior()")
