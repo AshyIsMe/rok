@@ -1156,6 +1156,22 @@ fn test_array_indexing() {
 
   let res = eval(&mut env, scan("(1 2 3; 3.14; `a) @ 0").unwrap()).unwrap();
   assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+
+  // (1;2;3 4)@0 1
+  // (1;2;3 4)@2
+  let res = eval(&mut env, scan("(1;2;3 4)@ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Bool(1)));
+
+  let res = eval(&mut env, scan("(1;2;3 4)@ 0 1").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([1, 2i64]))));
+
+  let res = eval(&mut env, scan("(1;2;3 4)@ 2").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([3, 4i64]))));
+
+  assert_eq!(
+    eval(&mut env, scan("(1;2;3 4)@ 42 42 42").unwrap()).unwrap(),
+    eval(&mut env, scan("0N 0N 0N").unwrap()).unwrap()
+  );
 }
 
 #[test]

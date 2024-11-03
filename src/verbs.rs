@@ -591,19 +591,19 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
             let c: char = a.chars().nth(i as usize).unwrap();
             Ok(K::Char(c))
           }
-          K::List(_v) => todo!("v_at List"),
+          K::List(v) => Ok(v.get(i as usize).unwrap().clone()),
           _ => todo!("index into l"),
         }
       } else {
         l.fill(0)
       }
     }
-    K::BoolArray(i) => v_at(l, K::try_from(i.cast(&DataType::Int64).unwrap()).unwrap()),
+    K::BoolArray(i) => v_at(l, K::IntArray(i.cast(&DataType::Int64).unwrap())),
     K::IntArray(i) => {
       // https://docs.rs/polars/latest/polars/series/struct.Series.html#method.take_threaded
       // Notes: Out of bounds access doesn’t Error but will return a Null value
       // TODO Add fills not Nulls
-      let i = Series::new(
+      let i_u32 = Series::new(
         "",
         i.i64()
           .unwrap()
@@ -611,7 +611,8 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           .map(|i| i.unwrap_or(4_294_967_295) as u32)
           .collect::<Vec<u32>>(),
       );
-      let idcs: Vec<u32> = i.u32().unwrap().into_iter().map(|i| i.unwrap()).collect::<Vec<u32>>();
+      let idcs: Vec<u32> =
+        i_u32.u32().unwrap().into_iter().map(|i| i.unwrap()).collect::<Vec<u32>>();
       match l.clone() {
         K::SymbolArray(a) => match a.take_slice(&idcs) {
           Ok(a) => Ok(K::SymbolArray(a)),
@@ -630,13 +631,26 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
           _ => todo!("index out of bounds - this shouldn't be an error"),
         },
         K::CharArray(a) => Ok(K::CharArray(
-          i.u32()
+          i_u32
+            .u32()
             .unwrap()
             .iter()
             .map(|i| a.chars().nth(i.unwrap() as usize).unwrap_or(' '))
             .collect(),
         )),
-        K::List(_) => todo!("v_at K::List"),
+        K::List(v) => {
+          let r: Vec<K> = i
+            .i64()
+            .unwrap()
+            .into_iter()
+            .map(|i| match i {
+              None => K::Int(None),
+              Some(i) if i < 0 || i as usize >= v.len() => K::Int(None),
+              _ => v.get(i.unwrap() as usize).unwrap().clone(),
+            })
+            .collect();
+          Ok(promote_num(r.clone()).unwrap_or(K::List(r)))
+        }
         _ => todo!("v_at"),
       }
     }
