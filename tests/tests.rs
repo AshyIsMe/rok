@@ -6,6 +6,12 @@ use roklang::*;
 
 use roklang::KW::*;
 
+fn k_eval(s: &str) -> K {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  eval(&mut env, scan(s).unwrap()).unwrap().unwrap_noun()
+}
+
 #[test]
 fn test_scan() {
   assert_eq!(scan("1").unwrap(), vec![Noun(K::Bool(1u8))]);
@@ -859,6 +865,16 @@ fn test_scan_fixedpoint() {
 }
 
 #[test]
+fn test_v_d_scan() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("3 +\\ 1 2 3").unwrap()).unwrap(),
+    eval(&mut env, scan("4 6 9").unwrap()).unwrap(),
+  );
+}
+
+#[test]
 fn test_parse_functions() {
   // See https://estradajke.github.io/k9-simples/k9/User-Functions.html
   //
@@ -1458,4 +1474,17 @@ fn test_grade() {
 
   let res = eval(&mut env, scan("< 3.0 2.5 1").unwrap()).unwrap().unwrap_noun();
   assert_eq!(res, K::IntArray(arr!([2, 1, 0i64])));
+}
+
+#[test]
+fn test_index_take_drop_bounds() {
+  assert_eq!(k_eval("1 _ 1 2 3"), k_eval("2 3"));
+
+  assert_eq!(k_eval("1 2 3 @ 42"), k_eval("0N"));
+
+  assert_eq!(k_eval("1 2 3 @ 0 1 42"), k_eval("1 2 0N"));
+
+  assert_eq!(k_eval("0 # 1 2 3"), k_eval("!0"));
+
+  assert_eq!(k_eval("0N # 1 2 3"), k_eval("1 2 3"));
 }

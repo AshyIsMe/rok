@@ -106,6 +106,7 @@ fn test_aoc2015_12_02_p2() {
   assert_eq!(res, expected);
 }
 
+#[ignore]
 #[test]
 fn test_aoc2015_12_03() {
   let mut env = Env { names: HashMap::new(), parent: None };

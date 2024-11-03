@@ -43,6 +43,23 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
 pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
 pub fn v_take(x: K, y: K) -> Result<K, &'static str> {
   match x {
+    K::Int(Some(0)) => match y {
+      K::Bool(_) | K::BoolArray(_) => Ok(K::BoolArray(Series::new_empty("", &DataType::Boolean))),
+      K::Int(_) | K::IntArray(_) => Ok(K::IntArray(Series::new_empty("", &DataType::Int64))),
+      K::Float(_) | K::FloatArray(_) => {
+        Ok(K::FloatArray(Series::new_empty("", &DataType::Float64)))
+      }
+      K::Char(_) | K::CharArray(_) => Ok(K::CharArray("".to_string())),
+      K::Symbol(_) | K::SymbolArray(_) => Ok(K::SymbolArray(Series::new_empty(
+        "",
+        &DataType::Categorical(None, CategoricalOrdering::Lexical),
+      ))),
+      K::List(_) => Ok(K::List(vec![])),
+      K::Dictionary(_) => Ok(K::Dictionary(IndexMap::default())),
+      K::Table(_) => Ok(K::Table(DataFrame::empty())),
+      K::Nil => Ok(K::Nil),
+      K::Name(_) => panic!("impossible"),
+    },
     K::Int(_) => v_at(y, v_iota(x).unwrap()),
     _ => Err("type"),
   }
@@ -453,7 +470,25 @@ pub fn v_fill(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_except(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_floor(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_drop(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_drop(x: K, y: K) -> Result<K, &'static str> {
+  match x {
+    K::Int(Some(0)) => Ok(y),
+    K::Int(Some(i)) => {
+      if i.abs() as usize >= y.len() {
+        v_take(K::Int(Some(0)), y)
+      } else if i < 0 {
+        // drop off end.
+        // TODO efficient K slicing
+        v_at(y.clone(), K::IntArray(arr!((0..(y.len() as i64 - i.abs())).collect::<Vec<i64>>())))
+      } else {
+        // drop off front.
+        // TODO efficient K slicing
+        v_at(y.clone(), K::IntArray(arr!((i..(y.len() as i64)).collect::<Vec<i64>>())))
+      }
+    }
+    _ => Err("type"),
+  }
+}
 pub fn v_delete(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_cut(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
@@ -993,9 +1028,27 @@ pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     _ => Err("type"),
   }
 }
-pub fn v_d_scan(_env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
-  //
-  todo!("v_d_scan")
+pub fn v_d_scan(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+  match v.clone() {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => {
+      let first: K = eval(
+        env,
+        vec![
+          f.clone(),
+          KW::FuncArgs(vec![
+            vec![KW::Noun(x.clone())],
+            vec![KW::Noun(v_first(y.clone()).unwrap())],
+          ]),
+        ],
+      )
+      .unwrap()
+      .unwrap_noun();
+
+      let rest: K = v_drop(K::Int(Some(1)), y).unwrap();
+      v_scan(env, v, v_concat(first, rest).unwrap())
+    }
+    _ => Err("type"),
+  }
 }
 
 pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
