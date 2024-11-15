@@ -462,7 +462,11 @@ pub fn v_concat(x: K, y: K) -> Result<K, &'static str> {
     (K::Char(x), K::Char(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
     (K::CharArray(x), K::Char(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
     (K::Char(x), K::CharArray(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
-    _ => Err("nyi v_concat() other cases"),
+
+    (K::List(x), K::List(y)) => Ok(K::List(x.iter().chain(y.iter()).cloned().collect())),
+    (K::List(x), y) => Ok(K::List(x.iter().chain(vec![y].iter()).cloned().collect())),
+    (x, K::List(y)) => Ok(K::List(vec![x].iter().chain(y.iter()).cloned().collect())),
+    _ => todo!("nyi v_concat() other cases {}, {}", x, y),
   }
 }
 
