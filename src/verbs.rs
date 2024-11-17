@@ -5,7 +5,33 @@ use std::collections::BTreeMap;
 use std::iter::repeat;
 
 pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_group(_x: K) -> Result<K, &'static str> { Err("nyi") }
+
+pub fn v_group(x: K) -> Result<K, &'static str> {
+  // https://docs.rs/polars/latest/polars/frame/group_by/struct.GroupBy.html#method.get_groups
+  // https://docs.rs/polars/latest/polars/frame/group_by/struct.GroupBy.html#method.groups
+  match x {
+    K::BoolArray(x) | K::IntArray(x) | K::FloatArray(x) => {
+      //TODO dicts should be IndexMap<K,K>
+      let df = DataFrame::new(vec![x.clone().cast(&DataType::String).unwrap()]).unwrap();
+      let g = df.group_by_stable([x.name()]).unwrap().groups().unwrap();
+      // let keys: K = K::try_from(g.iter().nth(0).unwrap().clone()).unwrap();
+      let keys: K = K::SymbolArray(
+        g.iter()
+          .nth(0)
+          .unwrap()
+          .clone()
+          .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+          .unwrap(),
+      );
+      let vals: Vec<K> =
+        g.iter().nth(1).unwrap().iter().map(|cell| K::try_from(cell).unwrap()).collect();
+      // println!("v_makedict({:?}, {:?})", keys, vals);
+      v_makedict(keys, K::List(vals))
+    }
+    _ => Err("nyi"),
+  }
+}
+
 pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
   len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
@@ -501,7 +527,14 @@ pub fn v_cut(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_string(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_dfmt(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_cast(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_cast(l: K, r: K) -> Result<K, &'static str> {
+  match l {
+    K::Symbol(s) if s == "c".to_string() => todo!("cast to string"),
+    K::Symbol(s) if s == "i".to_string() => todo!("cast to int"),
+    K::Symbol(s) if s == "f".to_string() => todo!("cast to float"),
+    _ => Err("type"),
+  }
+}
 
 pub fn v_randfloat(r: K) -> Result<K, &'static str> {
   match r {
@@ -855,7 +888,12 @@ pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()
 
 pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   match l {
-    K::SymbolArray(_) | K::Symbol(_) => v_makedict(l, r),
+    K::SymbolArray(_)
+    | K::Symbol(_)
+    | K::BoolArray(_)
+    | K::IntArray(_)
+    | K::FloatArray(_)
+    | K::CharArray(_) => v_makedict(l, r),
     _ => v_mod(l, r),
   }
 }

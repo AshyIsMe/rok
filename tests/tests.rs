@@ -1490,3 +1490,8 @@ fn test_index_take_drop_bounds() {
 
   assert_eq!(k_eval("0N # 1 2 3"), k_eval("1 2 3"));
 }
+
+#[test]
+fn test_group() {
+  assert_eq!(k_eval("= 1 1 2 2 3 3 4"), k_eval("`1`2`3`4!(0 1;2 3;4 5;6)"));
+}

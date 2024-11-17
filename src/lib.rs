@@ -37,6 +37,7 @@ pub enum K {
   CharArray(String),
   Nil, // Is Nil a noun?
   List(Vec<K>),
+  // Dictionary(IndexMap<K, K>), //TODO dicts should be K: K
   Dictionary(IndexMap<String, K>),
   Table(DataFrame),
   //Quote(Box<K>) // Is Quote a noun?
@@ -309,18 +310,56 @@ impl TryFrom<Series> for K {
   type Error = &'static str;
 
   fn try_from(s: Series) -> Result<Self, Self::Error> {
-    if s.i64().is_ok() {
+    if s.i64().is_ok() || s.i32().is_ok() || s.u64().is_ok() || s.u32().is_ok() {
       if s.min().unwrap() == Some(0) && s.max().unwrap() == Some(1) {
         Ok(K::BoolArray(s.cast(&DataType::UInt8).unwrap()))
       } else {
-        Ok(K::IntArray(s))
+        Ok(K::IntArray(s.cast(&DataType::Int64).unwrap()))
       }
     } else if s.f64().is_ok() {
       Ok(K::FloatArray(s))
     } else if s.categorical().is_ok() {
       Ok(K::SymbolArray(s))
+    } else if s.str().is_ok() {
+      Ok(K::List(
+        s.iter()
+          .map(|s| {
+            // TODO s.to_string() adds surrounding " chars
+            K::CharArray(s.to_string())
+          })
+          .collect(),
+      ))
     } else {
+      todo!("try_from<Series>() nyi: {}", s);
       Err("type")
+    }
+  }
+}
+
+impl TryFrom<AnyValue<'_>> for K {
+  type Error = &'static str;
+
+  fn try_from(v: AnyValue) -> Result<Self, Self::Error> {
+    match v {
+      // AnyValue::Boolean(b) => Ok(K::Bool(match b {
+      //   true => 1,
+      //   false => 0,
+      // })),
+      AnyValue::Boolean(b) => Ok(K::Bool(b as u8)),
+      AnyValue::UInt16(i) => Ok(K::Int(Some(i as i64))),
+      AnyValue::Int16(i) => Ok(K::Int(Some(i as i64))),
+      AnyValue::UInt32(i) => Ok(K::Int(Some(i as i64))),
+      AnyValue::Int32(i) => Ok(K::Int(Some(i as i64))),
+      AnyValue::UInt64(i) => Ok(K::Int(Some(i as i64))),
+      AnyValue::Int64(i) => Ok(K::Int(Some(i))),
+      AnyValue::Float32(f) => Ok(K::Float(f as f64)),
+      AnyValue::Float64(f) => Ok(K::Float(f)),
+      AnyValue::List(s) => K::try_from(s),
+      AnyValue::String(s) => Ok(K::CharArray(s.to_string())),
+      _ => {
+        todo!("try_from() nyi: {}", v);
+        Err("type")
+      }
     }
   }
 }
