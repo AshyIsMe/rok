@@ -6,6 +6,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
+use std::hash::{Hash, Hasher};
 use std::iter::zip;
 use std::path::Path;
 use std::{collections::VecDeque, iter::repeat, ops};
@@ -46,7 +47,10 @@ pub enum K {
   // Float32Array(Series), // TODO maybe later?
   // Decimal(_), DecimalArray(Series) // TODO maybe later?
 }
-// impl Eq for K {} // TODO for the v_unique() K::List() case
+
+// Needed for the v_unique() and v_group() K::List() case.
+// TODO Is this actually ok even though Series and DataFrame don't impl Eq?
+impl Eq for K {}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum KW /* KWords */ {
@@ -302,6 +306,42 @@ impl fmt::Display for K {
   }
 }
 
+impl Hash for K {
+  fn hash<H: Hasher>(&self, state: &mut H) {
+    match self {
+      K::Bool(b) => b.hash(state),
+      K::Int(i) => i.hash(state),
+      K::Float(f) => f.to_string().hash(state),
+      K::Char(c) => c.hash(state),
+      K::Symbol(s) => s.hash(state),
+      K::BoolArray(b) => {
+        let v: Vec<Option<u8>> = b.u8().unwrap().into_iter().collect();
+        v.hash(state)
+      }
+      K::IntArray(i) => {
+        let v: Vec<Option<i64>> = i.i64().unwrap().into_iter().collect();
+        v.hash(state)
+      }
+      K::FloatArray(f) => {
+        let v: Vec<Option<String>> = f
+          .f64()
+          .unwrap()
+          .into_iter()
+          .map(|f| match f {
+            Some(f) => Some(f.to_string()),
+            None => None,
+          })
+          .collect();
+        v.hash(state)
+      }
+      K::CharArray(c) => c.hash(state),
+      K::SymbolArray(s) => todo!("impl hash for K::SymbolArray"),
+
+      _ => panic!("TODO: validate impl Hash for K!"),
+    }
+  }
+}
+
 impl From<String> for K {
   fn from(item: String) -> Self { K::CharArray(item) }
 }
@@ -310,9 +350,10 @@ impl TryFrom<Series> for K {
   type Error = &'static str;
 
   fn try_from(s: Series) -> Result<Self, Self::Error> {
-    if s.i64().is_ok() || s.i32().is_ok() || s.u64().is_ok() || s.u32().is_ok() {
+    if s.i64().is_ok() || s.i32().is_ok() || s.u64().is_ok() || s.u32().is_ok() || s.u8().is_ok() {
       if s.min().unwrap() == Some(0) && s.max().unwrap() == Some(1) {
-        Ok(K::BoolArray(s.cast(&DataType::UInt8).unwrap()))
+        // Ok(K::BoolArray(s.cast(&DataType::UInt8).unwrap()))
+        Ok(K::BoolArray(s.cast(&DataType::Boolean).unwrap()))
       } else {
         Ok(K::IntArray(s.cast(&DataType::Int64).unwrap()))
       }
@@ -357,7 +398,7 @@ impl TryFrom<AnyValue<'_>> for K {
       AnyValue::List(s) => K::try_from(s),
       AnyValue::String(s) => Ok(K::CharArray(s.to_string())),
       _ => {
-        todo!("try_from() nyi: {}", v);
+        println!("try_from() nyi: {}", v);
         Err("type")
       }
     }

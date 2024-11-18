@@ -28,7 +28,33 @@ pub fn v_group(x: K) -> Result<K, &'static str> {
       // println!("v_makedict({:?}, {:?})", keys, vals);
       v_makedict(keys, K::List(vals))
     }
-    _ => Err("nyi"),
+    K::CharArray(s) => {
+      let mut letters = IndexMap::new();
+      for (i, ch) in s.chars().enumerate() {
+        (*letters.entry(ch).or_insert(vec![])).extend(vec![K::Int(Some(i as i64))]);
+      }
+      let mut d = IndexMap::new();
+      for (k, v) in letters {
+        d.insert(k.to_string(), promote_num(v).unwrap());
+      }
+      Ok(K::Dictionary(d))
+    }
+    K::SymbolArray(_s) => todo!("v_group(SymbolArray(_))"),
+    K::List(v) => {
+      let mut im = IndexMap::new();
+      for (i, k) in v.iter().enumerate() {
+        (*im.entry(k).or_insert(vec![])).extend(vec![K::Int(Some(i as i64))]);
+      }
+
+      let mut d = IndexMap::new();
+      for (k, v) in im {
+        d.insert(k.to_string(), promote_num(v).unwrap());
+      }
+      Ok(K::Dictionary(d))
+    }
+    K::Table(_df) => todo!("v_group(Table(_))"),
+
+    _ => Err("type"),
   }
 }
 
@@ -527,7 +553,7 @@ pub fn v_cut(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_string(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_dfmt(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_cast(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_cast(l: K, _r: K) -> Result<K, &'static str> {
   match l {
     K::Symbol(s) if s == "c".to_string() => todo!("cast to string"),
     K::Symbol(s) if s == "i".to_string() => todo!("cast to int"),

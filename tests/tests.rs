@@ -1493,5 +1493,12 @@ fn test_index_take_drop_bounds() {
 
 #[test]
 fn test_group() {
-  assert_eq!(k_eval("= 1 1 2 2 3 3 4"), k_eval("`1`2`3`4!(0 1;2 3;4 5;6)"));
+  assert_eq!(k_eval("= 1 1 2 2 3 3 4"), k_eval("`1`2`3`4!(0 1;2 3;4 5;(,6))"));
+  assert_eq!(k_eval("= 1.0 1 2 2 3 3 4"), k_eval("`1.0`2.0`3.0`4.0!(0 1;2 3;4 5;(,6))"));
+
+  // TODO: result is IntArray(0) vs BoolArray(0)
+  assert_eq!(k_eval("= \"foo\""), k_eval("`f`0!((,0);1 2)"));
+
+  // TODO
+  assert_eq!(k_eval("= (0 1;1 0;0 1)"), k_eval("!/+((0 1;0 2);(1 0;,1))"));
 }
