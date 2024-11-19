@@ -208,12 +208,13 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
         .get_columns()
         .iter()
         .map(|s| match s.dtype() {
-          DataType::Boolean => K::BoolArray(s.clone()),
+          // DataType::Boolean => K::BoolArray(s.clone()), // TODO: cleanup all BoolArray/Boolean usage
+          DataType::UInt8 => K::BoolArray(s.clone()),
           DataType::Int64 => K::IntArray(s.clone()),
           DataType::Float64 => K::FloatArray(s.clone()),
           // DataType::String => K::CharArray(s.clone()), // TODO K::List([K::CharArray(), ...])
           DataType::Categorical { .. } => K::SymbolArray(s.clone()),
-          _ => panic!("impossible"),
+          _ => panic!("impossible s.dtype(): {}", s.dtype()),
         })
         .collect();
 

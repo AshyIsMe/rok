@@ -32,7 +32,7 @@ pub enum K {
   Char(char),
   Symbol(String),
   SymbolArray(Series),
-  BoolArray(Series),  // Series<bool>
+  BoolArray(Series),  // Series<u8> // TODO should this be Series<bool>? bitstrings?
   IntArray(Series),   // Series<i64>
   FloatArray(Series), // Series<f64>
   CharArray(String),
@@ -335,9 +335,14 @@ impl Hash for K {
         v.hash(state)
       }
       K::CharArray(c) => c.hash(state),
-      K::SymbolArray(s) => todo!("impl hash for K::SymbolArray"),
+      K::SymbolArray(_s) => todo!("impl hash for K::SymbolArray"),
 
-      _ => panic!("TODO: validate impl Hash for K!"),
+      K::List(v) => v.hash(state),
+      K::Dictionary(_d) => todo!("impl hash for K::Dictionary"),
+      K::Table(_df) => todo!("impl hash for K::Table"),
+
+      K::Nil => self.hash(state),
+      K::Name(_) => panic!("impossible"),
     }
   }
 }
@@ -372,7 +377,7 @@ impl TryFrom<Series> for K {
       ))
     } else {
       todo!("try_from<Series>() nyi: {}", s);
-      Err("type")
+      // Err("type")
     }
   }
 }
@@ -1726,6 +1731,17 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
         .collect();
 
       Ok(K::FloatArray(Series::new("", fa)))
+    } else if nums.iter().all(|k| matches!(k, K::Int(Some(1)) | K::Int(Some(0)))) {
+      let ba: Vec<u8> = nums
+        .iter()
+        .map(|k| match k {
+          K::Int(Some(1)) => 1u8,
+          K::Int(Some(0)) => 0u8,
+          _ => panic!("invalid bool"),
+        })
+        .collect();
+
+      Ok(K::BoolArray(Series::new("", ba)))
     } else if nums.iter().any(|k| matches!(k, K::Int(_))) {
       let ia: Vec<Option<i64>> = nums
         .iter()
@@ -1738,11 +1754,18 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
 
       Ok(K::IntArray(Series::new("", ia)))
     } else if nums.iter().all(|k| matches!(k, K::Bool(_))) {
-      let ba: BooleanChunked = nums
+      // let ba: BooleanChunked = nums
+      //   .iter()
+      //   .map(|k| match k {
+      //     K::Bool(0) => false,
+      //     K::Bool(1) => true,
+      //     _ => panic!("invalid bool"),
+      //   })
+      //   .collect();
+      let ba: Vec<u8> = nums
         .iter()
         .map(|k| match k {
-          K::Bool(0) => false,
-          K::Bool(1) => true,
+          K::Bool(i) => *i,
           _ => panic!("invalid bool"),
         })
         .collect();
