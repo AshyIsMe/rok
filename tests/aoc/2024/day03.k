@@ -22,17 +22,13 @@ v:{vs[x]&ve[x]&vi[x]} /valid mul(x,y) instruction
 mi:&"m"=i /m indices
 mi:mi[&v'{i[x+!12]}'mi] /valid m indices
 
-mi:mi@&{x<(vr@1)@*&x<*vr}'mi /valid range m indices
+/WRONG mi:mi@&{x<(vr@1)@*&x<*vr}'mi /valid range m indices
+
+/each mi is valid if:
+/ doi to it's left is greater than donti to it's left
+mi:mi@&>/(+{doi@*|&doi<x}'mi),+{donti@*|&donti<x}'mi /valid range m indices
 
 e:{s:i[x+!12];","\4_(s?")")#s} /extract mul(x,y)
 p:{s:i[x+!12];.'","\4_(s?")")#s} /parse mul(x,y)
 
-+/*/+p'mi /part2 = 173419328 INCORRECT
-
-t1:+`i`s!(mi;e'mi)
-t2:+`i`s!(doi;(#doi)#(,"do"))
-t3:+`i`s!(donti;(#donti)#(,"dont"))
-
-t:t1,t2,t3 /table of indices
-
-/TODO rolling filter for "do" index ranges
++/*/+p'mi /part2 = 90669332
