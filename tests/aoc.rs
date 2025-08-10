@@ -111,8 +111,14 @@ fn test_aoc2015_12_03() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
   // #=0 0+\(0 1;0 -1;-1 0;1 0)@"^v<>"?*i:0:"day3.txt"
-  let s = r#"#=0 0+\(0 1;0 -1;-1 0;1 0)@"^v<>"?*0:"tests/aoc/2015/day03.txt""#;
+  let s = r#"#=santa:0 0+\(0 1;0 -1;-1 0;1 0)@"^v<>"?*0:"tests/aoc/2015/day03.txt""#;
   let res = eval(&mut env, scan(s).unwrap()).unwrap();
   let expected = eval(&mut env, scan("2572").unwrap()).unwrap();
   assert_eq!(res, expected);
+
+  // part 2
+  // let s = r#"#=santa,robot:0 0+\(0 -1;0 1;1 0;-1 0)@"^v<>"?*0:"tests/aoc/2015/day03.txt""#;
+  // let res = eval(&mut env, scan(s).unwrap()).unwrap();
+  // let expected = eval(&mut env, scan("1234").unwrap()).unwrap(); // 4403 too high
+  // assert_eq!(res, expected);
 }
