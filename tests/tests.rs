@@ -1367,6 +1367,18 @@ fn test_eachright() {
   assert_eq!(res1, res2);
 }
 
+#[ignore]
+#[test]
+fn test_eachright_defun() {
+  // TODO: parse adverbs properly
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("a{x=y}/:a:!3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("(1 0 0;0 1 0;0 0 1)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
 
 #[test]
 fn test_max() {

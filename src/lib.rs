@@ -801,29 +801,45 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
           panic!("impossible")
         }
       },
-      None => match adverbs.get(&v[v.len() - 1..]) {
-        Some((m_a, d_a)) => match (l, r) {
-          (Some(KW::Noun(l)), KW::Noun(r)) => {
-            d_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, l, r).map(KW::Noun)
-          }
-          (None, KW::Noun(r)) => {
-            m_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, r).map(KW::Noun)
-          }
-          _ => todo!("other adverb cases"),
-        },
-        None => todo!("NotYetImplemented {}", v),
-      },
+      None => {
+        // TODO: a nicer way to handle 2 char vs 1 char adverbs.
+        match adverbs.get(&v[v.len() - 2..]) {
+          Some((m_a, d_a)) => match (l, r) {
+            (Some(KW::Noun(l)), KW::Noun(r)) => {
+              d_a(env, KW::Verb { name: v[..v.len() - 2].to_string() }, l, r).map(KW::Noun)
+            }
+            (None, KW::Noun(r)) => {
+              m_a(env, KW::Verb { name: v[..v.len() - 2].to_string() }, r).map(KW::Noun)
+            }
+            _ => todo!("other adverb cases"),
+          },
+          None => match adverbs.get(&v[v.len() - 1..]) {
+            Some((m_a, d_a)) => match (l, r) {
+              (Some(KW::Noun(l)), KW::Noun(r)) => {
+                d_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, l, r).map(KW::Noun)
+              }
+              (None, KW::Noun(r)) => {
+                m_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, r).map(KW::Noun)
+              }
+              _ => todo!("other adverb cases"),
+            },
+            None => todo!("NotYetImplemented {}", v),
+          },
+        }
+      }
     },
   }
 }
 pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
   // Return a new Verb that implements the appropriate adverb behaviour
   match l {
-    KW::Verb { name } => if adverbs_table().keys().contains(&a) {
-      Ok(KW::Verb { name: name + a })
-    } else {
-      panic!("invalid adverb")
-    },
+    KW::Verb { name } => {
+      if adverbs_table().keys().contains(&a) {
+        Ok(KW::Verb { name: name + a })
+      } else {
+        panic!("invalid adverb")
+      }
+    }
     KW::Function { body, args, adverb: None } => match a {
       "\'" | "/" | "\\" => Ok(KW::Function { body, args, adverb: Some(a.to_string()) }),
       _ => panic!("invalid adverb"),

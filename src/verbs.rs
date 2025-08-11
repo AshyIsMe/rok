@@ -1154,9 +1154,9 @@ pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str
         .iter()
         .cloned()
         .map(|y|
-             // apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun()
-            //  eval(env, vec![f.clone(), KW::Noun(y.clone())]).unwrap().unwrap_noun())
-             eval(env, vec![f.clone(), KW::Noun(x.clone()),KW::Noun(y.clone())]).unwrap().unwrap_noun())
+             eval(env, vec![f.clone(), 
+               KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]])
+              ]).unwrap().unwrap_noun())
         .collect();
       promote_num(r.clone()).unwrap_or(K::List(r))
     }),
