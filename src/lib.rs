@@ -802,29 +802,24 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
         }
       },
       None => {
-        // TODO: a nicer way to handle 2 char vs 1 char adverbs.
-        match adverbs.get(&v[v.len() - 2..]) {
-          Some((m_a, d_a)) => match (l, r) {
+        let t = if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 2..]) {
+          Some((2, (m_a, d_a)))
+        } else if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 1..]) {
+          Some((1, (m_a, d_a)))
+        } else {
+          None
+        };
+        match t {
+          Some((adv_len, (m_a, d_a))) => match (l, r) {
             (Some(KW::Noun(l)), KW::Noun(r)) => {
-              d_a(env, KW::Verb { name: v[..v.len() - 2].to_string() }, l, r).map(KW::Noun)
+              d_a(env, KW::Verb { name: v[..v.len() - adv_len].to_string() }, l, r).map(KW::Noun)
             }
             (None, KW::Noun(r)) => {
-              m_a(env, KW::Verb { name: v[..v.len() - 2].to_string() }, r).map(KW::Noun)
+              m_a(env, KW::Verb { name: v[..v.len() - adv_len].to_string() }, r).map(KW::Noun)
             }
             _ => todo!("other adverb cases"),
           },
-          None => match adverbs.get(&v[v.len() - 1..]) {
-            Some((m_a, d_a)) => match (l, r) {
-              (Some(KW::Noun(l)), KW::Noun(r)) => {
-                d_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, l, r).map(KW::Noun)
-              }
-              (None, KW::Noun(r)) => {
-                m_a(env, KW::Verb { name: v[..v.len() - 1].to_string() }, r).map(KW::Noun)
-              }
-              _ => todo!("other adverb cases"),
-            },
-            None => todo!("NotYetImplemented {}", v),
-          },
+          None => todo!("NotYetImplemented {}", v),
         }
       }
     },
