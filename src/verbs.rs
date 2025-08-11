@@ -1147,11 +1147,25 @@ pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
 pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
   todo!("v_windows()")
 }
-pub fn v_eachright(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
-  todo!("v_eachright()")
+pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(y).map(|v| {
+      let r: Vec<K> = v
+        .iter()
+        .cloned()
+        .map(|y|
+             // apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun()
+            //  eval(env, vec![f.clone(), KW::Noun(y.clone())]).unwrap().unwrap_noun())
+             eval(env, vec![f.clone(), KW::Noun(x.clone()),KW::Noun(y.clone())]).unwrap().unwrap_noun())
+        .collect();
+      promote_num(r.clone()).unwrap_or(K::List(r))
+    }),
+    _ => Err("type"),
+  }
+  // todo!("v_d_eachright()")
 }
-pub fn v_eachleft(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
-  todo!("v_eachleft()")
+pub fn v_d_eachleft(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
+  todo!("v_d_eachleft()")
 }
 
 pub fn strip_quotes(s: String) -> String {

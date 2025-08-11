@@ -601,7 +601,8 @@ pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
 pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
-pub fn v_d_none2(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
+pub fn av_none1(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { Err("rank") }
+pub fn av_d_none2(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
 
 type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
 type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
@@ -729,8 +730,8 @@ pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
     ("/", (a_slash, a_d_slash)),    // over fixedpoint for while
     ("\\", (a_bslash, a_d_bslash)), // scan scan-fixedpoint scan-for scan-while
     ("':", (v_eachprior, v_windows)),
-    ("/:", (v_eachright, v_d_none2)),
-    ("\\:", (v_eachleft, v_d_none2)),
+    ("/:", (av_none1, v_d_eachright)),
+    ("\\:", (av_none1, v_d_eachleft)),
   ])
 }
 
@@ -818,9 +819,10 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
 pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
   // Return a new Verb that implements the appropriate adverb behaviour
   match l {
-    KW::Verb { name } => match a {
-      "\'" | "/" | "\\" => Ok(KW::Verb { name: name + a }),
-      _ => panic!("invalid adverb"),
+    KW::Verb { name } => if adverbs_table().keys().contains(&a) {
+      Ok(KW::Verb { name: name + a })
+    } else {
+      panic!("invalid adverb")
     },
     KW::Function { body, args, adverb: None } => match a {
       "\'" | "/" | "\\" => Ok(KW::Function { body, args, adverb: Some(a.to_string()) }),
