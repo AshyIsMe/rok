@@ -4,7 +4,16 @@ use std::cmp;
 use std::collections::BTreeMap;
 use std::iter::repeat;
 
-pub fn v_imat(_x: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_imat(x: K) -> Result<K, &'static str> {
+  match x {
+    K::Int(Some(i)) => {
+      let s = format!("{{a=/:a:!x}}{}", i);
+      let mut env = Env { names: HashMap::new(), parent: None };
+      Ok(eval(&mut env, scan(&s).unwrap()).unwrap().unwrap_noun())
+    }
+    _ => Err("type"),
+  }
+}
 
 pub fn v_group(x: K) -> Result<K, &'static str> {
   // https://docs.rs/polars/latest/polars/frame/group_by/struct.GroupBy.html#method.get_groups
@@ -1150,9 +1159,15 @@ pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
         .zip(v.iter().skip(1))
         .map(|(x, y)| {
           // f[y,x] / yes y,x not x,y
-          eval(env, vec![f.clone(),
-              KW::FuncArgs(vec![vec![KW::Noun(y.clone())], vec![KW::Noun(x.clone())]])],
-          ).unwrap().unwrap_noun()
+          eval(
+            env,
+            vec![
+              f.clone(),
+              KW::FuncArgs(vec![vec![KW::Noun(y.clone())], vec![KW::Noun(x.clone())]]),
+            ],
+          )
+          .unwrap()
+          .unwrap_noun()
         })
         .collect();
       let r: Vec<K> = vec![first.clone()].into_iter().chain(r).collect();

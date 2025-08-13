@@ -1572,3 +1572,8 @@ fn test_group() {
   // assert_eq!(k_eval("= (0 1;1 0;0 1)"), k_eval("!/+((0 1;0 2);(1 0;,1))"));
   assert_eq!(k_eval("= (0 1;1 0;0 1)"), k_eval("`01b`10b!(0 2;(,1))"));
 }
+
+#[test]
+fn test_imat() {
+  assert_eq!(k_eval("=3"), k_eval("(1 0 0;0 1 0;0 0 1)"));
+}
