@@ -1141,22 +1141,53 @@ pub fn v_d_scan(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_eachprior(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> {
-  todo!("v_eachprior()")
+pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
+      let first: &K = &v[0];
+      let r: Vec<K> = v
+        .iter()
+        .zip(v.iter().skip(1))
+        .map(|(x, y)| {
+          // f[y,x] / yes y,x not x,y
+          eval(env, vec![f.clone(),
+              KW::FuncArgs(vec![vec![KW::Noun(y.clone())], vec![KW::Noun(x.clone())]])],
+          ).unwrap().unwrap_noun()
+        })
+        .collect();
+      let r: Vec<K> = vec![first.clone()].into_iter().chain(r).collect();
+      promote_num(r.clone()).unwrap_or(K::List(r))
+    }),
+    _ => Err("type"),
+  }
+}
+pub fn v_eachprior_d_or_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
+  todo!("v_eachprior_d_or_windows()")
+}
+pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
+  todo!("v_eachprior_d()")
 }
 pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
   todo!("v_windows()")
 }
+
 pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
   match v {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(y).map(|v| {
       let r: Vec<K> = v
         .iter()
         .cloned()
-        .map(|y|
-             eval(env, vec![f.clone(), 
-               KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]])
-              ]).unwrap().unwrap_noun())
+        .map(|y| {
+          eval(
+            env,
+            vec![
+              f.clone(),
+              KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]]),
+            ],
+          )
+          .unwrap()
+          .unwrap_noun()
+        })
         .collect();
       promote_num(r.clone()).unwrap_or(K::List(r))
     }),
@@ -1169,10 +1200,17 @@ pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str>
       let r: Vec<K> = v
         .iter()
         .cloned()
-        .map(|x|
-             eval(env, vec![f.clone(), 
-               KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]])
-              ]).unwrap().unwrap_noun())
+        .map(|x| {
+          eval(
+            env,
+            vec![
+              f.clone(),
+              KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]]),
+            ],
+          )
+          .unwrap()
+          .unwrap_noun()
+        })
         .collect();
       promote_num(r.clone()).unwrap_or(K::List(r))
     }),

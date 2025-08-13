@@ -1390,6 +1390,44 @@ fn test_eachleft() {
 }
 
 #[test]
+fn test_eachprior() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("-':1 6 2 3 4").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("1 5 -4 1 1").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[ignore]
+#[test]
+fn test_eachprior_d() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("5-':1 6 2 3 4").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("-4 5 -4 1 1").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[ignore]
+#[test]
+fn test_windows() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("3':1 2 3 4 5 6").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("(1 2 3;2 3 4;3 4 5;4 5 6)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+
+  let res1 = eval(&mut env, scan("3 +/':1 2 3 4 5 6").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("6 9 12 15").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+
+#[test]
 fn test_max() {
   let mut env = Env { names: HashMap::new(), parent: None };
 

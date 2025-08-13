@@ -729,7 +729,7 @@ pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
     ("'", (v_each as AV1, v_d_each as AV2)),
     ("/", (a_slash, a_d_slash)),    // over fixedpoint for while
     ("\\", (a_bslash, a_d_bslash)), // scan scan-fixedpoint scan-for scan-while
-    ("':", (v_eachprior, v_windows)),
+    ("':", (v_eachprior, v_eachprior_d_or_windows)),
     ("/:", (av_none1, v_d_eachright)),
     ("\\:", (av_none1, v_d_eachleft)),
   ])
