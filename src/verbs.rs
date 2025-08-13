@@ -488,10 +488,8 @@ pub fn v_asc(x: K) -> Result<K, &'static str> {
 }
 pub fn v_lesser(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
-pub fn v_desc(x: K) -> Result<K, &'static str> {
-  // TODO: faster
-  v_reverse(v_asc(x).unwrap())
-}
+pub fn v_desc(x: K) -> Result<K, &'static str> { v_reverse(v_asc(x).unwrap()) /* TODO: faster */ }
+
 pub fn v_greater(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_not(_r: K) -> Result<K, &'static str> { Err("nyi") }

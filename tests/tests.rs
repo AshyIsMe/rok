@@ -13,9 +13,7 @@ fn k_eval(s: &str) -> K {
   println!("k_eval({}) = {}", s, r);
   r
 }
-fn k_evals(s: &str) -> String {
-  format!("{}", k_eval(s))
-}
+fn k_evals(s: &str) -> String { format!("{}", k_eval(s)) }
 
 #[test]
 fn test_scan() {
@@ -1429,7 +1427,6 @@ fn test_windows() {
   assert_eq!(res1, res2);
 }
 
-
 #[test]
 fn test_max() {
   let mut env = Env { names: HashMap::new(), parent: None };
@@ -1594,4 +1591,5 @@ fn test_reverse() {
   assert_eq!(k_evals("|`a`b`c"), k_evals("`c`b`a"));
   assert_eq!(k_eval("|`a`b`c!(1;2;3)"), k_eval("`c`b`a!(3;2;1)"));
   assert_eq!(k_eval("|+`a`b`c!(1 2 3;4 5 6;\"abc\")"), k_eval("+`a`b`c!(3 2 1;6 5 4;\"cba\")"));
+  assert_eq!(k_eval("|(`a;1;\"b\")"), k_eval("(\"b\";1;`a)"));
 }
