@@ -1549,6 +1549,9 @@ fn test_grade() {
 
   let res = eval(&mut env, scan("< 3.0 2.5 1").unwrap()).unwrap().unwrap_noun();
   assert_eq!(res, K::IntArray(arr!([2, 1, 0i64])));
+
+  let res = eval(&mut env, scan("> 3 2 1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::IntArray(arr!([0i64, 1, 2])));
 }
 
 #[test]
