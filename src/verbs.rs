@@ -349,7 +349,28 @@ pub fn v_where(x: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_reverse(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_reverse(x: K) -> Result<K, &'static str> {
+  match x {
+    K::Bool(_) => Ok(x),
+    K::Int(_) => Ok(x),
+    K::Float(_) => Ok(x),
+    K::Char(_) => Ok(x),
+    K::Symbol(_) => Ok(x),
+    K::SymbolArray(v) => Ok(K::SymbolArray(v.reverse())),
+    K::BoolArray(v) => Ok(K::BoolArray(v.reverse())),
+    K::IntArray(v) => Ok(K::IntArray(v.reverse())),
+    K::FloatArray(v) => Ok(K::FloatArray(v.reverse())),
+    K::CharArray(s) => Ok(K::CharArray(s.chars().rev().collect::<String>())),
+    K::List(v) => Ok(K::List(v.iter().cloned().rev().collect())),
+    K::Dictionary(m) => {
+      let mut d = m.clone();
+      d.reverse();
+      Ok(K::Dictionary(d))
+    },
+    K::Table(df) => Ok(K::Table(df.reverse())),
+    _ => Err("nyi"),
+  }
+}
 
 pub fn v_min(l: K, r: K) -> Result<K, &'static str> {
   //TODO fix code duplication in v_min/v_max
