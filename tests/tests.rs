@@ -1577,3 +1577,13 @@ fn test_group() {
 fn test_imat() {
   assert_eq!(k_eval("=3"), k_eval("(1 0 0;0 1 0;0 0 1)"));
 }
+
+#[test]
+fn test_reverse() {
+  assert_eq!(k_eval("|1"), k_eval("1"));
+  assert_eq!(k_eval("|2"), k_eval("2"));
+  assert_eq!(k_eval("|1 2 3"), k_eval("3 2 1"));
+  assert_eq!(k_eval("|1 2 3.0"), k_eval("3.0 2 1"));
+  assert_eq!(k_eval("|\"abc\""), k_eval("\"cba\""));
+  assert_eq!(k_eval("|`a`b`c"), k_eval("`c`b`a"));
+}
