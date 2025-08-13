@@ -1379,6 +1379,15 @@ fn test_eachright_defun() {
   assert_eq!(res1, res2);
 }
 
+#[test]
+fn test_eachleft() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("3 4 5 +\\:(2 3;4 5;6)").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("((5 6;7 8;9);(6 7;8 9;10);(7 8;9 10;11))").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
 
 #[test]
 fn test_max() {

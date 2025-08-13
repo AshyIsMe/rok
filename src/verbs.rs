@@ -1162,10 +1162,22 @@ pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str
     }),
     _ => Err("type"),
   }
-  // todo!("v_d_eachright()")
 }
-pub fn v_d_eachleft(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
-  todo!("v_d_eachleft()")
+pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+  match v {
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
+      let r: Vec<K> = v
+        .iter()
+        .cloned()
+        .map(|x|
+             eval(env, vec![f.clone(), 
+               KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]])
+              ]).unwrap().unwrap_noun())
+        .collect();
+      promote_num(r.clone()).unwrap_or(K::List(r))
+    }),
+    _ => Err("type"),
+  }
 }
 
 pub fn strip_quotes(s: String) -> String {
