@@ -486,7 +486,13 @@ pub fn v_asc(x: K) -> Result<K, &'static str> {
     _ => Err("nyi"),
   }
 }
-pub fn v_lesser(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_lesser(l: K, r: K) -> Result<K, &'static str> { 
+  // TODO: use promote_num()
+  match (l,r) {
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l<r) as u8)),
+    _ => Err("nyi") 
+  }
+}
 
 pub fn v_desc(x: K) -> Result<K, &'static str> { v_reverse(v_asc(x).unwrap()) /* TODO: faster */ }
 

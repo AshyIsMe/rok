@@ -1593,3 +1593,17 @@ fn test_reverse() {
   assert_eq!(k_eval("|+`a`b`c!(1 2 3;4 5 6;\"abc\")"), k_eval("+`a`b`c!(3 2 1;6 5 4;\"cba\")"));
   assert_eq!(k_eval("|(`a;1;\"b\")"), k_eval("(\"b\";1;`a)"));
 }
+
+#[test]
+fn test_comparisons() {
+  assert_eq!(k_eval("1<2"), k_eval("1"));
+  assert_eq!(k_eval("1>2"), k_eval("0"));
+  assert_eq!(k_eval("1<1 2 3"), k_eval("0 1 1"));
+  assert_eq!(k_eval("1.0<2"), k_eval("1"));
+  assert_eq!(k_eval("0N<1"), k_eval("1"));
+  assert_eq!(k_eval("0N<0N"), k_eval("0"));
+
+  assert_eq!(k_eval("1<`a`b!(1;2)"), k_eval("`a`b!(0;1)"));
+  assert_eq!(k_eval("1<`a`b!(1;2 3 4)"), k_eval("`a`b!(0;1 1 1)"));
+  assert_eq!(k_eval("1<+`a`b!(1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
+}
