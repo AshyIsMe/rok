@@ -1597,7 +1597,6 @@ fn test_reverse() {
 #[test]
 fn test_comparisons() {
   assert_eq!(k_eval("1<2"), k_eval("1"));
-  assert_eq!(k_eval("1>2"), k_eval("0"));
   assert_eq!(k_eval("1<1 2 3"), k_eval("0 1 1"));
   assert_eq!(k_eval("1.0<2"), k_eval("1"));
   assert_eq!(k_eval("0N<1"), k_eval("1"));
@@ -1606,4 +1605,6 @@ fn test_comparisons() {
   assert_eq!(k_eval("1<`a`b!(1;2)"), k_eval("`a`b!(0;1)"));
   assert_eq!(k_eval("1<`a`b!(1;2 3 4)"), k_eval("`a`b!(0;1 1 1)"));
   assert_eq!(k_eval("1<+`a`b!(1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
+
+  assert_eq!(k_eval("1>2"), k_eval("0"));
 }

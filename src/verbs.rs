@@ -366,7 +366,7 @@ pub fn v_reverse(x: K) -> Result<K, &'static str> {
       let mut d = m.clone();
       d.reverse();
       Ok(K::Dictionary(d))
-    },
+    }
     K::Table(df) => Ok(K::Table(df.reverse())),
     _ => Err("nyi"),
   }
@@ -486,15 +486,62 @@ pub fn v_asc(x: K) -> Result<K, &'static str> {
     _ => Err("nyi"),
   }
 }
-pub fn v_lesser(l: K, r: K) -> Result<K, &'static str> { 
-  // TODO: use promote_num()
-  match (l,r) {
-    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l<r) as u8)),
-    _ => Err("nyi") 
-  }
+pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
+  len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l < r) as u8)),
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l < r) as u8)),
+    (K::Int(None) , K::Int(Some(_))) => Ok(K::Bool(1)),
+    (K::Int(Some(_)) , K::Int(None)) => Ok(K::Bool(0)),
+    (K::Int(None) , K::Int(None)) => Ok(K::Bool(0)),
+    (K::Float(l), K::Float(r)) => Ok(K::Bool((l < r) as u8)),
+    (K::BoolArray(l), K::BoolArray(r)) => {
+      Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
+    }
+    (K::IntArray(l), K::IntArray(r)) => {
+      Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
+    }
+    (K::FloatArray(l), K::FloatArray(r)) => {
+      Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
+    }
+    (K::CharArray(l), K::CharArray(r)) => {
+      Ok(K::BoolArray(arr!(l.chars().zip(r.chars()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
+    }
+    (K::List(l), K::List(r)) => Ok(K::List(
+      zip(l.iter(), r.iter())
+        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0 as u8)))
+        .collect::<Vec<K>>(),
+    )),
+    (K::Dictionary(l), K::Dictionary(r)) => {
+      // TODO: Does this match ngn/k behaviour?
+      Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
+        if r.keys().contains(k) {
+          match v_lesser(l.get(k).unwrap().clone(), r.get(k).unwrap().clone()) {
+            Ok(r) => Some((k.clone(), r)),
+            _ => None,
+          }
+        } else {
+          None
+        }
+      }))))
+    }
+    (l, K::Dictionary(r)) => {
+      // TODO: Does this match ngn/k behaviour?
+      Ok(K::Dictionary(IndexMap::from_iter(r.keys().filter_map(|k| {
+          match v_lesser(l.clone(), r.get(k).unwrap().clone()) {
+            Ok(r) => Some((k.clone(), r)),
+            _ => None,
+          }
+      }))))
+    }
+    (_, K::Table(_)) => todo!("table"),
+    (K::Table(_), _) => todo!("table"),
+    _ => Err("nyi"),
+  })
 }
 
-pub fn v_desc(x: K) -> Result<K, &'static str> { v_reverse(v_asc(x).unwrap()) /* TODO: faster */ }
+pub fn v_desc(x: K) -> Result<K, &'static str> {
+  v_reverse(v_asc(x).unwrap()) /* TODO: faster */
+}
 
 pub fn v_greater(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
