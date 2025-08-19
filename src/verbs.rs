@@ -533,6 +533,15 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
           }
       }))))
     }
+    (K::Dictionary(l), r) => {
+      // TODO: Does this match ngn/k behaviour?
+      Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
+          match v_lesser(l.get(k).unwrap().clone(), r.clone()) {
+            Ok(l) => Some((k.clone(), l)),
+            _ => None,
+          }
+      }))))
+    }
     (_, K::Table(_)) => todo!("table"),
     (K::Table(_), _) => todo!("table"),
     _ => Err("nyi"),

@@ -1596,15 +1596,23 @@ fn test_reverse() {
 
 #[test]
 fn test_comparisons() {
+  println!("test_comparisons() numbers");
   assert_eq!(k_eval("1<2"), k_eval("1"));
   assert_eq!(k_eval("1<1 2 3"), k_eval("0 1 1"));
   assert_eq!(k_eval("1.0<2"), k_eval("1"));
   assert_eq!(k_eval("0N<1"), k_eval("1"));
   assert_eq!(k_eval("0N<0N"), k_eval("0"));
 
+  println!("test_comparisons() dicts");
   assert_eq!(k_eval("1<`a`b!(1;2)"), k_eval("`a`b!(0;1)"));
   assert_eq!(k_eval("1<`a`b!(1;2 3 4)"), k_eval("`a`b!(0;1 1 1)"));
+
+  assert_eq!(k_eval("(`a`b!(1;2))<2"), k_eval("`a`b!(1;0)"));
+  assert_eq!(k_eval("(`a`b!(1;2 3 4))<3"), k_eval("`a`b!(1;1 0 0)"));
+
+  println!("test_comparisons() tables");
   assert_eq!(k_eval("1<+`a`b!(1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
+  assert_eq!(k_eval("(+`a`b!(1;2 3 4))<3"), k_eval("+`a`b!(1 1 1;1 0 0)"));
 
   assert_eq!(k_eval("1>2"), k_eval("0"));
 }

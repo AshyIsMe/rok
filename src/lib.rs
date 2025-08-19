@@ -982,14 +982,16 @@ pub fn promote_nouns(l: K, r: K) -> (K, K) {
       v_makedict(K::SymbolArray(Series::new("", l_inner.keys().cloned().collect::<Vec<String>>()) .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical)) .unwrap(),), r,) .unwrap()),
     (_l, K::Dictionary(_)) if !matches!(_l, K::Dictionary(_)) => match (l.len(), r.len()) {
       (0,0) => todo!("promote_nouns empties"),
-      (1,_) => todo!("promote_nouns atom"),
-      (_,1) => todo!("promote_nouns atom"),
+      // (1,_) => todo!("promote_nouns atom"),
+      // (_,1) => todo!("promote_nouns atom"),
+      (1,_) => (l,r),
+      (_,1) => (l,r),
       (llen, rlen) => if llen == rlen { promote_nouns(K::List(k_to_vec(l).unwrap()), r) } else { (l,r) }
     }
     (K::Dictionary(_), _r) if !matches!(_r, K::Dictionary(_))=> match (l.len(), r.len()) {
       (0,0) => todo!("promote_nouns empties"),
-      (1,_) => todo!("promote_nouns atom"),
-      (_,1) => todo!("promote_nouns atom"),
+      (1,_) => (l,r),
+      (_,1) => (l,r),
       (llen, rlen) => if llen == rlen { promote_nouns(l, K::List(k_to_vec(r).unwrap())) } else { (l,r) }
     }
     _ => (l, r),
