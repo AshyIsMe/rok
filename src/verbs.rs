@@ -525,7 +525,6 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
       }))))
     }
     (l, K::Dictionary(r)) => {
-      // TODO: Does this match ngn/k behaviour?
       Ok(K::Dictionary(IndexMap::from_iter(r.keys().filter_map(|k| {
           match v_lesser(l.clone(), r.get(k).unwrap().clone()) {
             Ok(r) => Some((k.clone(), r)),
@@ -534,7 +533,6 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
       }))))
     }
     (K::Dictionary(l), r) => {
-      // TODO: Does this match ngn/k behaviour?
       Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
           match v_lesser(l.get(k).unwrap().clone(), r.clone()) {
             Ok(l) => Some((k.clone(), l)),
