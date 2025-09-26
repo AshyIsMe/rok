@@ -1609,6 +1609,8 @@ fn test_comparisons() {
   assert_eq!(k_eval("(`a`b!(1;2))<2"), k_eval("`a`b!(1;0)"));
   assert_eq!(k_eval("(`a`b!(1;2 3 4))<3"), k_eval("`a`b!(1;1 0 0)"));
   assert_eq!(k_eval("(`a`b!(1;1))<(`a`b`c!(1;2;3 4 5))"), k_eval("`a`b`c!(0;1;1 1 1)"));
+
+  println!("UP TO HERE");
   assert_eq!(k_eval("(`a`b!(1;1))<(`a`b`c!(1;2;0N))"), k_eval("`a`b`c!(0;1;0)"));
 
   println!("test_comparisons() tables");

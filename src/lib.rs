@@ -1035,10 +1035,16 @@ impl ops::Div for K {
 }
 
 fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
-  if l.len() == r.len() || l.len() == 1 || r.len() == 1 {
-    Ok(true)
-  } else {
-    Err("length")
+  match (l, r) {
+    (K::Dictionary(_), K::Dictionary(_)) => Ok(true),
+    (K::Table(_), K::Table(_)) => Ok(true),
+    _ => {
+      if l.len() == r.len() || l.len() == 1 || r.len() == 1 {
+        Ok(true)
+      } else {
+        Err("length")
+      }
+    }
   }
 }
 

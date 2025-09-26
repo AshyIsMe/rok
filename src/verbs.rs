@@ -170,6 +170,8 @@ pub fn v_reshape(l: K, r: K) -> Result<K, &'static str> {
       }
     }
     K::BoolArray(_) => Err("nyi"),
+    // K::Int(Some(i)) => v_reshape(K::IntArray(arr!([i])), r),
+    // K::Bool(b) => v_reshape(K::IntArray(arr!([b])), r),
     _ => Err("type"),
   }
 }
@@ -490,9 +492,9 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
   len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l < r) as u8)),
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l < r) as u8)),
-    (K::Int(None) , K::Int(Some(_))) => Ok(K::Bool(1)),
-    (K::Int(Some(_)) , K::Int(None)) => Ok(K::Bool(0)),
-    (K::Int(None) , K::Int(None)) => Ok(K::Bool(0)),
+    (K::Int(None), K::Int(Some(_))) => Ok(K::Bool(1)),
+    (K::Int(Some(_)), K::Int(None)) => Ok(K::Bool(0)),
+    (K::Int(None), K::Int(None)) => Ok(K::Bool(0)),
     (K::Float(l), K::Float(r)) => Ok(K::Bool((l < r) as u8)),
     (K::BoolArray(l), K::BoolArray(r)) => {
       Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
@@ -512,34 +514,35 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
         .collect::<Vec<K>>(),
     )),
     (K::Dictionary(l), K::Dictionary(r)) => {
-      // TODO: Does this match ngn/k behaviour?
-      Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
-        if r.keys().contains(k) {
+      Ok(K::Dictionary(IndexMap::from_iter(l.keys().chain(r.keys()).filter_map(|k| {
+        if l.keys().contains(k) && r.keys().contains(k) {
           match v_lesser(l.get(k).unwrap().clone(), r.get(k).unwrap().clone()) {
             Ok(r) => Some((k.clone(), r)),
             _ => None,
           }
+        } else if l.keys().contains(k) {
+          // If key is missing on the right, then it's treated as NULL: 1 < 0N == 0
+          Some((k.clone(), K::BoolArray(repeat(0u8).take(r.get(k).unwrap().len()).collect())))
+        } else if r.keys().contains(k) {
+          // If key is missing on the left, then it's treated as NULL: 0N < 1 == 1
+          Some((k.clone(), K::BoolArray(repeat(1u8).take(r.get(k).unwrap().len()).collect())))
         } else {
-          None
+          panic!("impossible")
         }
       }))))
     }
-    (l, K::Dictionary(r)) => {
-      Ok(K::Dictionary(IndexMap::from_iter(r.keys().filter_map(|k| {
-          match v_lesser(l.clone(), r.get(k).unwrap().clone()) {
-            Ok(r) => Some((k.clone(), r)),
-            _ => None,
-          }
-      }))))
-    }
-    (K::Dictionary(l), r) => {
-      Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
-          match v_lesser(l.get(k).unwrap().clone(), r.clone()) {
-            Ok(l) => Some((k.clone(), l)),
-            _ => None,
-          }
-      }))))
-    }
+    (l, K::Dictionary(r)) => Ok(K::Dictionary(IndexMap::from_iter(r.keys().filter_map(|k| {
+      match v_lesser(l.clone(), r.get(k).unwrap().clone()) {
+        Ok(r) => Some((k.clone(), r)),
+        _ => None,
+      }
+    })))),
+    (K::Dictionary(l), r) => Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
+      match v_lesser(l.get(k).unwrap().clone(), r.clone()) {
+        Ok(l) => Some((k.clone(), l)),
+        _ => None,
+      }
+    })))),
     (_, K::Table(_)) => todo!("table"),
     (K::Table(_), _) => todo!("table"),
     _ => Err("nyi"),
