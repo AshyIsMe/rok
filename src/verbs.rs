@@ -495,19 +495,52 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
     (K::Int(None), K::Int(Some(_))) => Ok(K::Bool(1)),
     (K::Int(Some(_)), K::Int(None)) => Ok(K::Bool(0)),
     (K::Int(None), K::Int(None)) => Ok(K::Bool(0)),
-    (K::Float(l), K::Float(r)) => Ok(K::Bool((l < r) as u8)),
-    (K::BoolArray(l), K::BoolArray(r)) => {
-      Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
+    (K::Float(l), K::Float(r)) => {
+      println!("comparing floats: (l.is_nan(), r.is_nan()): {}, {}", l.is_nan(), r.is_nan());
+      Ok(K::Bool(match (l.is_nan(), r.is_nan()) {
+        (false, false) => (l < r) as u8,
+        (true, false) => 1u8,
+        (false, true) => 0u8,
+        (true, true) => 0u8,
+      }))
     }
-    (K::IntArray(l), K::IntArray(r)) => {
-      Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
-    }
-    (K::FloatArray(l), K::FloatArray(r)) => {
-      Ok(K::BoolArray(arr!(zip(l.iter(), r.iter()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
-    }
-    (K::CharArray(l), K::CharArray(r)) => {
-      Ok(K::BoolArray(arr!(l.chars().zip(r.chars()).map(|(l, r)| l < r).collect::<Vec<bool>>())))
-    }
+    (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+      .map(|(l, r)| match (l.is_null(), r.is_null()) {
+        (false, false) => (l < r) as u8,
+        (true, false) => 1u8,
+        (false, true) => 0u8,
+        (true, true) => 0u8,
+      })
+      .collect::<Vec<u8>>()))),
+    (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+      .map(|(l, r)| match (l.is_null(), r.is_null()) {
+        (false, false) => (l < r) as u8,
+        (true, false) => 1u8,
+        (false, true) => 0u8,
+        (true, true) => 0u8,
+      })
+      .collect::<Vec<u8>>()))),
+    (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+      .map(|(l, r)| {
+        match (l, r) {
+          (AnyValue::Float64(l), AnyValue::Float64(r)) => {
+            println!("comparing floats: (l.is_nan(), r.is_nan()): {}, {}", l.is_nan(), r.is_nan());
+            match (l.is_nan(), r.is_nan()) {
+              (false, false) => (l < r) as u8,
+              (true, false) => 1u8,
+              (false, true) => 0u8,
+              (true, true) => 0u8,
+            }
+          }
+          _ => panic!("impossible"),
+        }
+      })
+      .collect::<Vec<u8>>()))),
+    (K::CharArray(l), K::CharArray(r)) => Ok(K::BoolArray(arr!(l
+      .chars()
+      .zip(r.chars())
+      .map(|(l, r)| (l < r) as u8)
+      .collect::<Vec<u8>>()))),
     (K::List(l), K::List(r)) => Ok(K::List(
       zip(l.iter(), r.iter())
         .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0 as u8)))
@@ -522,10 +555,10 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
           }
         } else if l.keys().contains(k) {
           // If key is missing on the right, then it's treated as NULL: 1 < 0N == 0
-          Some((k.clone(), K::BoolArray(repeat(0u8).take(r.get(k).unwrap().len()).collect())))
+          Some((k.clone(), v_lesser(r.get(k).unwrap().clone(), K::Int(None)).unwrap()))
         } else if r.keys().contains(k) {
           // If key is missing on the left, then it's treated as NULL: 0N < 1 == 1
-          Some((k.clone(), K::BoolArray(repeat(1u8).take(r.get(k).unwrap().len()).collect())))
+          Some((k.clone(), v_lesser(K::Int(None), r.get(k).unwrap().clone()).unwrap()))
         } else {
           panic!("impossible")
         }

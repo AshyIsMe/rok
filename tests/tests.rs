@@ -672,6 +672,8 @@ fn test_table() {
   println!("{:?}", s1);
   println!("{:?}", s2);
   assert_eq!(s1, s2);
+
+  assert_eq!(k_eval("+`a`b!(1;2 3 4)"), k_eval("+`a`b!(1 1 1;2 3 4)"));
 }
 
 #[test]
@@ -1601,6 +1603,11 @@ fn test_comparisons() {
   assert_eq!(k_eval("1<1 2 3"), k_eval("0 1 1"));
   assert_eq!(k_eval("1.0<2"), k_eval("1"));
   assert_eq!(k_eval("0N<1"), k_eval("1"));
+  assert_eq!(k_eval("0n<1"), k_eval("1"));
+  assert_eq!(k_eval("0n 0n<1"), k_eval("1 1"));
+  assert_eq!(k_eval("0N<1 1 1"), k_eval("1 1 1"));
+  assert_eq!(k_eval("0N<1 0N 1"), k_eval("1 0 1"));
+  assert_eq!(k_eval("0N<1 0n 1"), k_eval("1 0 1"));
   assert_eq!(k_eval("0N<0N"), k_eval("0"));
 
   println!("test_comparisons() dicts");
@@ -1610,12 +1617,13 @@ fn test_comparisons() {
   assert_eq!(k_eval("(`a`b!(1;2 3 4))<3"), k_eval("`a`b!(1;1 0 0)"));
   assert_eq!(k_eval("(`a`b!(1;1))<(`a`b`c!(1;2;3 4 5))"), k_eval("`a`b`c!(0;1;1 1 1)"));
 
-  println!("UP TO HERE");
   assert_eq!(k_eval("(`a`b!(1;1))<(`a`b`c!(1;2;0N))"), k_eval("`a`b`c!(0;1;0)"));
+  assert_eq!(k_eval("(`a`b!(1;1))<(`a`b`c!(1;2;3))"), k_eval("`a`b`c!(0;1;1)"));
 
   println!("test_comparisons() tables");
-  assert_eq!(k_eval("1<+`a`b!(1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
-  assert_eq!(k_eval("(+`a`b!(1;2 3 4))<3"), k_eval("+`a`b!(1 1 1;1 0 0)"));
+  println!("UP TO HERE");
+  assert_eq!(k_eval("1<+`a`b!(1 1 1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
+  assert_eq!(k_eval("(+`a`b!(1 1 1;2 3 4))<3"), k_eval("+`a`b!(1 1 1;1 0 0)"));
 
   assert_eq!(k_eval("1>2"), k_eval("0"));
 }
