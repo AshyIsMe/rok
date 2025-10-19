@@ -180,7 +180,7 @@ pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
 pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
 pub fn v_flip(x: K) -> Result<K, &'static str> {
   match x {
-    K::Dictionary(d) => {
+    K::Dictionary(ref d) => {
       let lengths: Vec<usize> = d.iter().map(|(_k, v)| v.len()).unique().sorted().collect();
       if lengths.len() > 2 || lengths.len() == 0 {
         Err("length")
@@ -192,8 +192,10 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
           .map(|(k, v)| match v {
             K::SymbolArray(s) | K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) => {
               match s.len() {
-                1 => Series::new(&k.to_string(), s.extend_constant(s.get(0).unwrap(), *len).unwrap()),
-                _ => Series::new(&k.to_string(), s.clone())
+                1 => {
+                  Series::new(&k.to_string(), s.extend_constant(s.get(0).unwrap(), *len).unwrap())
+                }
+                _ => Series::new(&k.to_string(), s.clone()),
               }
             }
             // | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
@@ -211,14 +213,27 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
                 panic!("type error?")
               }
             }
-            K::Bool(b) => Series::new(&k.to_string(), std::iter::repeat(*b).take(*len).collect::<Vec<u8>>()),
-            K::Int(Some(i)) => Series::new(&k.to_string(), std::iter::repeat(*i).take(*len).collect::<Vec<i64>>()),
+            K::Bool(b) => {
+              Series::new(&k.to_string(), std::iter::repeat(*b).take(*len).collect::<Vec<u8>>())
+            }
+            K::Int(Some(i)) => {
+              Series::new(&k.to_string(), std::iter::repeat(*i).take(*len).collect::<Vec<i64>>())
+            }
             K::Int(None) => Series::full_null(&k.to_string(), *len, &DataType::Int64),
-            K::Float(f) => Series::new(&k.to_string(), std::iter::repeat(*f).take(*len).collect::<Vec<f64>>()),
-            K::Symbol(s) => Series::new(&k.to_string(), std::iter::repeat(s.clone()).take(*len).collect::<Vec<String>>()),
+            K::Float(f) => {
+              Series::new(&k.to_string(), std::iter::repeat(*f).take(*len).collect::<Vec<f64>>())
+            }
+            K::Symbol(s) => Series::new(
+              &k.to_string(),
+              std::iter::repeat(s.clone()).take(*len).collect::<Vec<String>>(),
+            ),
             // K::Char(c) => Series::new(&k.to_string(), std::iter::repeat(*c.to_string()).take(*len).collect::<Vec<String>>()),
-            K::Char(c) => todo!("handle char"),
-            _ => panic!("impossible")
+            K::Char(_c) => todo!("handle char"),
+            K::Table(df) => todo!("why is Table here?"),
+            _ => {
+              println!("v_flip(x): x: {}", x);
+              panic!("impossible")
+            }
           })
           .collect();
         Ok(K::Table(DataFrame::new(cols).unwrap()))
@@ -604,13 +619,13 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
       todo!("table")
     }
     (l, ref r @ K::Table(_)) => {
-      // hack: flip to dict, v_lesser(l, r), flip back to table
-      v_makedict(
-        v_keys_odometer(r.clone()).unwrap(),
-        v_flip(v_lesser(l, v_flip(r.clone()).unwrap()).unwrap()).unwrap(),
-      )
+      // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
+      v_flip(v_lesser(l, v_flip(r.clone()).unwrap()).unwrap())
     }
-    (K::Table(_), _) => todo!("table"),
+    (l@K::Table(_), r) => {
+      // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
+      v_flip(v_lesser(v_flip(l.clone()).unwrap(),r).unwrap())
+    }
     _ => Err("nyi"),
   })
 }
