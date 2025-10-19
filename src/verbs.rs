@@ -34,7 +34,6 @@ pub fn v_group(x: K) -> Result<K, &'static str> {
       );
       let vals: Vec<K> =
         g.iter().nth(1).unwrap().iter().map(|cell| K::try_from(cell).unwrap()).collect();
-      // println!("v_makedict({:?}, {:?})", keys, vals);
       v_makedict(keys, K::List(vals))
     }
     K::CharArray(s) => {
@@ -229,7 +228,7 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
             ),
             // K::Char(c) => Series::new(&k.to_string(), std::iter::repeat(*c.to_string()).take(*len).collect::<Vec<String>>()),
             K::Char(_c) => todo!("handle char"),
-            K::Table(df) => todo!("why is Table here?"),
+            K::Table(_df) => todo!("why is Table here?"),
             _ => {
               println!("v_flip(x): x: {}", x);
               panic!("impossible")
@@ -527,6 +526,11 @@ pub fn v_asc(x: K) -> Result<K, &'static str> {
     _ => Err("nyi"),
   }
 }
+
+pub fn v_desc(x: K) -> Result<K, &'static str> {
+  v_reverse(v_asc(x).unwrap()) /* TODO: faster */
+}
+
 pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
   len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l < r) as u8)),
@@ -534,15 +538,12 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
     (K::Int(None), K::Int(Some(_))) => Ok(K::Bool(1)),
     (K::Int(Some(_)), K::Int(None)) => Ok(K::Bool(0)),
     (K::Int(None), K::Int(None)) => Ok(K::Bool(0)),
-    (K::Float(l), K::Float(r)) => {
-      println!("comparing floats: (l.is_nan(), r.is_nan()): {}, {}", l.is_nan(), r.is_nan());
-      Ok(K::Bool(match (l.is_nan(), r.is_nan()) {
-        (false, false) => (l < r) as u8,
-        (true, false) => 1u8,
-        (false, true) => 0u8,
-        (true, true) => 0u8,
-      }))
-    }
+    (K::Float(l), K::Float(r)) => Ok(K::Bool(match (l.is_nan(), r.is_nan()) {
+      (false, false) => (l < r) as u8,
+      (true, false) => 1u8,
+      (false, true) => 0u8,
+      (true, true) => 0u8,
+    })),
     (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
       .map(|(l, r)| match (l.is_null(), r.is_null()) {
         (false, false) => (l < r) as u8,
@@ -562,15 +563,12 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
     (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
       .map(|(l, r)| {
         match (l, r) {
-          (AnyValue::Float64(l), AnyValue::Float64(r)) => {
-            println!("comparing floats: (l.is_nan(), r.is_nan()): {}, {}", l.is_nan(), r.is_nan());
-            match (l.is_nan(), r.is_nan()) {
-              (false, false) => (l < r) as u8,
-              (true, false) => 1u8,
-              (false, true) => 0u8,
-              (true, true) => 0u8,
-            }
-          }
+          (AnyValue::Float64(l), AnyValue::Float64(r)) => match (l.is_nan(), r.is_nan()) {
+            (false, false) => (l < r) as u8,
+            (true, false) => 1u8,
+            (false, true) => 0u8,
+            (true, true) => 0u8,
+          },
           _ => panic!("impossible"),
         }
       })
@@ -622,19 +620,118 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
       v_flip(v_lesser(l, v_flip(r.clone()).unwrap()).unwrap())
     }
-    (l@K::Table(_), r) => {
+    (l @ K::Table(_), r) => {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
-      v_flip(v_lesser(v_flip(l.clone()).unwrap(),r).unwrap())
+      v_flip(v_lesser(v_flip(l.clone()).unwrap(), r).unwrap())
     }
     _ => Err("nyi"),
   })
 }
 
-pub fn v_desc(x: K) -> Result<K, &'static str> {
-  v_reverse(v_asc(x).unwrap()) /* TODO: faster */
+pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
+  len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l > r) as u8)),
+    (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l > r) as u8)),
+    (K::Int(None), K::Int(Some(_))) => Ok(K::Bool(1)),
+    (K::Int(Some(_)), K::Int(None)) => Ok(K::Bool(0)),
+    (K::Int(None), K::Int(None)) => Ok(K::Bool(0)),
+    (K::Float(l), K::Float(r)) => {
+      Ok(K::Bool(match (l.is_nan(), r.is_nan()) {
+        //TODO fix (copied from v_lesser)
+        (false, false) => (l > r) as u8,
+        (true, false) => 1u8,
+        (false, true) => 0u8,
+        (true, true) => 0u8,
+      }))
+    }
+    (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+      .map(|(l, r)| match (l.is_null(), r.is_null()) {
+        //TODO fix (copied from v_lesser)
+        (false, false) => (l > r) as u8,
+        (true, false) => 1u8,
+        (false, true) => 0u8,
+        (true, true) => 0u8,
+      })
+      .collect::<Vec<u8>>()))),
+    (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+      .map(|(l, r)| match (l.is_null(), r.is_null()) {
+        //TODO fix (copied from v_lesser)
+        (false, false) => (l > r) as u8,
+        (true, false) => 1u8,
+        (false, true) => 0u8,
+        (true, true) => 0u8,
+      })
+      .collect::<Vec<u8>>()))),
+    (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
+      .map(|(l, r)| {
+        match (l, r) {
+          (AnyValue::Float64(l), AnyValue::Float64(r)) => {
+            match (l.is_nan(), r.is_nan()) {
+              //TODO fix (copied from v_lesser)
+              (false, false) => (l > r) as u8,
+              (true, false) => 1u8,
+              (false, true) => 0u8,
+              (true, true) => 0u8,
+            }
+          }
+          _ => panic!("impossible"),
+        }
+      })
+      .collect::<Vec<u8>>()))),
+    (K::CharArray(l), K::CharArray(r)) => Ok(K::BoolArray(arr!(l
+      .chars()
+      .zip(r.chars())
+      .map(|(l, r)| (l > r) as u8)
+      .collect::<Vec<u8>>()))),
+    (K::List(l), K::List(r)) => Ok(K::List(
+      zip(l.iter(), r.iter())
+        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0 as u8)))
+        .collect::<Vec<K>>(),
+    )),
+    (K::Dictionary(l), K::Dictionary(r)) => {
+      Ok(K::Dictionary(IndexMap::from_iter(l.keys().chain(r.keys()).filter_map(|k| {
+        if l.keys().contains(k) && r.keys().contains(k) {
+          match v_lesser(l.get(k).unwrap().clone(), r.get(k).unwrap().clone()) {
+            Ok(r) => Some((k.clone(), r)),
+            _ => None,
+          }
+        } else if l.keys().contains(k) {
+          // If key is missing on the right, then it's treated as NULL: 1 > 0N == 0
+          Some((k.clone(), v_lesser(r.get(k).unwrap().clone(), K::Int(None)).unwrap()))
+        } else if r.keys().contains(k) {
+          // If key is missing on the left, then it's treated as NULL: 0N > 1 == 1
+          Some((k.clone(), v_lesser(K::Int(None), r.get(k).unwrap().clone()).unwrap()))
+        } else {
+          panic!("impossible")
+        }
+      }))))
+    }
+    (l, K::Dictionary(r)) => Ok(K::Dictionary(IndexMap::from_iter(r.keys().filter_map(|k| {
+      match v_lesser(l.clone(), r.get(k).unwrap().clone()) {
+        Ok(r) => Some((k.clone(), r)),
+        _ => None,
+      }
+    })))),
+    (K::Dictionary(l), r) => Ok(K::Dictionary(IndexMap::from_iter(l.keys().filter_map(|k| {
+      match v_lesser(l.get(k).unwrap().clone(), r.clone()) {
+        Ok(l) => Some((k.clone(), l)),
+        _ => None,
+      }
+    })))),
+    (K::Table(_l), K::Table(_r)) => {
+      todo!("table")
+    }
+    (l, ref r @ K::Table(_)) => {
+      // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
+      v_flip(v_lesser(l, v_flip(r.clone()).unwrap()).unwrap())
+    }
+    (l @ K::Table(_), r) => {
+      // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
+      v_flip(v_lesser(v_flip(l.clone()).unwrap(), r).unwrap())
+    }
+    _ => Err("nyi"),
+  })
 }
-
-pub fn v_greater(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 
 pub fn v_not(_r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_match(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
