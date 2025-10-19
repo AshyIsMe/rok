@@ -324,7 +324,18 @@ pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
 }
 pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
 pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide, div, l, r) }
-pub fn v_odometer(_r: K) -> Result<K, &'static str> { todo!("implement odometer") }
+pub fn v_keys_odometer(x: K) -> Result<K, &'static str> {
+  match x {
+    K::Dictionary(_) => todo!("implement keys"),
+    K::Table(df) => Ok(K::SymbolArray(
+      Series::new("", df.fields().iter().cloned().map(|f| f.name.into()).collect::<Vec<String>>())
+        .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
+        .unwrap(),
+    )),
+    K::IntArray(_) => todo!("implement odometer"),
+    _ => Err("nyi"),
+  }
+}
 pub fn v_mod(l: K, r: K) -> Result<K, &'static str> {
   match (l, r) {
     (K::Int(Some(i)), K::IntArray(a)) => Ok(K::IntArray(a % i)),
@@ -576,7 +587,16 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
         _ => None,
       }
     })))),
-    (_, K::Table(_)) => todo!("table"),
+    (K::Table(_l), K::Table(_r)) => {
+      todo!("table")
+    }
+    (l, ref r @ K::Table(_)) => {
+      // hack: flip to dict, v_lesser(l, r), flip back to table
+      v_makedict(
+        v_keys_odometer(r.clone()).unwrap(),
+        v_flip(v_lesser(l, v_flip(r.clone()).unwrap()).unwrap()).unwrap(),
+      )
+    }
     (K::Table(_), _) => todo!("table"),
     _ => Err("nyi"),
   })

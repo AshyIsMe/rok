@@ -673,6 +673,8 @@ fn test_table() {
   println!("{:?}", s2);
   assert_eq!(s1, s2);
 
+  assert_eq!(k_eval("!+`a`b!(1 2 3;2 3 4)"), k_eval("`a`b"));
+
   assert_eq!(k_eval("+`a`b!(1;2 3 4)"), k_eval("+`a`b!(1 1 1;2 3 4)"));
 }
 

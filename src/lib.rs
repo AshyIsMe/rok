@@ -92,6 +92,7 @@ impl K {
       CharArray(a) => a.len(),
       Dictionary(d) => d.len(),
       List(v) => v.len(),
+      Table(df) => df.height(),
       _ => 1,
     }
   }
@@ -618,7 +619,7 @@ pub fn primitives_table() -> VerbDispatchTable {
     ("-", (v_negate, v_negate, v_minus, v_minus, v_minus, v_minus, v_none3, v_none4)),
     ("*", (v_first, v_first, v_times, v_times, v_times, v_times, v_none3, v_none4)),
     ("%", (v_sqrt, v_sqrt, v_divide, v_divide, v_divide, v_divide, v_none3, v_none4)),
-    ("!", (v_iota, v_odometer, v_d_bang, v_d_bang, v_d_bang, v_d_bang, v_none3, v_none4)),
+    ("!", (v_iota, v_keys_odometer, v_d_bang, v_d_bang, v_d_bang, v_d_bang, v_none3, v_none4)),
     ("&", (v_where, v_where, v_min, v_min, v_min, v_min, v_none3, v_none4)),
     ("|", (v_reverse, v_reverse, v_max, v_max, v_max, v_max, v_none3, v_none4)),
     ("<", (v_asc, v_asc, v_lesser, v_lesser, v_lesser, v_lesser, v_none3, v_none4)),
@@ -638,7 +639,7 @@ pub fn primitives_table() -> VerbDispatchTable {
     ("-:", (v_negate, v_negate, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
     ("*:", (v_first, v_first, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
     ("%:", (v_sqrt, v_sqrt, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
-    ("!:", (v_iota, v_odometer, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
+    ("!:", (v_iota, v_keys_odometer, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
     ("&:", (v_where, v_where, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
     ("|:", (v_reverse, v_reverse, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
     ("<:", (v_asc, v_asc, v_none2, v_none2, v_none2, v_none2, v_none3, v_none4)),
@@ -1037,7 +1038,10 @@ impl ops::Div for K {
 fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
   match (l, r) {
     (K::Dictionary(_), K::Dictionary(_)) => Ok(true),
-    (K::Table(_), K::Table(_)) => Ok(true),
+    (l @ K::Table(_), r @ K::Table(_)) => match l.len() == r.len() {
+      true => Ok(true),
+      false => Err("length"),
+    },
     _ => {
       if l.len() == r.len() || l.len() == 1 || r.len() == 1 {
         Ok(true)
