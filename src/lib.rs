@@ -908,7 +908,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
 /// promote_nouns(l,r) => (l,r) eg. (Int, Bool) => (Int, Int)
 ///
 /// Also promotes scalars to arrays to match length of other arg.
-/// Eg. promote_nouns(1, [1 2 3]) => ([1 2 3], [1 2 3]).
+/// Eg. promote_nouns(1, [1 2 3]) => ([1 1 1], [1 2 3]).
 /// TODO: Improve performance by NOT promoting scalars to arrays.
 /// Similar to promote_num() can we combine these somehow and be more concise?
 #[rustfmt::skip]
