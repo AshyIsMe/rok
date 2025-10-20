@@ -4,7 +4,7 @@ use log::debug;
 use polars::prelude::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fmt;
+use std::{f64, fmt};
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::iter::zip;
@@ -1724,7 +1724,8 @@ pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
   match &term[..i] {
     "0N" => Ok(K::Int(None)),
     "0n" => Ok(K::Float(f64::NAN)),
-    "0w" => todo!("inf and ninf https://github.com/kparc/kcc#nulls-and-infinities"),
+    "0w" => Ok(K::Float(f64::INFINITY)),
+    "-0w" => Ok(K::Float(f64::NEG_INFINITY)),
     _ => {
       if let Ok(i) = term[..i].parse::<u8>() {
         match i {
