@@ -632,34 +632,28 @@ pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
   len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l > r) as u8)),
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l > r) as u8)),
-    (K::Int(None), K::Int(Some(_))) => Ok(K::Bool(1)),
-    (K::Int(Some(_)), K::Int(None)) => Ok(K::Bool(0)),
+    (K::Int(None), K::Int(Some(_))) => Ok(K::Bool(0)),
+    (K::Int(Some(_)), K::Int(None)) => Ok(K::Bool(1)),
     (K::Int(None), K::Int(None)) => Ok(K::Bool(0)),
     (K::Float(l), K::Float(r)) => {
       Ok(K::Bool(match (l.is_nan(), r.is_nan()) {
-        //TODO fix (copied from v_lesser)
         (false, false) => (l > r) as u8,
-        (true, false) => 1u8,
-        (false, true) => 0u8,
-        (true, true) => 0u8,
+        (false, true) => 1u8,
+        _ => 0u8
       }))
     }
     (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
       .map(|(l, r)| match (l.is_null(), r.is_null()) {
-        //TODO fix (copied from v_lesser)
         (false, false) => (l > r) as u8,
-        (true, false) => 1u8,
-        (false, true) => 0u8,
-        (true, true) => 0u8,
+        (false, true) => 1u8,
+        _ => 0u8
       })
       .collect::<Vec<u8>>()))),
     (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
       .map(|(l, r)| match (l.is_null(), r.is_null()) {
-        //TODO fix (copied from v_lesser)
         (false, false) => (l > r) as u8,
-        (true, false) => 1u8,
-        (false, true) => 0u8,
-        (true, true) => 0u8,
+        (false, true) => 1u8,
+        _ => 0u8,
       })
       .collect::<Vec<u8>>()))),
     (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
@@ -667,11 +661,9 @@ pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
         match (l, r) {
           (AnyValue::Float64(l), AnyValue::Float64(r)) => {
             match (l.is_nan(), r.is_nan()) {
-              //TODO fix (copied from v_lesser)
               (false, false) => (l > r) as u8,
-              (true, false) => 1u8,
-              (false, true) => 0u8,
-              (true, true) => 0u8,
+              (false, true) => 1u8,
+              _ => 0u8,
             }
           }
           _ => panic!("impossible"),
