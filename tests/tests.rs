@@ -6,6 +6,15 @@ use roklang::*;
 
 use roklang::KW::*;
 
+fn k_eval(s: &str) -> K {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let r = eval(&mut env, scan(s).unwrap()).unwrap().unwrap_noun();
+  println!("k_eval({}) = {}", s, r);
+  r
+}
+fn k_evals(s: &str) -> String { format!("{}", k_eval(s)) }
+
 #[test]
 fn test_scan() {
   assert_eq!(scan("1").unwrap(), vec![Noun(K::Bool(1u8))]);
@@ -663,6 +672,10 @@ fn test_table() {
   println!("{:?}", s1);
   println!("{:?}", s2);
   assert_eq!(s1, s2);
+
+  assert_eq!(k_eval("!+`a`b!(1 2 3;2 3 4)"), k_eval("`a`b"));
+
+  assert_eq!(k_eval("+`a`b!(1;2 3 4)"), k_eval("+`a`b!(1 1 1;2 3 4)"));
 }
 
 #[test]
@@ -859,6 +872,16 @@ fn test_scan_fixedpoint() {
 }
 
 #[test]
+fn test_v_d_scan() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  assert_eq!(
+    eval(&mut env, scan("3 +\\ 1 2 3").unwrap()).unwrap(),
+    eval(&mut env, scan("4 6 9").unwrap()).unwrap(),
+  );
+}
+
+#[test]
 fn test_parse_functions() {
   // See https://estradajke.github.io/k9-simples/k9/User-Functions.html
   //
@@ -873,6 +896,44 @@ fn test_parse_functions() {
   };
   let mut env = Env { names: HashMap::new(), parent: None };
   assert_eq!(eval(&mut env, scan("{2 * x}").unwrap()).unwrap(), f);
+
+  let f = KW::Function {
+    body: vec![KW::Exprs(vec![
+      vec![
+        KW::Noun(K::Name("a".to_string())),
+        KW::Verb { name: ":".to_string() },
+        KW::Noun(K::Int(Some(2))),
+      ],
+      vec![
+        KW::Noun(K::Name("x".to_string())),
+        KW::Verb { name: "*".to_string() },
+        KW::Noun(K::Name("a".to_string())),
+      ],
+    ])],
+    args: vec!["x".to_string()],
+    adverb: None,
+  };
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(eval(&mut env, scan("{a:2;x*a}").unwrap()).unwrap(), f);
+
+  let f = KW::Function {
+    body: vec![KW::Exprs(vec![
+      vec![
+        KW::Noun(K::Name("a".to_string())),
+        KW::Verb { name: ":".to_string() },
+        KW::Noun(K::Int(Some(2))),
+      ],
+      vec![KW::Exprs(vec![vec![
+        KW::Noun(K::Name("x".to_string())),
+        KW::Verb { name: "*".to_string() },
+        KW::Noun(K::Name("a".to_string())),
+      ]])],
+    ])],
+    args: vec!["x".to_string()],
+    adverb: None,
+  };
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(eval(&mut env, scan("{a:2;[x*a]}").unwrap()).unwrap(), f);
 }
 
 #[test]
@@ -892,6 +953,14 @@ fn test_functions() {
 }
 
 #[test]
+fn test_function_local_vars() {
+  // See https://estradajke.github.io/k9-simples/k9/User-Functions.html
+  //
+  let mut env = Env { names: HashMap::new(), parent: None };
+  assert_eq!(eval(&mut env, scan("{a:2; a * x} 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
+}
+
+#[test]
 fn test_expr_funcargs() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
@@ -902,7 +971,7 @@ fn test_expr_funcargs() {
   assert_eq!(eval(&mut env, scan("f[2;2;2]").unwrap()).unwrap(), Noun(K::Int(Some(6))));
 
   // let mut env = Env { names: HashMap::new(), parent: None };
-  // AA TODO a space between verb and arg list changes from verb[args] to verb (eval args) => verb(curry)list
+  // TODO a space between verb and arg list changes from verb[args] to verb (eval args) => verb(curry)list
   // assert_eq!(eval(&mut env, scan("+ [2;2]").unwrap()).unwrap(), CurryVerb("+", Noun(K::Int(Some(2)))));
 }
 
@@ -1110,6 +1179,22 @@ fn test_array_indexing() {
 
   let res = eval(&mut env, scan("(1 2 3; 3.14; `a) @ 0").unwrap()).unwrap();
   assert_eq!(res, Noun(K::IntArray(arr!([1, 2, 3i64]))));
+
+  // (1;2;3 4)@0 1
+  // (1;2;3 4)@2
+  let res = eval(&mut env, scan("(1;2;3 4)@ 0").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::Bool(1)));
+
+  let res = eval(&mut env, scan("(1;2;3 4)@ 0 1").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([1, 2i64]))));
+
+  let res = eval(&mut env, scan("(1;2;3 4)@ 2").unwrap()).unwrap();
+  assert_eq!(res, Noun(K::IntArray(arr!([3, 4i64]))));
+
+  assert_eq!(
+    eval(&mut env, scan("(1;2;3 4)@ 42 42 42").unwrap()).unwrap(),
+    eval(&mut env, scan("0N 0N 0N").unwrap()).unwrap()
+  );
 }
 
 #[test]
@@ -1252,7 +1337,6 @@ fn test_rand() {
   }
 }
 
-#[ignore]
 #[test]
 fn test_find() {
   let mut env = Env { names: HashMap::new(), parent: None };
@@ -1274,6 +1358,75 @@ fn test_each() {
 
   let res1 = eval(&mut env, scan("{2*x}'1 2 3").unwrap()).unwrap();
   let res2 = eval(&mut env, scan("2 4 6").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[test]
+fn test_eachright() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("a=/:a:!3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("(1 0 0;0 1 0;0 0 1)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[ignore]
+#[test]
+fn test_eachright_defun() {
+  // TODO: parse adverbs properly
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("a{x=y}/:a:!3").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("(1 0 0;0 1 0;0 0 1)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[test]
+fn test_eachleft() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("3 4 5 +\\:(2 3;4 5;6)").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("((5 6;7 8;9);(6 7;8 9;10);(7 8;9 10;11))").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[test]
+fn test_eachprior() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("-':1 6 2 3 4").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("1 5 -4 1 1").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[ignore]
+#[test]
+fn test_eachprior_d() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("5-':1 6 2 3 4").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("-4 5 -4 1 1").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+}
+
+#[ignore]
+#[test]
+fn test_windows() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res1 = eval(&mut env, scan("3':1 2 3 4 5 6").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("(1 2 3;2 3 4;3 4 5;4 5 6)").unwrap()).unwrap();
+  println!("res1: {:?}", res1);
+  assert_eq!(res1, res2);
+
+  let res1 = eval(&mut env, scan("3 +/':1 2 3 4 5 6").unwrap()).unwrap();
+  let res2 = eval(&mut env, scan("6 9 12 15").unwrap()).unwrap();
   println!("res1: {:?}", res1);
   assert_eq!(res1, res2);
 }
@@ -1351,3 +1504,163 @@ fn test_promote_nouns() {
   assert_eq!(promote_nouns(l.clone(), r), (l, K::FloatArray(arr!([1.0, 1.0, 1.0f64]))));
 }
 
+#[ignore]
+#[test]
+fn test_split_strings() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  //TODO fix parse error of 2 or more adverb chain
+  let res = eval(&mut env, scan(r#"","\'("1,2";"3,4")"#).unwrap()).unwrap().unwrap_noun();
+
+  assert_eq!(
+    res,
+    K::List(vec![
+      K::List(vec![K::Char('1'), K::Char('2')]),
+      K::List(vec![K::Char('3'), K::Char('4')])
+    ])
+  );
+}
+
+#[test]
+fn test_eval_verb() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res = eval(&mut env, scan(r#"."42""#).unwrap()).unwrap().unwrap_noun();
+
+  assert_eq!(res, K::Int(Some(42)));
+}
+
+#[test]
+fn test_concat() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res = eval(&mut env, scan("2,3").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::IntArray(arr!([2, 3i64])));
+
+  let res = eval(&mut env, scan("1 2,3 4.0").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::FloatArray(arr!([1., 2., 3., 4.0f64])));
+}
+
+#[test]
+fn test_grade() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let res = eval(&mut env, scan("< 3 2 1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::IntArray(arr!([2, 1, 0i64])));
+
+  let res = eval(&mut env, scan("< 3.0 2.5 1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::IntArray(arr!([2, 1, 0i64])));
+
+  let res = eval(&mut env, scan("> 3 2 1").unwrap()).unwrap().unwrap_noun();
+  assert_eq!(res, K::IntArray(arr!([0i64, 1, 2])));
+}
+
+#[test]
+fn test_index_take_drop_bounds() {
+  assert_eq!(k_eval("1 _ 1 2 3"), k_eval("2 3"));
+
+  assert_eq!(k_eval("1 2 3 @ 42"), k_eval("0N"));
+
+  assert_eq!(k_eval("1 2 3 @ 0 1 42"), k_eval("1 2 0N"));
+
+  assert_eq!(k_eval("0 # 1 2 3"), k_eval("!0"));
+
+  assert_eq!(k_eval("0N # 1 2 3"), k_eval("1 2 3"));
+}
+
+#[test]
+fn test_group() {
+  assert_eq!(k_eval("= 1 1 2 2 3 3 4"), k_eval("`1`2`3`4!(0 1;2 3;4 5;(,6))"));
+  assert_eq!(k_eval("= 1.0 1 2 2 3 3 4"), k_eval("`1.0`2.0`3.0`4.0!(0 1;2 3;4 5;(,6))"));
+
+  assert_eq!(k_eval("= \"foo\""), k_eval("`f`o!((,0);1 2)"));
+
+  // TODO
+  // assert_eq!(k_eval("= (0 1;1 0;0 1)"), k_eval("!/+((0 1;0 2);(1 0;,1))"));
+  assert_eq!(k_eval("= (0 1;1 0;0 1)"), k_eval("`01b`10b!(0 2;(,1))"));
+}
+
+#[test]
+fn test_imat() {
+  assert_eq!(k_eval("=3"), k_eval("(1 0 0;0 1 0;0 0 1)"));
+}
+
+#[test]
+fn test_reverse() {
+  assert_eq!(k_eval("|1"), k_eval("1"));
+  assert_eq!(k_eval("|2"), k_eval("2"));
+  assert_eq!(k_eval("|1 2 3"), k_eval("3 2 1"));
+  assert_eq!(k_eval("|1 2 3.0"), k_eval("3.0 2 1"));
+  assert_eq!(k_eval("|\"abc\""), k_eval("\"cba\""));
+  assert_eq!(k_evals("|`a`b`c"), k_evals("`c`b`a"));
+  assert_eq!(k_eval("|`a`b`c!(1;2;3)"), k_eval("`c`b`a!(3;2;1)"));
+  assert_eq!(k_eval("|+`a`b`c!(1 2 3;4 5 6;\"abc\")"), k_eval("+`a`b`c!(3 2 1;6 5 4;\"cba\")"));
+  assert_eq!(k_eval("|(`a;1;\"b\")"), k_eval("(\"b\";1;`a)"));
+}
+
+#[test]
+fn test_comparisons() {
+  println!("test_comparisons() numbers");
+  assert_eq!(k_eval("1<2"), k_eval("1"));
+  assert_eq!(k_eval("1<1 2 3"), k_eval("0 1 1"));
+  assert_eq!(k_eval("1.0<2"), k_eval("1"));
+  assert_eq!(k_eval("0N<1"), k_eval("1"));
+  assert_eq!(k_eval("0n<1"), k_eval("1"));
+  assert_eq!(k_eval("0n 0n<1"), k_eval("1 1"));
+  assert_eq!(k_eval("0N<1 1 1"), k_eval("1 1 1"));
+  assert_eq!(k_eval("0N<1 0N 1"), k_eval("1 0 1"));
+  assert_eq!(k_eval("0N<1 0n 1"), k_eval("1 0 1"));
+  assert_eq!(k_eval("0N<0N"), k_eval("0"));
+
+  println!("test_comparisons() dicts");
+  assert_eq!(k_eval("1<`a`b!(1;2)"), k_eval("`a`b!(0;1)"));
+  assert_eq!(k_eval("1<`a`b!(1;2 3 4)"), k_eval("`a`b!(0;1 1 1)"));
+  assert_eq!(k_eval("(`a`b!(1;2))<2"), k_eval("`a`b!(1;0)"));
+  assert_eq!(k_eval("(`a`b!(1;2 3 4))<3"), k_eval("`a`b!(1;1 0 0)"));
+  assert_eq!(k_eval("(`a`b!(1;1))<(`a`b`c!(1;2;3 4 5))"), k_eval("`a`b`c!(0;1;1 1 1)"));
+
+  assert_eq!(k_eval("(`a`b!(1;1))<(`a`b`c!(1;2;0N))"), k_eval("`a`b`c!(0;1;0)"));
+  assert_eq!(k_eval("(`a`b!(1;1))<(`a`b`c!(1;2;3))"), k_eval("`a`b`c!(0;1;1)"));
+
+  println!("test_comparisons() tables");
+  assert_eq!(k_eval("1<+`a`b!(1 1 1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
+  assert_eq!(k_eval("(+`a`b!(1 1 1;2 3 4))<3"), k_eval("+`a`b!(1 1 1;1 0 0)"));
+
+
+  println!("test_comparisons() numbers");
+  assert_eq!(k_eval("1>2"), k_eval("0"));
+  assert_eq!(k_eval("1>1 2 3"), k_eval("0 0 0"));
+  assert_eq!(k_eval("1.0>2"), k_eval("0"));
+
+  assert_eq!(k_eval("0N>1"), k_eval("0")); 
+  assert_eq!(k_eval("0n>1"), k_eval("0"));
+  assert_eq!(k_eval("0n 0n>1"), k_eval("0 0"));
+  // 0N>0n is an annoyance to implement because of promote_nouns().
+  // I'm going to leave it as 0=0N>0n for rok for convenience and assume it was just a quirk of the implementation for ngn-k.
+  // assert_eq!(k_eval("0N>0N"), k_eval("0"));
+  // assert_eq!(k_eval("0N>0n"), k_eval("1"));
+  // assert_eq!(k_eval("0n>0N"), k_eval("0"));
+  // assert_eq!(k_eval("0n<0N"), k_eval("1"));
+  assert_eq!(k_eval("0N>0N"), k_eval("0"));
+  assert_eq!(k_eval("0N>0n"), k_eval("0"));
+  assert_eq!(k_eval("0n>0N"), k_eval("0"));
+  assert_eq!(k_eval("0n<0N"), k_eval("0"));
+  assert_eq!(k_eval("0N>1 1 1"), k_eval("0 0 0"));
+  assert_eq!(k_eval("0N>1 0N 1"), k_eval("0 0 0"));
+  assert_eq!(k_eval("0N>1 0n 1"), k_eval("0 0 0"));
+
+  println!("test_comparisons() dicts");
+  assert_eq!(k_eval("1>`a`b!(1;2)"), k_eval("`a`b!(0;1)"));
+  assert_eq!(k_eval("1>`a`b!(1;2 3 4)"), k_eval("`a`b!(0;1 1 1)"));
+  assert_eq!(k_eval("(`a`b!(1;2))>2"), k_eval("`a`b!(1;0)"));
+  assert_eq!(k_eval("(`a`b!(1;2 3 4))>3"), k_eval("`a`b!(1;1 0 0)"));
+  assert_eq!(k_eval("(`a`b!(1;1))>(`a`b`c!(1;2;3 4 5))"), k_eval("`a`b`c!(0;1;1 1 1)"));
+
+  assert_eq!(k_eval("(`a`b!(1;1))>(`a`b`c!(1;2;0N))"), k_eval("`a`b`c!(0;1;0)"));
+  assert_eq!(k_eval("(`a`b!(1;1))>(`a`b`c!(1;2;3))"), k_eval("`a`b`c!(0;1;1)"));
+
+  println!("test_comparisons() tables");
+  assert_eq!(k_eval("1>+`a`b!(1 1 1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
+  assert_eq!(k_eval("(+`a`b!(1 1 1;2 3 4))>3"), k_eval("+`a`b!(1 1 1;1 0 0)"));
+
+}
