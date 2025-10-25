@@ -350,7 +350,14 @@ pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
-pub fn v_divide(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(/, v_divide, div, l, r) }
+pub fn v_divide(l: K, r: K) -> Result<K, &'static str> {
+  match (&l, &r) {
+    (K::Bool(_), K::Bool(0)) => Ok(K::Float(f64::NAN)),
+    (K::Bool(_), K::Int(Some(0))) => Ok(K::Float(f64::NAN)),
+    //TODO arrays
+    _ => atomicdyad!(/, v_divide, div, l, r),
+  }
+}
 pub fn v_keys_odometer(x: K) -> Result<K, &'static str> {
   match x {
     K::Dictionary(_) => todo!("implement keys"),
@@ -635,18 +642,16 @@ pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
     (K::Int(None), K::Int(Some(_))) => Ok(K::Bool(0)),
     (K::Int(Some(_)), K::Int(None)) => Ok(K::Bool(1)),
     (K::Int(None), K::Int(None)) => Ok(K::Bool(0)),
-    (K::Float(l), K::Float(r)) => {
-      Ok(K::Bool(match (l.is_nan(), r.is_nan()) {
-        (false, false) => (l > r) as u8,
-        (false, true) => 1u8,
-        _ => 0u8
-      }))
-    }
+    (K::Float(l), K::Float(r)) => Ok(K::Bool(match (l.is_nan(), r.is_nan()) {
+      (false, false) => (l > r) as u8,
+      (false, true) => 1u8,
+      _ => 0u8,
+    })),
     (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
       .map(|(l, r)| match (l.is_null(), r.is_null()) {
         (false, false) => (l > r) as u8,
         (false, true) => 1u8,
-        _ => 0u8
+        _ => 0u8,
       })
       .collect::<Vec<u8>>()))),
     (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
@@ -659,13 +664,11 @@ pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
     (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
       .map(|(l, r)| {
         match (l, r) {
-          (AnyValue::Float64(l), AnyValue::Float64(r)) => {
-            match (l.is_nan(), r.is_nan()) {
-              (false, false) => (l > r) as u8,
-              (false, true) => 1u8,
-              _ => 0u8,
-            }
-          }
+          (AnyValue::Float64(l), AnyValue::Float64(r)) => match (l.is_nan(), r.is_nan()) {
+            (false, false) => (l > r) as u8,
+            (false, true) => 1u8,
+            _ => 0u8,
+          },
           _ => panic!("impossible"),
         }
       })
@@ -784,7 +787,13 @@ pub fn v_concat(x: K, y: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_isnull(_r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_isnull(x: K) -> Result<K, &'static str> {
+  match x {
+    K::Int(None) => Ok(K::Bool(1u8)),
+    K::Float(f) if f.is_nan() => Ok(K::Bool(1u8)),
+    _ => Ok(K::Bool(0u8)),
+  }
+}
 pub fn v_fill(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_except(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 

@@ -1032,7 +1032,10 @@ impl ops::Mul for K {
 }
 impl ops::Div for K {
   type Output = Self;
-  fn div(self, r: Self) -> Self::Output { impl_op!(/, div, self, r) }
+  fn div(self, r: Self) -> Self::Output { 
+    //TODO this doesn't gracefully handle divide by zero. in k 0n~0%0 
+    impl_op!(/, div, self, r) 
+  }
 }
 
 fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {

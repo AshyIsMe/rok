@@ -971,7 +971,7 @@ fn test_expr_funcargs() {
   assert_eq!(eval(&mut env, scan("f[2;2;2]").unwrap()).unwrap(), Noun(K::Int(Some(6))));
 
   // let mut env = Env { names: HashMap::new(), parent: None };
-  // AA TODO a space between verb and arg list changes from verb[args] to verb (eval args) => verb(curry)list
+  // TODO a space between verb and arg list changes from verb[args] to verb (eval args) => verb(curry)list
   // assert_eq!(eval(&mut env, scan("+ [2;2]").unwrap()).unwrap(), CurryVerb("+", Noun(K::Int(Some(2)))));
 }
 
