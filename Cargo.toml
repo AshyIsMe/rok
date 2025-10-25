@@ -8,6 +8,7 @@ license = "ISC"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.100"
 crossterm = "0.27.0"
 directories = "5.0.1"
 env_logger = "0.11.3"
@@ -18,6 +19,7 @@ log = "0.4.19"
 polars = { version = "0.41.3", features = ["performant", "cse", "lazy", "parquet", "dtype-categorical", "strings"] }
 rand = "0.8.5"
 rustyline = "14.0.0"
+thiserror = "2.0.17"
 
 [[bin]]
 name = "rok"
