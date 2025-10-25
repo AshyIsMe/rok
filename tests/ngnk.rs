@@ -1,7 +1,6 @@
-use roklang::KW::*;
 use roklang::*;
 use std::collections::HashMap;
-use std::fs::{self, File};
+use std::fs::{File};
 use std::io::Read;
 
 fn k_eval(s: &str) -> Result<KW, &str> {
@@ -62,7 +61,7 @@ fn test_ngnk_tests() {
           println!("Failed test: ({failed_tests}/{test_count}): {}", l);
           match res {
             Ok(k) => println!("{}", k),
-            Err(e) => println!("{:?}", res),
+            Err(_) => println!("{:?}", res),
           }
         }
       }

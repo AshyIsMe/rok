@@ -9,7 +9,7 @@ use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::iter::zip;
 use std::path::Path;
-use std::{collections::VecDeque, iter::repeat, ops};
+use std::{collections::VecDeque, iter::repeat, iter::repeat_n, ops};
 
 mod verbs;
 
@@ -230,7 +230,7 @@ impl fmt::Display for K {
             .collect(),
         );
         let s = if s.len() < cols { s } else { s[..(cols - 2)].to_string() + ".." };
-        if b.len() == 0 {
+        if b.is_empty() {
           write!(f, "!0")
         } else if b.len() == 1 {
           write!(f, ",{}", s)
@@ -328,10 +328,7 @@ impl Hash for K {
           .f64()
           .unwrap()
           .into_iter()
-          .map(|f| match f {
-            Some(f) => Some(f.to_string()),
-            None => None,
-          })
+          .map(|f| f.map(|f| f.to_string()))
           .collect();
         v.hash(state)
       }
@@ -916,51 +913,51 @@ pub fn promote_nouns(l: K, r: K) -> (K, K) {
   match (&l, &r) {
     (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
     (K::Bool(l), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Bool(l), K::BoolArray(_)) => (K::BoolArray(repeat(*l).take(r.len()).collect()), r),
-    (K::Bool(l), K::IntArray(_)) => (K::IntArray(repeat(*l as i64).take(r.len()).collect()), r),
-    (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(repeat(*l as f64).take(r.len()).collect()), r),
+    (K::Bool(l), K::BoolArray(_)) => (K::BoolArray(repeat_n(*l, r.len()).collect()), r),
+    (K::Bool(l), K::IntArray(_)) => (K::IntArray(repeat_n(*l as i64, r.len()).collect()), r),
+    (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(repeat_n(*l as f64, r.len()).collect()), r),
 
     (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
     (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(repeat(*l).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
-    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(repeat(*l).take(r.len()).collect()), r),
-    (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(repeat(*l as f64).take(r.len()).collect()), r),
+    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(repeat_n(*l, r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(repeat_n(*l, r.len()).collect()), r),
+    (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(repeat_n(*l as f64, r.len()).collect()), r),
     (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
-    (K::Int(None), K::BoolArray(r)) => (K::IntArray(repeat(None::<i64>).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
-    (K::Int(None), K::IntArray(_)) => (K::IntArray(repeat(None::<i64>).take(r.len()).collect()), r),
-    (K::Int(None), K::FloatArray(_)) => (K::FloatArray(repeat(f64::NAN).take(r.len()).collect()), r),
+    (K::Int(None), K::BoolArray(r)) => (K::IntArray(repeat_n(None::<i64>, r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(None), K::IntArray(_)) => (K::IntArray(repeat_n(None::<i64>, r.len()).collect()), r),
+    (K::Int(None), K::FloatArray(_)) => (K::FloatArray(repeat_n(f64::NAN, r.len()).collect()), r),
 
     (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
-    (K::Float(l), K::BoolArray(r)) => (K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
-    (K::Float(l), K::IntArray(r)) => {(K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
-    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(repeat(l).take(r.len()).collect()), r),
+    (K::Float(l), K::BoolArray(r)) => (K::FloatArray(repeat_n(l, r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+    (K::Float(l), K::IntArray(r)) => {(K::FloatArray(repeat_n(l, r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
+    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(repeat_n(l, r.len()).collect()), r),
 
     // (K::Char(_l), K::Int(_)) => panic!("nyi"), // TODO
     // (K::Char(_l), K::Float(_)) => panic!("nyi"), // TODO
-    (K::Char(l), K::CharArray(_)) => (K::CharArray(repeat(*l).take(r.len()).collect()), r),
+    (K::Char(l), K::CharArray(_)) => (K::CharArray(repeat_n(*l, r.len()).collect()), r),
     // (K::Char(_l), K::IntArray(_)) => panic!("nyi"), // TODO
     // (K::Char(_l), K::FloatArray(_)) => panic!("nyi"), // TODO
 
-    (K::BoolArray(_), K::Bool(r)) => (l.clone(), K::BoolArray(repeat(*r as f64).take(l.len()).collect())),
-    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(r).take(l.len()).collect())),
-    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(None::<i64>).take(l.len()).collect()))}
-    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(r).take(l.len()).collect()))}
+    (K::BoolArray(_), K::Bool(r)) => (l.clone(), K::BoolArray(repeat_n(*r as f64, l.len()).collect())),
+    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat_n(r, l.len()).collect())),
+    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat_n(None::<i64>, l.len()).collect()))}
+    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat_n(r, l.len()).collect()))}
     (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
-    (K::IntArray(_), K::Bool(r)) => (l.clone(), K::IntArray(repeat(*r as i64).take(l.len()).collect())),
-    (K::IntArray(_), K::Int(Some(r))) => (l.clone(), K::IntArray(repeat(r).take(l.len()).collect())),
-    (K::IntArray(_), K::Int(None)) => (l.clone(), K::IntArray(repeat(None::<i64>).take(l.len()).collect())),
-    (K::IntArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(*r).take(l.len()).collect())),
+    (K::IntArray(_), K::Bool(r)) => (l.clone(), K::IntArray(repeat_n(*r as i64, l.len()).collect())),
+    (K::IntArray(_), K::Int(Some(r))) => (l.clone(), K::IntArray(repeat_n(r, l.len()).collect())),
+    (K::IntArray(_), K::Int(None)) => (l.clone(), K::IntArray(repeat_n(None::<i64>, l.len()).collect())),
+    (K::IntArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat_n(*r, l.len()).collect())),
     (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
     (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
-    (K::FloatArray(_), K::Bool(r)) => (l.clone(), K::FloatArray(repeat(*r as f64).take(l.len()).collect())),
-    (K::FloatArray(_), K::Int(Some(r))) => (l.clone(), K::FloatArray(repeat(*r as f64).take(l.len()).collect())),
-    (K::FloatArray(_), K::Int(None)) => (l.clone(), K::FloatArray(repeat(f64::NAN).take(l.len()).collect())),
-    (K::FloatArray(_), K::Float(r)) => (l.clone(), K::FloatArray(repeat(r).take(l.len()).collect())),
+    (K::FloatArray(_), K::Bool(r)) => (l.clone(), K::FloatArray(repeat_n(*r as f64, l.len()).collect())),
+    (K::FloatArray(_), K::Int(Some(r))) => (l.clone(), K::FloatArray(repeat_n(*r as f64, l.len()).collect())),
+    (K::FloatArray(_), K::Int(None)) => (l.clone(), K::FloatArray(repeat_n(f64::NAN, l.len()).collect())),
+    (K::FloatArray(_), K::Float(r)) => (l.clone(), K::FloatArray(repeat_n(r, l.len()).collect())),
     (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
     (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
 
@@ -1063,7 +1060,7 @@ pub struct Env {
 
 fn resolve_names(env: Env, fragment: (KW, KW, KW, KW)) -> Result<(KW, KW, KW, KW), &'static str> {
   //Resolve Names only on the RHS of assignment
-  let words = vec![fragment.0.clone(), fragment.1.clone(), fragment.2.clone(), fragment.3.clone()];
+  let words = [fragment.0.clone(), fragment.1.clone(), fragment.2.clone(), fragment.3.clone()];
   let mut resolved_words = Vec::new();
   for w in words.iter().rev() {
     match w {

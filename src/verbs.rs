@@ -1,8 +1,6 @@
 use crate::*;
 use rand::distributions::{Distribution, Uniform};
-use std::cmp;
-use std::collections::BTreeMap;
-use std::iter::repeat;
+use std::{cmp, collections::BTreeMap, iter::repeat, iter::repeat_n};
 
 pub fn v_imat(x: K) -> Result<K, &'static str> {
   match x {
@@ -26,7 +24,7 @@ pub fn v_group(x: K) -> Result<K, &'static str> {
       // let keys: K = K::try_from(g.iter().nth(0).unwrap().clone()).unwrap();
       let keys: K = K::SymbolArray(
         g.iter()
-          .nth(0)
+          .next()
           .unwrap()
           .clone()
           .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
@@ -181,7 +179,7 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
   match x {
     K::Dictionary(ref d) => {
       let lengths: Vec<usize> = d.iter().map(|(_k, v)| v.len()).unique().sorted().collect();
-      if lengths.len() > 2 || lengths.len() == 0 {
+      if lengths.len() > 2 || lengths.is_empty() {
         Err("length")
       } else {
         // if d.iter().map(|(_k, v)| v.len()).all_equal() {
@@ -212,20 +210,15 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
                 panic!("type error?")
               }
             }
-            K::Bool(b) => {
-              Series::new(&k.to_string(), std::iter::repeat(*b).take(*len).collect::<Vec<u8>>())
-            }
+            K::Bool(b) => Series::new(&k.to_string(), repeat_n(*b, *len).collect::<Vec<u8>>()),
             K::Int(Some(i)) => {
-              Series::new(&k.to_string(), std::iter::repeat(*i).take(*len).collect::<Vec<i64>>())
+              Series::new(&k.to_string(), repeat_n(*i, *len).collect::<Vec<i64>>())
             }
             K::Int(None) => Series::full_null(&k.to_string(), *len, &DataType::Int64),
-            K::Float(f) => {
-              Series::new(&k.to_string(), std::iter::repeat(*f).take(*len).collect::<Vec<f64>>())
+            K::Float(f) => Series::new(&k.to_string(), repeat_n(*f, *len).collect::<Vec<f64>>()),
+            K::Symbol(s) => {
+              Series::new(&k.to_string(), repeat_n(s.clone(), *len).collect::<Vec<String>>())
             }
-            K::Symbol(s) => Series::new(
-              &k.to_string(),
-              std::iter::repeat(s.clone()).take(*len).collect::<Vec<String>>(),
-            ),
             // K::Char(c) => Series::new(&k.to_string(), std::iter::repeat(*c.to_string()).take(*len).collect::<Vec<String>>()),
             K::Char(_c) => todo!("handle char"),
             K::Table(_df) => todo!("why is Table here?"),
@@ -334,7 +327,7 @@ pub fn v_first(x: K) -> Result<K, &'static str> {
     K::BoolArray(a) => Ok(K::Bool(a.bool().unwrap().get(0).unwrap() as u8)),
     K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(0).unwrap()))),
     K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(0).unwrap())),
-    K::CharArray(a) => Ok(K::Char(a.chars().nth(0).unwrap_or(' '))),
+    K::CharArray(a) => Ok(K::Char(a.chars().next().unwrap_or(' '))),
     K::List(l) => Ok(l.first().unwrap().clone()),
     _ => Err("nyi"),
   }
@@ -587,7 +580,7 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
       .collect::<Vec<u8>>()))),
     (K::List(l), K::List(r)) => Ok(K::List(
       zip(l.iter(), r.iter())
-        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0 as u8)))
+        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0_u8)))
         .collect::<Vec<K>>(),
     )),
     (K::Dictionary(l), K::Dictionary(r)) => {
@@ -680,7 +673,7 @@ pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
       .collect::<Vec<u8>>()))),
     (K::List(l), K::List(r)) => Ok(K::List(
       zip(l.iter(), r.iter())
-        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0 as u8)))
+        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0_u8)))
         .collect::<Vec<K>>(),
     )),
     (K::Dictionary(l), K::Dictionary(r)) => {
@@ -781,8 +774,8 @@ pub fn v_concat(x: K, y: K) -> Result<K, &'static str> {
     (K::Char(x), K::CharArray(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
 
     (K::List(x), K::List(y)) => Ok(K::List(x.iter().chain(y.iter()).cloned().collect())),
-    (K::List(x), y) => Ok(K::List(x.iter().chain(vec![y].iter()).cloned().collect())),
-    (x, K::List(y)) => Ok(K::List(vec![x].iter().chain(y.iter()).cloned().collect())),
+    (K::List(x), y) => Ok(K::List(x.iter().chain([y].iter()).cloned().collect())),
+    (x, K::List(y)) => Ok(K::List([x].iter().chain(y.iter()).cloned().collect())),
     _ => todo!("nyi v_concat() other cases {}, {}", x, y),
   }
 }
@@ -803,7 +796,7 @@ pub fn v_drop(x: K, y: K) -> Result<K, &'static str> {
     K::Bool(1) => v_drop(K::Int(Some(1)), y),
     K::Int(Some(0)) | K::Bool(0) => Ok(y),
     K::Int(Some(i)) => {
-      if i.abs() as usize >= y.len() {
+      if i.unsigned_abs() as usize >= y.len() {
         v_take(K::Int(Some(0)), y)
       } else if i < 0 {
         // drop off end.
@@ -826,9 +819,9 @@ pub fn v_dfmt(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
 pub fn v_cast(l: K, _r: K) -> Result<K, &'static str> {
   match l {
-    K::Symbol(s) if s == "c".to_string() => todo!("cast to string"),
-    K::Symbol(s) if s == "i".to_string() => todo!("cast to int"),
-    K::Symbol(s) if s == "f".to_string() => todo!("cast to float"),
+    K::Symbol(s) if s == "c" => todo!("cast to string"),
+    K::Symbol(s) if s == "i" => todo!("cast to int"),
+    K::Symbol(s) if s == "f" => todo!("cast to float"),
     _ => Err("type"),
   }
 }
@@ -1200,7 +1193,6 @@ pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
       let r: Vec<K> = v
         .iter()
-        .cloned()
         .map(|y|
              // apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun()
              eval(env, vec![f.clone(), KW::Noun(y.clone())]).unwrap().unwrap_noun())
@@ -1452,7 +1444,6 @@ pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(y).map(|v| {
       let r: Vec<K> = v
         .iter()
-        .cloned()
         .map(|y| {
           eval(
             env,
@@ -1475,7 +1466,6 @@ pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str>
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
       let r: Vec<K> = v
         .iter()
-        .cloned()
         .map(|x| {
           eval(
             env,
@@ -1529,7 +1519,7 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         ))))
       }
       _ => {
-        if s.len() == 0 {
+        if s.is_empty() {
           Err("length")
         } else if s.len() == 1 {
           Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
