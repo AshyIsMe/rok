@@ -144,7 +144,7 @@ impl K {
         IntArray(a) => {
           if n > a.len() {
             // Ok(IntArray(a.i64().unwrap().into_iter().chain(repeat(Some(0i64))).take(n).collect()))
-            Ok(IntArray(a.extend_constant(AnyValue::Int64(0i64), n - a.len()).unwrap()))
+            Ok(IntArray(a.extend_constant(AnyValue::Int64(0i64), n - a.len())?))
           } else {
             todo!("just take?")
           }
@@ -438,6 +438,13 @@ impl KW {
     match self {
       KW::Noun(n) => n.clone(),
       _ => panic!("not a noun"),
+    }
+  }
+  //TODO get rid of panic version above
+  pub fn unwrap_noun_result(&self) -> Result<K> {
+    match self {
+      KW::Noun(n) => Ok(n.clone()),
+      _ => Err(RokError::Error("not a noun".into()).into()),
     }
   }
 }
@@ -1023,11 +1030,13 @@ macro_rules! impl_op {
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray((l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()).unwrap()),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray((l $op r).unwrap()),
             (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray((l $op r).unwrap()),
-            (_, K::Dictionary(_)) => todo!("dict"),
-            (K::Dictionary(_), _) => todo!("dict"),
-            (_, K::Table(_)) => todo!("table"),
-            (K::Table(_), _) => todo!("table"),
-          _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc. self: {}, r: {}", $self, $r),
+            // HACK: symbols instead of RokError() due to impl ops
+            (_, K::Dictionary(_)) => K::Symbol("nyi: dict".into()),
+            (K::Dictionary(_), _) => K::Symbol("nyi: dict".into()),
+            (_, K::Table(_)) => K::Symbol("nyi: table".into()),
+            (K::Table(_), _) => K::Symbol("nyi: table".into()),
+          // _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc. self: {}, r: {}", $self, $r),
+          _ => K::Symbol(format!("nyi: various $op pairs - LOTS MORE to do still: char/dicts/tables/etc. self: {}, r: {}", $self, $r)),
         }
     };
 }
@@ -1177,7 +1186,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW> {
             .filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP))
             .collect();
           Ok(vec![KW::Noun(
-            vec_to_list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
+            vec_to_list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat())?,
           )])
         } else {
           Err(RokError::Error("invalid list syntax".into()).into())

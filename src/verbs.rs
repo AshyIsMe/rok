@@ -1191,15 +1191,18 @@ pub fn v_d_bang(l: K, r: K) -> Result<K> {
 
 pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K> {
   match v {
-    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
-      let r: Vec<K> = v
-        .iter()
-        .map(|y|
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => {
+      match k_to_vec(x).map(|v| {
+        v.iter()
+          .map(|y|
              // apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun()
-             eval(env, vec![f.clone(), KW::Noun(y.clone())]).unwrap().unwrap_noun())
-        .collect();
-      promote_num(r.clone()).unwrap_or(K::List(r))
-    }),
+             eval(env, vec![f.clone(), KW::Noun(y.clone())])?.unwrap_noun_result())
+          .collect::<Result<Vec<K>>>()
+      })? {
+        Ok(r) => Ok(promote_num(r.clone()).unwrap_or(K::List(r))),
+        Err(e) => Err(e),
+      }
+    }
     _ => Err(RokError::Type.into()),
   }
 }
@@ -1433,12 +1436,8 @@ pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K> {
 pub fn v_eachprior_d_or_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
   todo!("v_eachprior_d_or_windows()")
 }
-pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
-  todo!("v_eachprior_d()")
-}
-pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
-  todo!("v_windows()")
-}
+pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { todo!("v_eachprior_d()") }
+pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { todo!("v_windows()") }
 
 pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   match v {
