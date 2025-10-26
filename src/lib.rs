@@ -81,19 +81,19 @@ pub enum KW /* KWords */ {
 
 #[derive(Error, Debug)]
 pub enum RokError {
-  #[error("'domain\n")]
+  #[error("'domain")]
   Domain,
-  #[error("'error\n{0}\n")]
+  #[error("'error\n{0}")]
   Error(String),
-  #[error("'length\n")]
+  #[error("'length")]
   Length,
-  #[error("'nyi\n")]
+  #[error("'nyi")]
   NYI,
-  #[error("'parse\n{0}\n")]
+  #[error("'parse\n{0}")]
   Parse(&'static str),
-  #[error("'rank\n")]
+  #[error("'rank")]
   Rank,
-  #[error("'type\n")]
+  #[error("'type")]
   Type,
 }
 
@@ -1329,12 +1329,12 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>> {
         }
       }
       '"' => {
-        let (j, k) = scan_string(&code[i..]).unwrap();
+        let (j, k) = scan_string(&code[i..])?;
         words.push(k);
         skip = j;
       }
       '`' => {
-        let (j, k) = scan_symbol(&code[i..]).unwrap();
+        let (j, k) = scan_symbol(&code[i..])?;
         words.push(k);
         skip = j;
       }
@@ -1380,7 +1380,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>> {
       '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }),
       ' ' | '\t' | '\n' => continue,
       'a'..='z' | 'A'..='Z' => {
-        let (j, k) = scan_name(&code[i..]).unwrap();
+        let (j, k) = scan_name(&code[i..])?;
         words.push(k);
         skip = j;
       }

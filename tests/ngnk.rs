@@ -8,7 +8,7 @@ fn k_eval(s: &str) -> Result<KW> {
   let mut env = Env { names: HashMap::new(), parent: None };
 
   // let r = eval(&mut env, scan(s).unwrap()).unwrap().unwrap_noun();
-  match eval(&mut env, scan(s).unwrap()) {
+  match eval(&mut env, scan(s)?) {
     Ok(r) => {
       // let r = r.unwrap_noun();
       // println!("k_eval({}) = {}", s, r);
@@ -41,7 +41,8 @@ fn test_ngnk_tests() {
   let mut failed_tests = 0;
 
   // TODO add support for these lines
-  let skiplines = [9, 10, 14, 15, 28, 30, 31, 32, 34];
+  // let skiplines = [9, 10, 14, 15, 28, 30, 31, 32, 34];
+  let skiplines = [];
 
   for (i, l) in lines.iter().enumerate() {
     if skiplines.contains(&i) {
