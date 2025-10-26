@@ -1,9 +1,10 @@
 use roklang::*;
+use anyhow::Result;
 use std::collections::HashMap;
 use std::fs::{File};
 use std::io::Read;
 
-fn k_eval(s: &str) -> Result<KW, &str> {
+fn k_eval(s: &str) -> Result<KW> {
   let mut env = Env { names: HashMap::new(), parent: None };
 
   // let r = eval(&mut env, scan(s).unwrap()).unwrap().unwrap_noun();
@@ -55,13 +56,18 @@ fn test_ngnk_tests() {
       } else {
         test_count += 1;
         //   assert_eq!(k_eval(t[0]), k_eval(t[1]));
-        let res = k_eval(t[0]);
-        if res != k_eval(t[1]) {
+        let res_l = k_eval(t[0]);
+        let res_r = k_eval(t[1]);
+        let fail = match (&res_l, &res_r) {
+          (Ok(l), Ok(r)) if l == r => false,
+          _ => true
+        };
+        if fail {
           failed_tests += 1;
           println!("Failed test: ({failed_tests}/{test_count}): {}", l);
-          match res {
+          match res_l {
             Ok(k) => println!("{}", k),
-            Err(_) => println!("{:?}", res),
+            Err(_) => println!("{:?}", res_l),
           }
         }
       }
