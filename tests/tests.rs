@@ -399,18 +399,19 @@ fn test_quoted_symbols() {
 #[test]
 fn test_length_errors() {
   let mut env = Env { names: HashMap::new(), parent: None };
-  assert_eq!(eval(&mut env, scan("1 2 3 + 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 + 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1.0 2.0 + 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 3 - 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 - 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1.0 2.0 - 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 3 * 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 * 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1.0 2.0 * 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 3 % 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 % 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1.0 2.0 % 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
+  //TODO this doesn't build, anyhow::Error does not impl PartialEq
+  assert_eq!(eval(&mut env, scan("1 2 3 + 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1 2 + 3 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1.0 2.0 + 3 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1 2 3 - 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1 2 - 3 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1.0 2.0 - 3 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1 2 3 * 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1 2 * 3 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1.0 2.0 * 3 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1 2 3 % 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1 2 % 3 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
+  assert_eq!(eval(&mut env, scan("1.0 2.0 % 3 4 5").unwrap()), Err::<KW, RokError>(RokError::Length));
 }
 
 #[test]
