@@ -815,7 +815,9 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
         }
       },
       None => {
-        let t = if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 2..]) {
+        let t = if v.len() < 2 {
+          None
+        } else if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 2..]) {
           Some((2, (m_a, d_a)))
         } else if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 1..]) {
           Some((1, (m_a, d_a)))
@@ -830,9 +832,9 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
             (None, KW::Noun(r)) => {
               m_a(env, KW::Verb { name: v[..v.len() - adv_len].to_string() }, r).map(KW::Noun)
             }
-            _ => todo!("other adverb cases"),
+            _ => Err(RokError::Error("NYI: other adverb cases".into()).into()),
           },
-          None => todo!("NotYetImplemented {}", v),
+          None => Err(RokError::Error(format!("NYI: {}", v)).into()),
         }
       }
     },
@@ -1251,9 +1253,7 @@ fn parse_cond(env: &mut Env, kw: KW) -> Result<KW> {
   }
 }
 
-pub fn scan(code: &str) -> Result<Vec<KW>> {
-  scan_pass3(scan_pass2(scan_pass1(code)?)?)
-}
+pub fn scan(code: &str) -> Result<Vec<KW>> { scan_pass3(scan_pass2(scan_pass1(code)?)?) }
 
 pub fn scan_pass1(code: &str) -> Result<Vec<KW>> {
   // First tokenization pass.
@@ -1390,9 +1390,7 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>> {
   Ok(words)
 }
 
-pub fn split_on(
-  tokens: Vec<KW>, delim: KW, end_tok: KW,
-) -> Result<(Vec<Vec<KW>>, Vec<KW>)> {
+pub fn split_on(tokens: Vec<KW>, delim: KW, end_tok: KW) -> Result<(Vec<Vec<KW>>, Vec<KW>)> {
   // Split tokens on delim token until end token.
   // Depth of 0 meaning we keep track of nested parens, brackets, funcs etc
   let mut depth = 0;
@@ -1400,7 +1398,8 @@ pub fn split_on(
   let mut start = 0;
   for i in 0..tokens.len() {
     if depth < 0 {
-      return Err(RokError::Parse("mismatched parens, brackets or curly brackets").into()); // TODO better message
+      return Err(RokError::Parse("mismatched parens, brackets or curly brackets").into());
+      // TODO better message
     }
     if start > i {
       continue;
@@ -1601,7 +1600,12 @@ pub fn scan_number(code: &str) -> Result<(usize, KW)> {
       _ => Ok((l, KW::Noun(promote_num(nums).unwrap()))),
     }
   } else {
-    Err(RokError::Error("syntax error: a sentence starting with a digit must contain a valid number".into()).into())
+    Err(
+      RokError::Error(
+        "syntax error: a sentence starting with a digit must contain a valid number".into(),
+      )
+      .into(),
+    )
   }
 }
 
