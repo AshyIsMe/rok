@@ -434,14 +434,7 @@ impl TryInto<Vec<K>> for K {
 }
 
 impl KW {
-  pub fn unwrap_noun(&self) -> K {
-    match self {
-      KW::Noun(n) => n.clone(),
-      _ => panic!("not a noun"),
-    }
-  }
-  //TODO get rid of panic version above
-  pub fn unwrap_noun_result(&self) -> Result<K> {
+  pub fn unwrap_noun(&self) -> Result<K> {
     match self {
       KW::Noun(n) => Ok(n.clone()),
       _ => Err(RokError::Error("not a noun".into()).into()),

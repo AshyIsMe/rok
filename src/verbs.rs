@@ -8,7 +8,7 @@ pub fn v_imat(x: K) -> Result<K> {
     K::Int(Some(i)) => {
       let s = format!("{{a=/:a:!x}}{}", i);
       let mut env = Env { names: HashMap::new(), parent: None };
-      Ok(eval(&mut env, scan(&s).unwrap()).unwrap().unwrap_noun())
+      eval(&mut env, scan(&s)?)?.unwrap_noun()
     }
     _ => Err(RokError::Type.into()),
   }
@@ -1098,7 +1098,7 @@ pub fn v_eval(x: K) -> Result<K> {
   match x {
     K::CharArray(s) => {
       let mut env = Env { names: HashMap::new(), parent: None };
-      Ok(eval(&mut env, scan(&s).unwrap()).unwrap().unwrap_noun())
+      eval(&mut env, scan(&s)?)?.unwrap_noun()
     }
     _ => Err(RokError::NYI.into()),
   }
@@ -1159,12 +1159,15 @@ pub fn v_sum(x: K) -> Result<K> {
     _ => {
       // Fall back to slow catchall. TODO Something nicer
       let mut env = Env { names: HashMap::new(), parent: None };
-      let sum = eval(&mut env, scan("{x+y}/").unwrap()).unwrap();
-      Ok(eval(&mut env, vec![sum, KW::Noun(x.clone())]).unwrap().unwrap_noun())
+      let sum = eval(&mut env, scan("{x+y}/")?)?;
+      eval(&mut env, vec![sum, KW::Noun(x.clone())])?.unwrap_noun()
     }
   }
 }
-pub fn v_d_sum(l: K, r: K) -> Result<K> { Ok(l + v_sum(r).unwrap()) }
+pub fn v_d_sum(l: K, r: K) -> Result<K> {
+  let r = v_sum(r)?;
+  Ok(l + r)
+}
 
 // TODO
 // pub fn v_product(x: K) -> Result<K> {
@@ -1196,7 +1199,7 @@ pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K> {
         v.iter()
           .map(|y|
              // apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun()
-             eval(env, vec![f.clone(), KW::Noun(y.clone())])?.unwrap_noun_result())
+             eval(env, vec![f.clone(), KW::Noun(y.clone())])?.unwrap_noun())
           .collect::<Result<Vec<K>>>()
       })? {
         Ok(r) => Ok(promote_num(r.clone()).unwrap_or(K::List(r))),
@@ -1250,7 +1253,7 @@ pub fn v_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K> {
   // a given noun y until it stops changing, or the initial value has been repeated.
   let mut prev_r = x.clone();
   loop {
-    let r = eval(env, vec![v.clone(), KW::Noun(prev_r.clone())]).unwrap().unwrap_noun();
+    let r = eval(env, vec![v.clone(), KW::Noun(prev_r.clone())])?.unwrap_noun()?;
     if r == prev_r || r == x {
       return Ok(r);
     }
@@ -1263,9 +1266,8 @@ pub fn v_scan_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K> {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x.clone()).and_then(|_| {
       let mut result: Vec<K> = vec![x.clone()];
       loop {
-        let r = eval(env, vec![f.clone(), KW::Noun(result[result.len() - 1].clone())])
-          .unwrap()
-          .unwrap_noun();
+        let r =
+          eval(env, vec![f.clone(), KW::Noun(result[result.len() - 1].clone())])?.unwrap_noun()?;
         if r == result[result.len() - 1] || r == x {
           match promote_num(result.clone()) {
             Ok(k) => return Ok(k),
@@ -1291,6 +1293,7 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K> {
         )
         .unwrap()
         .unwrap_noun()
+        .unwrap()
       });
       match r {
         Some(k) => Ok(k.clone()),
@@ -1303,16 +1306,8 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K> {
 pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   if let KW::Verb { ref name } = v {
     let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
-    Ok(
-      apply_primitive(
-        env,
-        &name.clone(),
-        Some(KW::Noun(x.clone())),
-        KW::Noun(v_fold(&mut e, v, y).unwrap()),
-      )
-      .unwrap()
-      .unwrap_noun(),
-    )
+    apply_primitive(env, &name.clone(), Some(KW::Noun(x.clone())), KW::Noun(v_fold(&mut e, v, y)?))?
+      .unwrap_noun()
   } else {
     Err(RokError::Type.into())
   }
@@ -1373,7 +1368,8 @@ pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K> {
             ],
           )
           .unwrap()
-          .unwrap_noun(),
+          .unwrap_noun()
+          .unwrap(),
         )
       }
       match promote_num(result.clone()) {
@@ -1391,17 +1387,13 @@ pub fn v_d_scan(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
         env,
         vec![
           f.clone(),
-          KW::FuncArgs(vec![
-            vec![KW::Noun(x.clone())],
-            vec![KW::Noun(v_first(y.clone()).unwrap())],
-          ]),
+          KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(v_first(y.clone())?)]]),
         ],
-      )
-      .unwrap()
-      .unwrap_noun();
+      )?
+      .unwrap_noun()?;
 
-      let rest: K = v_drop(K::Int(Some(1)), y).unwrap();
-      v_scan(env, v, v_concat(first, rest).unwrap())
+      let rest: K = v_drop(K::Int(Some(1)), y)?;
+      v_scan(env, v, v_concat(first, rest)?)
     }
     _ => Err(RokError::Type.into()),
   }
@@ -1425,6 +1417,7 @@ pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K> {
           )
           .unwrap()
           .unwrap_noun()
+          .unwrap()
         })
         .collect();
       let r: Vec<K> = vec![first.clone()].into_iter().chain(r).collect();
@@ -1454,6 +1447,7 @@ pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
           )
           .unwrap()
           .unwrap_noun()
+          .unwrap()
         })
         .collect();
       promote_num(r.clone()).unwrap_or(K::List(r))
@@ -1476,6 +1470,7 @@ pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
           )
           .unwrap()
           .unwrap_noun()
+          .unwrap()
         })
         .collect();
       promote_num(r.clone()).unwrap_or(K::List(r))
