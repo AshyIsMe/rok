@@ -1039,7 +1039,7 @@ pub fn v_at(l: K, r: K) -> Result<K> {
             .collect();
           Ok(promote_num(r.clone()).unwrap_or(K::List(r)))
         }
-        _ => todo!("v_at"),
+        _ => Err(RokError::Error("nyi: v_at".into()).into()),
       }
     }
     K::Symbol(s) => match l.clone() {
@@ -1052,7 +1052,7 @@ pub fn v_at(l: K, r: K) -> Result<K> {
       }
       K::Table(df) => match df.get_column_index(&s) {
         Some(i) => K::try_from(df[i].clone()),
-        _ => todo!("nyi"),
+        _ => Err(RokError::NYI.into()),
       },
       K::SymbolArray(ss) => match l.clone() {
         K::Dictionary(d) => {
@@ -1070,8 +1070,8 @@ pub fn v_at(l: K, r: K) -> Result<K> {
               .collect::<Vec<K>>(),
           ))
         }
-        K::Table(_df) => todo!("nyi"),
-        _ => todo!("nyi"),
+        K::Table(_df) => Err(RokError::NYI.into()),
+        _ => Err(RokError::NYI.into()),
       },
       _ => Err(RokError::Type.into()),
     },
@@ -1209,7 +1209,9 @@ pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K> {
     _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Error("nyi: each".into()).into()) }
+pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
+  Err(RokError::Error("nyi: each".into()).into())
+}
 
 // Dispatch / based on inputs:  fold, over, fixedpoint
 pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K> {
@@ -1457,8 +1459,8 @@ pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
 }
 pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   match v {
-    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
-      let r: Vec<K> = v
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => {
+      let r: Vec<K> = k_to_vec(x)?
         .iter()
         .map(|x| {
           eval(
@@ -1467,14 +1469,12 @@ pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
               f.clone(),
               KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]]),
             ],
-          )
-          .unwrap()
+          )?
           .unwrap_noun()
-          .unwrap()
         })
-        .collect();
-      promote_num(r.clone()).unwrap_or(K::List(r))
-    }),
+        .collect::<Result<Vec<K>>>()?;
+      Ok(promote_num(r.clone()).unwrap_or(K::List(r)))
+    }
     _ => Err(RokError::Type.into()),
   }
 }
