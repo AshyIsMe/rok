@@ -46,7 +46,7 @@ pub fn v_group(x: K) -> Result<K> {
       }
       Ok(K::Dictionary(d))
     }
-    K::SymbolArray(_s) => todo!("v_group(SymbolArray(_))"),
+    K::SymbolArray(_s) => Err(RokError::Error("nyi: v_group(SymbolArray(_))".into()).into()),
     K::List(v) => {
       let mut im = IndexMap::new();
       for (i, k) in v.iter().enumerate() {
@@ -59,7 +59,7 @@ pub fn v_group(x: K) -> Result<K> {
       }
       Ok(K::Dictionary(d))
     }
-    K::Table(_df) => todo!("v_group(Table(_))"),
+    K::Table(_df) => Err(RokError::Error("nyi: v_group(Table(_))".into()).into()),
 
     _ => Err(RokError::Type.into()),
   }
@@ -93,8 +93,8 @@ pub fn v_equal(x: K, y: K) -> Result<K> {
         }
       }))))
     }
-    (_, K::Table(_)) => todo!("table"),
-    (K::Table(_), _) => todo!("table"),
+    (_, K::Table(_)) => Err(RokError::Error("nyi: table".into()).into()),
+    (K::Table(_), _) => Err(RokError::Error("nyi: table".into()).into()),
     _ => Err(RokError::NYI.into()),
   })
 }
@@ -360,7 +360,7 @@ pub fn v_keys_odometer(x: K) -> Result<K> {
         .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
         .unwrap(),
     )),
-    K::IntArray(_) => todo!("implement odometer"),
+    K::IntArray(_) => Err(RokError::Error("nyi: odometer".into()).into()),
     _ => Err(RokError::NYI.into()),
   }
 }
@@ -368,8 +368,8 @@ pub fn v_mod(l: K, r: K) -> Result<K> {
   match (l, r) {
     (K::Int(Some(i)), K::IntArray(a)) => Ok(K::IntArray(a % i)),
     (K::Int(Some(i)), K::FloatArray(a)) => Ok(K::FloatArray(a % i)),
-    (K::Int(Some(_i)), K::CharArray(_a)) => todo!("implement v_mod"),
-    _ => todo!("implement v_mod"),
+    (K::Int(Some(_i)), K::CharArray(_a)) => Err(RokError::Error("implement v_mod".into()).into()),
+    _ => Err(RokError::Error("nyi: v_mod".into()).into()),
   }
 }
 
@@ -1147,7 +1147,7 @@ pub fn v_iota(x: K) -> Result<K> {
     K::Bool(1) => v_iota(K::Int(Some(1))),
     K::Int(Some(0)) | K::Int(None) => Ok(K::IntArray(Series::new_empty("", &DataType::Int64))),
     K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
-    _ => todo!("v_iota variants: {}", x),
+    _ => Err(RokError::Error(format!("nyi: v_iota variants: {}", x)).into()),
   }
 }
 pub fn v_sum(x: K) -> Result<K> {
@@ -1209,7 +1209,7 @@ pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K> {
     _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { todo!("each") }
+pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Error("nyi: each".into()).into()) }
 
 // Dispatch / based on inputs:  fold, over, fixedpoint
 pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K> {
