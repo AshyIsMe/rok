@@ -255,7 +255,7 @@ pub fn v_flip(x: K) -> Result<K> {
         v.iter().cloned(),
       ))))
     }
-    _ => todo!("flip the rest"),
+    _ => Err(RokError::Error("flip the rest".into()).into()),
   }
 }
 macro_rules! atomicdyad {
@@ -777,7 +777,7 @@ pub fn v_concat(x: K, y: K) -> Result<K> {
     (K::List(x), K::List(y)) => Ok(K::List(x.iter().chain(y.iter()).cloned().collect())),
     (K::List(x), y) => Ok(K::List(x.iter().chain([y].iter()).cloned().collect())),
     (x, K::List(y)) => Ok(K::List([x].iter().chain(y.iter()).cloned().collect())),
-    _ => todo!("nyi v_concat() other cases {}, {}", x, y),
+    _ => Err(RokError::Error(format!("nyi: v_concat() other cases {}, {}", x, y)).into()),
   }
 }
 

@@ -538,9 +538,9 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>> {
     ),
     K::CharArray(v) => Ok(v.chars().map(K::Char).collect()),
     K::SymbolArray(_v) => {
-      todo!("enlist(SymbolArray(...))")
+      Err(RokError::Error("nyi: enlist(SymbolArray(...))".into()).into())
     }
-    _ => todo!("k_to_vec({})", k),
+    _ => Err(RokError::Error(format!("nyi: k_to_vec({})", k)).into()),
   }
 }
 pub fn vec_to_list(nouns: Vec<KW>) -> Result<K> {
@@ -810,9 +810,7 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
           }
         }
         (None, KW::Noun(r)) => (if r.len() > 1 { m_l } else { m_a })(r).map(KW::Noun),
-        _ => {
-          panic!("impossible")
-        }
+        _ => Err(RokError::Error("impossible".into()).into()),
       },
       None => {
         let t = if v.len() < 2 {
@@ -852,7 +850,7 @@ pub fn apply_adverb(a: &str, l: KW) -> Result<KW> {
     }
     KW::Function { body, args, adverb: None } => match a {
       "\'" | "/" | "\\" => Ok(KW::Function { body, args, adverb: Some(a.to_string()) }),
-      _ => panic!("invalid adverb"),
+      _ => Err(RokError::Error("invalid adverb".into()).into()),
     },
     KW::Function { body: _, args: _, adverb: Some(_adverb) } => todo!("function nested adverbs"),
     _ => panic!("verb required"),
