@@ -1385,17 +1385,21 @@ pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K> {
 pub fn v_d_scan(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   match v.clone() {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => {
-      let first: K = eval(
-        env,
-        vec![
-          f.clone(),
-          KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(v_first(y.clone())?)]]),
-        ],
-      )?
-      .unwrap_noun()?;
+      if y.is_empty() {
+        Ok(y)
+      } else {
+        let first: K = eval(
+          env,
+          vec![
+            f.clone(),
+            KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(v_first(y.clone())?)]]),
+          ],
+        )?
+        .unwrap_noun()?;
 
-      let rest: K = v_drop(K::Int(Some(1)), y)?;
-      v_scan(env, v, v_concat(first, rest)?)
+        let rest: K = v_drop(K::Int(Some(1)), y)?;
+        v_scan(env, v, v_concat(first, rest)?)
+      }
     }
     _ => Err(RokError::Type.into()),
   }
