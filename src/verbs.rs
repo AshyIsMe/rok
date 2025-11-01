@@ -1411,6 +1411,9 @@ pub fn v_d_scan(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
 
 pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K> {
   match v {
+    ref f @ KW::Function { ref body, ref args, ref adverb } if args.len() == 1 => {
+      Err(RokError::Error("nyi: peach https://code.kx.com/q/basics/peach/".into()).into())
+    }
     f @ KW::Verb { .. } | f @ KW::Function { .. } => {
       k_to_vec(x).map(|v| {
         let first: &K = &v[0];
