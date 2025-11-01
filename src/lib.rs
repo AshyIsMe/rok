@@ -865,12 +865,12 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW> {
         Some((m_a, _d_a)) => match arg {
           KW::Noun(x) => m_a(env, KW::Function { body, args, adverb: None }, x).map(KW::Noun),
           KW::FuncArgs(_exprs) => {
-            todo!("dyad/triad/etc adverb modified functions")
+            Err(RokError::Error("nyi: dyad/triad/etc adverb modified functions".into()).into())
             // d_a(env, f , l, r).map(KW::Noun)
           }
           _ => todo!("other adverb cases"),
         },
-        None => todo!("NotYetImplemented {}", adverb),
+        None => Err(RokError::Error(format!("nyi: {}", adverb)).into()),
       }
     }
     KW::Function { body, args, adverb: None } => match arg {

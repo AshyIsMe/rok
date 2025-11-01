@@ -139,32 +139,36 @@ macro_rules! reshape_atom_by_type {
 pub fn v_reshape(l: K, r: K) -> Result<K> {
   match l {
     K::IntArray(a) => {
-      let rev_shape: Vec<i64> =
-        a.i64().unwrap().to_vec().iter().rev().map(|i| i.unwrap()).collect();
-      match r {
-        K::Bool(b) => {
-          reshape_atom_by_type!(b, K::BoolArray, rev_shape)
-        }
-        K::Int(None) => Err(RokError::NYI.into()),
-        K::Int(Some(i)) => {
-          reshape_atom_by_type!(i, K::IntArray, rev_shape)
-        }
-        K::Float(f) => {
-          reshape_atom_by_type!(f, K::FloatArray, rev_shape)
-        }
-        K::Char(_) => Err(RokError::NYI.into()),
-        K::Symbol(_) => Err(RokError::NYI.into()),
+      if a.null_count() > 0 {
+        Err(RokError::Error("nyi: reshape fills".into()).into())
+      } else {
+        let rev_shape: Vec<i64> =
+          a.i64().unwrap().to_vec().iter().rev().map(|i| i.unwrap()).collect();
+        match r {
+          K::Bool(b) => {
+            reshape_atom_by_type!(b, K::BoolArray, rev_shape)
+          }
+          K::Int(None) => Err(RokError::NYI.into()),
+          K::Int(Some(i)) => {
+            reshape_atom_by_type!(i, K::IntArray, rev_shape)
+          }
+          K::Float(f) => {
+            reshape_atom_by_type!(f, K::FloatArray, rev_shape)
+          }
+          K::Char(_) => Err(RokError::NYI.into()),
+          K::Symbol(_) => Err(RokError::NYI.into()),
 
-        K::SymbolArray(_)
-        | K::BoolArray(_)
-        | K::IntArray(_)
-        | K::FloatArray(_)
-        | K::CharArray(_)
-        | K::List(_)
-        | K::Dictionary(_)
-        | K::Table(_)
-        | K::Nil => Err(RokError::NYI.into()),
-        K::Name(_) => panic!("impossible"),
+          K::SymbolArray(_)
+          | K::BoolArray(_)
+          | K::IntArray(_)
+          | K::FloatArray(_)
+          | K::CharArray(_)
+          | K::List(_)
+          | K::Dictionary(_)
+          | K::Table(_)
+          | K::Nil => Err(RokError::NYI.into()),
+          K::Name(_) => panic!("impossible"),
+        }
       }
     }
     K::BoolArray(_) => Err(RokError::NYI.into()),
@@ -1407,28 +1411,33 @@ pub fn v_d_scan(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
 
 pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K> {
   match v {
-    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
-      let first: &K = &v[0];
-      let r: Vec<K> = v
-        .iter()
-        .zip(v.iter().skip(1))
-        .map(|(x, y)| {
-          // f[y,x] / yes y,x not x,y
-          eval(
-            env,
-            vec![
-              f.clone(),
-              KW::FuncArgs(vec![vec![KW::Noun(y.clone())], vec![KW::Noun(x.clone())]]),
-            ],
-          )
-          .unwrap()
-          .unwrap_noun()
-          .unwrap()
-        })
-        .collect();
-      let r: Vec<K> = vec![first.clone()].into_iter().chain(r).collect();
-      promote_num(r.clone()).unwrap_or(K::List(r))
-    }),
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => {
+      k_to_vec(x).map(|v| {
+        let first: &K = &v[0];
+        let r: Result<Vec<K>> = v
+          .iter()
+          .zip(v.iter().skip(1))
+          .map(|(x, y)| {
+            // f[y,x] / yes y,x not x,y
+            eval(
+              env,
+              vec![
+                f.clone(),
+                KW::FuncArgs(vec![vec![KW::Noun(y.clone())], vec![KW::Noun(x.clone())]]),
+              ],
+            )?
+            .unwrap_noun()
+          })
+          .collect();
+        match r {
+          Ok(r) => {
+            let r: Vec<K> = vec![first.clone()].into_iter().chain(r).collect();
+            Ok(promote_num(r.clone()).unwrap_or(K::List(r)))
+          }
+          Err(e) => Err(e)
+        }
+      })?
+    }
     _ => Err(RokError::Type.into()),
   }
 }
