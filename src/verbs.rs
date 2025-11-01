@@ -1,21 +1,20 @@
 use crate::*;
+use anyhow::Result;
 use rand::distributions::{Distribution, Uniform};
-use std::cmp;
-use std::collections::BTreeMap;
-use std::iter::repeat;
+use std::{cmp, collections::BTreeMap, iter::repeat, iter::repeat_n};
 
-pub fn v_imat(x: K) -> Result<K, &'static str> {
+pub fn v_imat(x: K) -> Result<K> {
   match x {
     K::Int(Some(i)) => {
       let s = format!("{{a=/:a:!x}}{}", i);
       let mut env = Env { names: HashMap::new(), parent: None };
-      Ok(eval(&mut env, scan(&s).unwrap()).unwrap().unwrap_noun())
+      eval(&mut env, scan(&s)?)?.unwrap_noun()
     }
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
 
-pub fn v_group(x: K) -> Result<K, &'static str> {
+pub fn v_group(x: K) -> Result<K> {
   // https://docs.rs/polars/latest/polars/frame/group_by/struct.GroupBy.html#method.get_groups
   // https://docs.rs/polars/latest/polars/frame/group_by/struct.GroupBy.html#method.groups
   match x {
@@ -26,7 +25,7 @@ pub fn v_group(x: K) -> Result<K, &'static str> {
       // let keys: K = K::try_from(g.iter().nth(0).unwrap().clone()).unwrap();
       let keys: K = K::SymbolArray(
         g.iter()
-          .nth(0)
+          .next()
           .unwrap()
           .clone()
           .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
@@ -47,7 +46,7 @@ pub fn v_group(x: K) -> Result<K, &'static str> {
       }
       Ok(K::Dictionary(d))
     }
-    K::SymbolArray(_s) => todo!("v_group(SymbolArray(_))"),
+    K::SymbolArray(_s) => Err(RokError::Error("nyi: v_group(SymbolArray(_))".into()).into()),
     K::List(v) => {
       let mut im = IndexMap::new();
       for (i, k) in v.iter().enumerate() {
@@ -60,13 +59,13 @@ pub fn v_group(x: K) -> Result<K, &'static str> {
       }
       Ok(K::Dictionary(d))
     }
-    K::Table(_df) => todo!("v_group(Table(_))"),
+    K::Table(_df) => Err(RokError::Error("nyi: v_group(Table(_))".into()).into()),
 
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
 
-pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
+pub fn v_equal(x: K, y: K) -> Result<K> {
   len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l == r) as u8)),
@@ -94,14 +93,14 @@ pub fn v_equal(x: K, y: K) -> Result<K, &'static str> {
         }
       }))))
     }
-    (_, K::Table(_)) => todo!("table"),
-    (K::Table(_), _) => todo!("table"),
-    _ => Err("nyi"),
+    (_, K::Table(_)) => Err(RokError::Error("nyi: table".into()).into()),
+    (K::Table(_), _) => Err(RokError::Error("nyi: table".into()).into()),
+    _ => Err(RokError::NYI.into()),
   })
 }
 
-pub fn v_count(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
-pub fn v_take(x: K, y: K) -> Result<K, &'static str> {
+pub fn v_count(x: K) -> Result<K> { Ok(K::Int(Some(x.len().try_into().unwrap()))) }
+pub fn v_take(x: K, y: K) -> Result<K> {
   match x {
     K::Bool(0) | K::Int(Some(0)) => match y {
       K::Bool(_) | K::BoolArray(_) => Ok(K::BoolArray(Series::new_empty("", &DataType::Boolean))),
@@ -122,7 +121,7 @@ pub fn v_take(x: K, y: K) -> Result<K, &'static str> {
     },
     K::Bool(1) | K::Int(Some(_)) => v_at(y, v_iota(x).unwrap()),
     K::Int(None) => Ok(y),
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
 
@@ -137,52 +136,56 @@ macro_rules! reshape_atom_by_type {
   }};
 }
 
-pub fn v_reshape(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_reshape(l: K, r: K) -> Result<K> {
   match l {
     K::IntArray(a) => {
-      let rev_shape: Vec<i64> =
-        a.i64().unwrap().to_vec().iter().rev().map(|i| i.unwrap()).collect();
-      match r {
-        K::Bool(b) => {
-          reshape_atom_by_type!(b, K::BoolArray, rev_shape)
-        }
-        K::Int(None) => Err("nyi"),
-        K::Int(Some(i)) => {
-          reshape_atom_by_type!(i, K::IntArray, rev_shape)
-        }
-        K::Float(f) => {
-          reshape_atom_by_type!(f, K::FloatArray, rev_shape)
-        }
-        K::Char(_) => Err("nyi"),
-        K::Symbol(_) => Err("nyi"),
+      if a.null_count() > 0 {
+        Err(RokError::Error("nyi: reshape fills".into()).into())
+      } else {
+        let rev_shape: Vec<i64> =
+          a.i64().unwrap().to_vec().iter().rev().map(|i| i.unwrap()).collect();
+        match r {
+          K::Bool(b) => {
+            reshape_atom_by_type!(b, K::BoolArray, rev_shape)
+          }
+          K::Int(None) => Err(RokError::NYI.into()),
+          K::Int(Some(i)) => {
+            reshape_atom_by_type!(i, K::IntArray, rev_shape)
+          }
+          K::Float(f) => {
+            reshape_atom_by_type!(f, K::FloatArray, rev_shape)
+          }
+          K::Char(_) => Err(RokError::NYI.into()),
+          K::Symbol(_) => Err(RokError::NYI.into()),
 
-        K::SymbolArray(_)
-        | K::BoolArray(_)
-        | K::IntArray(_)
-        | K::FloatArray(_)
-        | K::CharArray(_)
-        | K::List(_)
-        | K::Dictionary(_)
-        | K::Table(_)
-        | K::Nil => Err("nyi"),
-        K::Name(_) => panic!("impossible"),
+          K::SymbolArray(_)
+          | K::BoolArray(_)
+          | K::IntArray(_)
+          | K::FloatArray(_)
+          | K::CharArray(_)
+          | K::List(_)
+          | K::Dictionary(_)
+          | K::Table(_)
+          | K::Nil => Err(RokError::NYI.into()),
+          K::Name(_) => panic!("impossible"),
+        }
       }
     }
-    K::BoolArray(_) => Err("nyi"),
+    K::BoolArray(_) => Err(RokError::NYI.into()),
     // K::Int(Some(i)) => v_reshape(K::IntArray(arr!([i])), r),
     // K::Bool(b) => v_reshape(K::IntArray(arr!([b])), r),
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
 
-pub fn v_ident(x: K) -> Result<K, &'static str> { Ok(x) }
-pub fn v_rident(_l: K, r: K) -> Result<K, &'static str> { Ok(r) }
-pub fn v_flip(x: K) -> Result<K, &'static str> {
+pub fn v_ident(x: K) -> Result<K> { Ok(x) }
+pub fn v_rident(_l: K, r: K) -> Result<K> { Ok(r) }
+pub fn v_flip(x: K) -> Result<K> {
   match x {
     K::Dictionary(ref d) => {
       let lengths: Vec<usize> = d.iter().map(|(_k, v)| v.len()).unique().sorted().collect();
-      if lengths.len() > 2 || lengths.len() == 0 {
-        Err("length")
+      if lengths.len() > 2 || lengths.is_empty() {
+        Err(RokError::Length.into())
       } else {
         // if d.iter().map(|(_k, v)| v.len()).all_equal() {
         let len = lengths.last().unwrap();
@@ -208,24 +211,19 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
                 let vs: Vec<String> = v.iter().map(|s| s.to_string()).collect();
                 Series::new(&k.to_string(), vs.clone())
               } else {
-                // Err("type")
+                // Err(RokError::Type.into())
                 panic!("type error?")
               }
             }
-            K::Bool(b) => {
-              Series::new(&k.to_string(), std::iter::repeat(*b).take(*len).collect::<Vec<u8>>())
-            }
+            K::Bool(b) => Series::new(&k.to_string(), repeat_n(*b, *len).collect::<Vec<u8>>()),
             K::Int(Some(i)) => {
-              Series::new(&k.to_string(), std::iter::repeat(*i).take(*len).collect::<Vec<i64>>())
+              Series::new(&k.to_string(), repeat_n(*i, *len).collect::<Vec<i64>>())
             }
             K::Int(None) => Series::full_null(&k.to_string(), *len, &DataType::Int64),
-            K::Float(f) => {
-              Series::new(&k.to_string(), std::iter::repeat(*f).take(*len).collect::<Vec<f64>>())
+            K::Float(f) => Series::new(&k.to_string(), repeat_n(*f, *len).collect::<Vec<f64>>()),
+            K::Symbol(s) => {
+              Series::new(&k.to_string(), repeat_n(s.clone(), *len).collect::<Vec<String>>())
             }
-            K::Symbol(s) => Series::new(
-              &k.to_string(),
-              std::iter::repeat(s.clone()).take(*len).collect::<Vec<String>>(),
-            ),
             // K::Char(c) => Series::new(&k.to_string(), std::iter::repeat(*c.to_string()).take(*len).collect::<Vec<String>>()),
             K::Char(_c) => todo!("handle char"),
             K::Table(_df) => todo!("why is Table here?"),
@@ -261,7 +259,7 @@ pub fn v_flip(x: K) -> Result<K, &'static str> {
         v.iter().cloned(),
       ))))
     }
-    _ => todo!("flip the rest"),
+    _ => Err(RokError::Error("flip the rest".into()).into()),
   }
 }
 macro_rules! atomicdyad {
@@ -321,11 +319,11 @@ macro_rules! atomicdyad {
     }
   };
 }
-pub fn v_plus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(+, v_plus, add, l, r) }
-pub fn v_negate(x: K) -> Result<K, &'static str> { Ok(K::Int(Some(-1i64)) * x) }
-pub fn v_minus(l: K, r: K) -> Result<K, &'static str> { atomicdyad!(-, v_minus, sub, l, r) }
+pub fn v_plus(l: K, r: K) -> Result<K> { atomicdyad!(+, v_plus, add, l, r) }
+pub fn v_negate(x: K) -> Result<K> { Ok(K::Int(Some(-1i64)) * x) }
+pub fn v_minus(l: K, r: K) -> Result<K> { atomicdyad!(-, v_minus, sub, l, r) }
 
-pub fn v_first(x: K) -> Result<K, &'static str> {
+pub fn v_first(x: K) -> Result<K> {
   match x {
     K::Bool(_) => Ok(x),
     K::Int(_) => Ok(x),
@@ -334,13 +332,13 @@ pub fn v_first(x: K) -> Result<K, &'static str> {
     K::BoolArray(a) => Ok(K::Bool(a.bool().unwrap().get(0).unwrap() as u8)),
     K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(0).unwrap()))),
     K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(0).unwrap())),
-    K::CharArray(a) => Ok(K::Char(a.chars().nth(0).unwrap_or(' '))),
+    K::CharArray(a) => Ok(K::Char(a.chars().next().unwrap_or(' '))),
     K::List(l) => Ok(l.first().unwrap().clone()),
-    _ => Err("nyi"),
+    _ => Err(RokError::NYI.into()),
   }
 }
 
-pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_times(l: K, r: K) -> Result<K> {
   match (l.clone(), r.clone()) {
     // TODO can we make this less repetitive and explicit?
     (K::Int(i), K::Table(df)) => Ok(K::Table(
@@ -349,8 +347,8 @@ pub fn v_times(l: K, r: K) -> Result<K, &'static str> {
     _ => atomicdyad!(*, v_times, mul, l, r),
   }
 }
-pub fn v_sqrt(_x: K) -> Result<K, &'static str> { todo!("implement sqrt") }
-pub fn v_divide(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_sqrt(_x: K) -> Result<K> { Err(RokError::Error("nyi: implement sqrt".into()).into()) }
+pub fn v_divide(l: K, r: K) -> Result<K> {
   match (&l, &r) {
     (K::Bool(_), K::Bool(0)) => Ok(K::Float(f64::NAN)),
     (K::Bool(_), K::Int(Some(0))) => Ok(K::Float(f64::NAN)),
@@ -358,28 +356,28 @@ pub fn v_divide(l: K, r: K) -> Result<K, &'static str> {
     _ => atomicdyad!(/, v_divide, div, l, r),
   }
 }
-pub fn v_keys_odometer(x: K) -> Result<K, &'static str> {
+pub fn v_keys_odometer(x: K) -> Result<K> {
   match x {
-    K::Dictionary(_) => todo!("implement keys"),
+    K::Dictionary(_) => Err(RokError::Error("nyi: implement keys".into()).into()),
     K::Table(df) => Ok(K::SymbolArray(
       Series::new("", df.fields().iter().cloned().map(|f| f.name.into()).collect::<Vec<String>>())
         .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
         .unwrap(),
     )),
-    K::IntArray(_) => todo!("implement odometer"),
-    _ => Err("nyi"),
+    K::IntArray(_) => Err(RokError::Error("nyi: odometer".into()).into()),
+    _ => Err(RokError::NYI.into()),
   }
 }
-pub fn v_mod(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_mod(l: K, r: K) -> Result<K> {
   match (l, r) {
     (K::Int(Some(i)), K::IntArray(a)) => Ok(K::IntArray(a % i)),
     (K::Int(Some(i)), K::FloatArray(a)) => Ok(K::FloatArray(a % i)),
-    (K::Int(Some(_i)), K::CharArray(_a)) => todo!("implement v_mod"),
-    _ => todo!("implement v_mod"),
+    (K::Int(Some(_i)), K::CharArray(_a)) => Err(RokError::Error("implement v_mod".into()).into()),
+    _ => Err(RokError::Error("nyi: v_mod".into()).into()),
   }
 }
 
-pub fn v_where(x: K) -> Result<K, &'static str> {
+pub fn v_where(x: K) -> Result<K> {
   match x {
     K::BoolArray(b) => {
       let indices: Vec<i64> = b
@@ -392,11 +390,11 @@ pub fn v_where(x: K) -> Result<K, &'static str> {
         .collect();
       Ok(K::IntArray(arr!(indices)))
     }
-    _ => Err("nyi"),
+    _ => Err(RokError::NYI.into()),
   }
 }
 
-pub fn v_reverse(x: K) -> Result<K, &'static str> {
+pub fn v_reverse(x: K) -> Result<K> {
   match x {
     K::Bool(_) => Ok(x),
     K::Int(_) => Ok(x),
@@ -415,11 +413,11 @@ pub fn v_reverse(x: K) -> Result<K, &'static str> {
       Ok(K::Dictionary(d))
     }
     K::Table(df) => Ok(K::Table(df.reverse())),
-    _ => Err("nyi"),
+    _ => Err(RokError::NYI.into()),
   }
 }
 
-pub fn v_min(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_min(l: K, r: K) -> Result<K> {
   //TODO fix code duplication in v_min/v_max
   len_ok(&l, &r).and_then(|_| match promote_nouns(l, r) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::min(l, r)) as u8)),
@@ -445,14 +443,14 @@ pub fn v_min(l: K, r: K) -> Result<K, &'static str> {
         })
         .collect(),
     )),
-    (K::List(_l), K::List(_r)) => Err("nyi"),
-    (K::Dictionary(_l), K::Dictionary(_r)) => Err("nyi"),
-    (_, K::Table(_)) => todo!("table"),
-    (K::Table(_), _) => todo!("table"),
-    _ => Err("nyi - wtf"),
+    (K::List(_l), K::List(_r)) => Err(RokError::NYI.into()),
+    (K::Dictionary(_l), K::Dictionary(_r)) => Err(RokError::NYI.into()),
+    (_, K::Table(_)) => Err(RokError::Error("nyi: table".into()).into()),
+    (K::Table(_), _) => Err(RokError::Error("nyi: table".into()).into()),
+    _ => Err(RokError::Error("nyi - wtf".into()).into()),
   })
 }
-pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_max(l: K, r: K) -> Result<K> {
   len_ok(&l, &r).and_then(|_| match promote_nouns(l, r) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((cmp::max(l, r)) as u8)),
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Int(Some(cmp::max(l, r)))),
@@ -477,15 +475,15 @@ pub fn v_max(l: K, r: K) -> Result<K, &'static str> {
         })
         .collect(),
     )),
-    (K::List(_l), K::List(_r)) => Err("nyi"),
-    (K::Dictionary(_l), K::Dictionary(_r)) => Err("nyi"),
-    (_, K::Table(_)) => todo!("table"),
-    (K::Table(_), _) => todo!("table"),
-    _ => Err("nyi - wtf"),
+    (K::List(_l), K::List(_r)) => Err(RokError::NYI.into()),
+    (K::Dictionary(_l), K::Dictionary(_r)) => Err(RokError::NYI.into()),
+    (_, K::Table(_)) => Err(RokError::Error("nyi: table".into()).into()),
+    (K::Table(_), _) => Err(RokError::Error("nyi: table".into()).into()),
+    _ => Err(RokError::Error("nyi - wtf".into()).into()),
   })
 }
 
-pub fn v_asc(x: K) -> Result<K, &'static str> {
+pub fn v_asc(x: K) -> Result<K> {
   match x {
     K::BoolArray(x) => {
       let mut map: BTreeMap<Option<bool>, Vec<usize>> = BTreeMap::new();
@@ -530,15 +528,15 @@ pub fn v_asc(x: K) -> Result<K, &'static str> {
       let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
       Ok(K::IntArray(arr!(v)))
     }
-    _ => Err("nyi"),
+    _ => Err(RokError::NYI.into()),
   }
 }
 
-pub fn v_desc(x: K) -> Result<K, &'static str> {
+pub fn v_desc(x: K) -> Result<K> {
   v_reverse(v_asc(x).unwrap()) /* TODO: faster */
 }
 
-pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
+pub fn v_lesser(x: K, y: K) -> Result<K> {
   len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l < r) as u8)),
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l < r) as u8)),
@@ -587,7 +585,7 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
       .collect::<Vec<u8>>()))),
     (K::List(l), K::List(r)) => Ok(K::List(
       zip(l.iter(), r.iter())
-        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0 as u8)))
+        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0_u8)))
         .collect::<Vec<K>>(),
     )),
     (K::Dictionary(l), K::Dictionary(r)) => {
@@ -621,7 +619,7 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
       }
     })))),
     (K::Table(_l), K::Table(_r)) => {
-      todo!("table")
+      Err(RokError::Error("nyi: table".into()).into())
     }
     (l, ref r @ K::Table(_)) => {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
@@ -631,11 +629,11 @@ pub fn v_lesser(x: K, y: K) -> Result<K, &'static str> {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
       v_flip(v_lesser(v_flip(l.clone()).unwrap(), r).unwrap())
     }
-    _ => Err("nyi"),
+    _ => Err(RokError::NYI.into()),
   })
 }
 
-pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
+pub fn v_greater(x: K, y: K) -> Result<K> {
   len_ok(&x, &y).and_then(|_| match promote_nouns(x, y) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l > r) as u8)),
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l > r) as u8)),
@@ -680,7 +678,7 @@ pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
       .collect::<Vec<u8>>()))),
     (K::List(l), K::List(r)) => Ok(K::List(
       zip(l.iter(), r.iter())
-        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0 as u8)))
+        .map(|(l, r)| v_lesser(l.clone(), r.clone()).unwrap_or(K::Bool(0_u8)))
         .collect::<Vec<K>>(),
     )),
     (K::Dictionary(l), K::Dictionary(r)) => {
@@ -714,7 +712,7 @@ pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
       }
     })))),
     (K::Table(_l), K::Table(_r)) => {
-      todo!("table")
+      Err(RokError::Error("nyi: table".into()).into())
     }
     (l, ref r @ K::Table(_)) => {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
@@ -724,14 +722,14 @@ pub fn v_greater(x: K, y: K) -> Result<K, &'static str> {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
       v_flip(v_lesser(v_flip(l.clone()).unwrap(), r).unwrap())
     }
-    _ => Err("nyi"),
+    _ => Err(RokError::NYI.into()),
   })
 }
 
-pub fn v_not(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_match(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_not(_r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_match(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 
-pub fn v_enlist(x: K) -> Result<K, &'static str> {
+pub fn v_enlist(x: K) -> Result<K> {
   match x {
     K::Bool(x) => Ok(K::BoolArray(arr!([x]))),
     K::Int(x) => Ok(K::IntArray(arr!([x]))),
@@ -749,61 +747,61 @@ pub fn v_enlist(x: K) -> Result<K, &'static str> {
     | K::List(_)
     | K::Dictionary(_)
     | K::Table(_) => Ok(K::List(vec![x])),
-    _ => Err("nyi v_enlist() other cases"),
+    _ => Err(RokError::Error("nyi v_enlist() other cases".into()).into()),
   }
 }
 
-pub fn v_concat(x: K, y: K) -> Result<K, &'static str> {
+pub fn v_concat(x: K, y: K) -> Result<K> {
   match (x.clone(), y.clone()) {
     (K::Bool(_) | K::Int(_) | K::Float(_), K::Bool(_) | K::Int(_) | K::Float(_)) => {
       promote_num(vec![x, y])
     }
     (K::BoolArray(x) | K::IntArray(x) | K::FloatArray(x), K::FloatArray(y)) => {
-      Ok(K::FloatArray(x.to_float().unwrap().extend(&y).unwrap().clone()))
+      Ok(K::FloatArray(x.to_float()?.extend(&y)?.clone()))
     }
     (K::FloatArray(mut x), K::BoolArray(y) | K::IntArray(y)) => {
-      Ok(K::FloatArray(x.extend(&y.to_float().unwrap()).unwrap().clone()))
+      Ok(K::FloatArray(x.extend(&y.to_float()?)?.clone()))
     }
     (K::BoolArray(x) | K::IntArray(x), K::IntArray(y)) => {
-      Ok(K::IntArray(x.cast(&DataType::Int64).unwrap().extend(&y).unwrap().clone()))
+      Ok(K::IntArray(x.cast(&DataType::Int64)?.extend(&y)?.clone()))
     }
     (K::BoolArray(mut x), K::BoolArray(y)) => {
-      Ok(K::IntArray(x.extend(&y.cast(&DataType::Boolean).unwrap()).unwrap().clone()))
+      Ok(K::IntArray(x.extend(&y.cast(&DataType::Boolean)?)?.clone()))
     }
     (K::Bool(_) | K::Int(_) | K::Float(_), K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_)) => {
-      v_concat(v_enlist(x).unwrap(), y)
+      v_concat(v_enlist(x)?, y)
     }
     (K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_), K::Bool(_) | K::Int(_) | K::Float(_)) => {
-      v_concat(x, v_enlist(y).unwrap())
+      v_concat(x, v_enlist(y)?)
     }
     (K::Char(x), K::Char(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
     (K::CharArray(x), K::Char(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
     (K::Char(x), K::CharArray(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
 
     (K::List(x), K::List(y)) => Ok(K::List(x.iter().chain(y.iter()).cloned().collect())),
-    (K::List(x), y) => Ok(K::List(x.iter().chain(vec![y].iter()).cloned().collect())),
-    (x, K::List(y)) => Ok(K::List(vec![x].iter().chain(y.iter()).cloned().collect())),
-    _ => todo!("nyi v_concat() other cases {}, {}", x, y),
+    (K::List(x), y) => Ok(K::List(x.iter().chain([y].iter()).cloned().collect())),
+    (x, K::List(y)) => Ok(K::List([x].iter().chain(y.iter()).cloned().collect())),
+    _ => Err(RokError::Error(format!("nyi: v_concat() other cases {}, {}", x, y)).into()),
   }
 }
 
-pub fn v_isnull(x: K) -> Result<K, &'static str> {
+pub fn v_isnull(x: K) -> Result<K> {
   match x {
     K::Int(None) => Ok(K::Bool(1u8)),
     K::Float(f) if f.is_nan() => Ok(K::Bool(1u8)),
     _ => Ok(K::Bool(0u8)),
   }
 }
-pub fn v_fill(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_except(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_fill(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_except(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 
-pub fn v_floor(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_drop(x: K, y: K) -> Result<K, &'static str> {
+pub fn v_floor(_r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_drop(x: K, y: K) -> Result<K> {
   match x {
     K::Bool(1) => v_drop(K::Int(Some(1)), y),
     K::Int(Some(0)) | K::Bool(0) => Ok(y),
     K::Int(Some(i)) => {
-      if i.abs() as usize >= y.len() {
+      if i.unsigned_abs() as usize >= y.len() {
         v_take(K::Int(Some(0)), y)
       } else if i < 0 {
         // drop off end.
@@ -815,35 +813,35 @@ pub fn v_drop(x: K, y: K) -> Result<K, &'static str> {
         v_at(y.clone(), K::IntArray(arr!((i..(y.len() as i64)).collect::<Vec<i64>>())))
       }
     }
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_delete(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_cut(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_delete(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_cut(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 
-pub fn v_string(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_dfmt(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_pad(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_cast(l: K, _r: K) -> Result<K, &'static str> {
+pub fn v_string(_r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_dfmt(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_pad(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_cast(l: K, _r: K) -> Result<K> {
   match l {
-    K::Symbol(s) if s == "c".to_string() => todo!("cast to string"),
-    K::Symbol(s) if s == "i".to_string() => todo!("cast to int"),
-    K::Symbol(s) if s == "f".to_string() => todo!("cast to float"),
-    _ => Err("type"),
+    K::Symbol(s) if s == "c" => Err(RokError::Error("nyi: cast to string".into()).into()),
+    K::Symbol(s) if s == "i" => Err(RokError::Error("nyi: cast to int".into()).into()),
+    K::Symbol(s) if s == "f" => Err(RokError::Error("nyi: cast to float".into()).into()),
+    _ => Err(RokError::Type.into()),
   }
 }
 
-pub fn v_randfloat(r: K) -> Result<K, &'static str> {
+pub fn v_randfloat(r: K) -> Result<K> {
   match r {
-    K::Int(Some(0)) => Err("nyi"),
-    K::Int(Some(i)) if i < 0 => Err("domain"),
+    K::Int(Some(0)) => Err(RokError::NYI.into()),
+    K::Int(Some(i)) if i < 0 => Err(RokError::Domain.into()),
     K::Int(Some(i)) if i > 0 => Ok(K::FloatArray(
       ChunkedArray::<Float64Type>::rand_uniform("", i as usize, 0.0f64, 1.0f64).into_series(),
     )),
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_unique(r: K) -> Result<K, &'static str> {
+pub fn v_unique(r: K) -> Result<K> {
   debug!("v_unique({:?})", r);
 
   match r {
@@ -854,11 +852,11 @@ pub fn v_unique(r: K) -> Result<K, &'static str> {
     K::CharArray(a) => Ok(K::CharArray(a.chars().unique().collect())),
     // TODO ?(3.14;"abc";3.14) works in ngn/k but k9 throws domain error if the list has any float item and otherwise works.
     // K::List(v) => Ok(K::List(v.into_iter().unique().collect())),
-    K::List(_v) => Err("nyi: v_unique(K::List(_))"),
-    _ => Err("domain"), //
+    K::List(_v) => Err(RokError::Error("nyi: v_unique(K::List(_))".into()).into()),
+    _ => Err(RokError::Domain.into()), //
   }
 }
-pub fn v_rand(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_rand(l: K, r: K) -> Result<K> {
   match (l.clone(), r.clone()) {
     (K::Int(Some(x)), K::Int(Some(y))) if x > 0 => {
       let mut rng = rand::thread_rng();
@@ -868,21 +866,21 @@ pub fn v_rand(l: K, r: K) -> Result<K, &'static str> {
       Ok(K::IntArray(Series::new("", v)))
     }
     (K::Int(Some(x)), K::Int(Some(_y))) if x < 0 => {
-      todo!("nyi v_rand with no repeats")
+      Err(RokError::Error("nyi: nyi v_rand with no repeats".into()).into())
     }
     (K::Int(Some(_x)), y) if y.len() > 1 => {
       let idxs = v_rand(l, K::Int(Some(y.len() as i64))).unwrap();
       v_at(r, idxs)
     }
-    _ => Err("nyi"),
+    _ => Err(RokError::NYI.into()),
   }
 }
-pub fn v_find(x: K, y: K) -> Result<K, &'static str> {
+pub fn v_find(x: K, y: K) -> Result<K> {
   // find index of every item of y in x
   match (x, y) {
-    (K::BoolArray(_x), K::BoolArray(_y)) => todo!("BoolArray "),
-    (K::IntArray(_x), K::IntArray(_y)) => todo!("IntArray "),
-    (K::FloatArray(_x), K::FloatArray(_y)) => todo!("FloatArray "),
+    (K::BoolArray(_x), K::BoolArray(_y)) => Err(RokError::Error("nyi: v_find BoolArray".into()).into()),
+    (K::IntArray(_x), K::IntArray(_y)) => Err(RokError::Error("nyi: v_find IntArray".into()).into()),
+    (K::FloatArray(_x), K::FloatArray(_y)) => Err(RokError::Error("nyi: v_find FloatArray".into()).into()),
     (K::CharArray(x), K::CharArray(y)) => {
       if let K::CharArray(uniq_y) = v_unique(K::CharArray(y.clone())).unwrap() {
         let map: IndexMap<char, Option<i64>> = uniq_y
@@ -899,12 +897,12 @@ pub fn v_find(x: K, y: K) -> Result<K, &'static str> {
         panic!("impossible")
       }
     }
-    _ => Err("nyi v_find"),
+    _ => Err(RokError::Error("nyi v_find".into()).into()),
   }
 }
-pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_splice(_x: K, _y: K, _z: K) -> Result<K> { Err(RokError::NYI.into()) }
 
-pub fn v_type(r: K) -> Result<K, &'static str> {
+pub fn v_type(r: K) -> Result<K> {
   use K::*;
   // TODO allow checking type of KW::Verb etc, see ngn/k's types help \0
   match r {
@@ -926,16 +924,16 @@ pub fn v_type(r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_at(l: K, r: K) -> Result<K> {
   match r {
     K::Int(None) => match l.clone() {
       K::SymbolArray(_) | K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) => {
         l.fill(0)
       }
-      K::List(_v) => todo!("v_at"),
-      K::Dictionary(_d) => todo!("v_at"),
-      K::Table(_df) => todo!("v_at"),
-      _ => Err("type"),
+      K::List(_v) => Err(RokError::Error("nyi: v_at List".into()).into()),
+      K::Dictionary(_d) => Err(RokError::Error("nyi: v_at Dictionary".into()).into()),
+      K::Table(_df) => Err(RokError::Error("nyi: v_at Table".into()).into()),
+      _ => Err(RokError::Type.into()),
     },
     K::Bool(i) => {
       // TODO remove this code duplication of K::Int(_) case below
@@ -951,7 +949,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
             if (i as usize) < v.len() {
               Ok(v[i as usize].clone())
             } else {
-              Err("length")
+              Err(RokError::Length.into())
             }
           }
           _ => todo!("index into l"),
@@ -1003,25 +1001,25 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
         K::SymbolArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::SymbolArray(a)),
-            _ => todo!("index out of bounds - this shouldn't be an error"),
+            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
           }
         }
         K::BoolArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::BoolArray(a)),
-            _ => todo!("index out of bounds - this shouldn't be an error"),
+            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
           }
         }
         K::IntArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::IntArray(a)),
-            _ => todo!("index out of bounds - this shouldn't be an error"),
+            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
           }
         }
         K::FloatArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::FloatArray(a)),
-            _ => todo!("index out of bounds - this shouldn't be an error"),
+            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
           }
         }
         K::CharArray(a) => Ok(K::CharArray(
@@ -1045,7 +1043,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
             .collect();
           Ok(promote_num(r.clone()).unwrap_or(K::List(r)))
         }
-        _ => todo!("v_at"),
+        _ => Err(RokError::Error("nyi: v_at".into()).into()),
       }
     }
     K::Symbol(s) => match l.clone() {
@@ -1058,7 +1056,7 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
       }
       K::Table(df) => match df.get_column_index(&s) {
         Some(i) => K::try_from(df[i].clone()),
-        _ => todo!("nyi"),
+        _ => Err(RokError::NYI.into()),
       },
       K::SymbolArray(ss) => match l.clone() {
         K::Dictionary(d) => {
@@ -1076,10 +1074,10 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
               .collect::<Vec<K>>(),
           ))
         }
-        K::Table(_df) => todo!("nyi"),
-        _ => todo!("nyi"),
+        K::Table(_df) => Err(RokError::NYI.into()),
+        _ => Err(RokError::NYI.into()),
       },
-      _ => Err("type"),
+      _ => Err(RokError::Type.into()),
     },
     K::SymbolArray(s) => {
       let keys: Vec<K> = s
@@ -1096,26 +1094,26 @@ pub fn v_at(l: K, r: K) -> Result<K, &'static str> {
 }
 
 // https://k.miraheze.org/wiki/Amend
-pub fn v_amend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_amend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_amend3(_x: K, _y: K, _z: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_amend4(_x: K, _y: K, _f: K, _z: K) -> Result<K> { Err(RokError::NYI.into()) }
 
-pub fn v_eval(x: K) -> Result<K, &'static str> {
+pub fn v_eval(x: K) -> Result<K> {
   // TODO: does this need the current Env passed in?
   match x {
     K::CharArray(s) => {
       let mut env = Env { names: HashMap::new(), parent: None };
-      Ok(eval(&mut env, scan(&s).unwrap()).unwrap().unwrap_noun())
+      eval(&mut env, scan(&s)?)?.unwrap_noun()
     }
-    _ => Err("nyi"),
+    _ => Err(RokError::NYI.into()),
   }
 }
-pub fn v_dot(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_dot(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 // https://k.miraheze.org/wiki/Deep_amend
-pub fn v_deepamend3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_deepamend4(_x: K, _y: K, _f: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_try(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_deepamend3(_x: K, _y: K, _z: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_deepamend4(_x: K, _y: K, _f: K, _z: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_try(_x: K, _y: K, _z: K) -> Result<K> { Err(RokError::NYI.into()) }
 
-pub fn v_join(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_join(l: K, r: K) -> Result<K> {
   match l {
     K::Char(l) => match r {
       K::List(v) => {
@@ -1123,40 +1121,40 @@ pub fn v_join(l: K, r: K) -> Result<K, &'static str> {
           v.iter().map(|k| if let K::CharArray(s) = k { Some(s.clone()) } else { None }).collect();
         match v {
           Some(v) => Ok(K::CharArray(v.join(&l.to_string()))),
-          None => Err("type"),
+          None => Err(RokError::Type.into()),
         }
       }
-      _ => Err("type"),
+      _ => Err(RokError::Type.into()),
     },
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_unpack(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_split(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_unpack(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_split(l: K, r: K) -> Result<K> {
   match l {
     K::Char(l) => match r {
       K::CharArray(r) => Ok(K::List(r.split(l).map(|s| K::CharArray(s.to_string())).collect())),
-      _ => Err("type"),
+      _ => Err(RokError::Type.into()),
     },
     K::CharArray(l) => match r {
       K::CharArray(r) => Ok(K::List(r.split(&l).map(|s| K::CharArray(s.to_string())).collect())),
-      _ => Err("type"),
+      _ => Err(RokError::Type.into()),
     },
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
 
-pub fn v_iota(x: K) -> Result<K, &'static str> {
+pub fn v_iota(x: K) -> Result<K> {
   debug!("v_iota");
   match x {
     K::Bool(0) => Ok(K::IntArray(Series::new_empty("", &DataType::Int64))),
     K::Bool(1) => v_iota(K::Int(Some(1))),
     K::Int(Some(0)) | K::Int(None) => Ok(K::IntArray(Series::new_empty("", &DataType::Int64))),
     K::Int(Some(i)) => Ok(K::IntArray(arr![(0..i).collect::<Vec<i64>>()])),
-    _ => todo!("v_iota variants: {}", x),
+    _ => Err(RokError::Error(format!("nyi: v_iota variants: {}", x)).into()),
   }
 }
-pub fn v_sum(x: K) -> Result<K, &'static str> {
+pub fn v_sum(x: K) -> Result<K> {
   match x {
     K::Bool(_) | K::Int(_) | K::Float(_) => Ok(x),
     K::BoolArray(a) => Ok(K::Int(a.sum().ok())),
@@ -1165,15 +1163,18 @@ pub fn v_sum(x: K) -> Result<K, &'static str> {
     _ => {
       // Fall back to slow catchall. TODO Something nicer
       let mut env = Env { names: HashMap::new(), parent: None };
-      let sum = eval(&mut env, scan("{x+y}/").unwrap()).unwrap();
-      Ok(eval(&mut env, vec![sum, KW::Noun(x.clone())]).unwrap().unwrap_noun())
+      let sum = eval(&mut env, scan("{x+y}/")?)?;
+      eval(&mut env, vec![sum, KW::Noun(x.clone())])?.unwrap_noun()
     }
   }
 }
-pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()) }
+pub fn v_d_sum(l: K, r: K) -> Result<K> {
+  let r = v_sum(r)?;
+  Ok(l + r)
+}
 
 // TODO
-// pub fn v_product(x: K) -> Result<K, &'static str> {
+// pub fn v_product(x: K) -> Result<K> {
 //   match x {
 //     K::BoolArray(a) => Ok(K::Int(a.product().ok().into())),
 //     K::IntArray(a) => Ok(K::Int(a.product().ok())),
@@ -1181,9 +1182,9 @@ pub fn v_d_sum(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_sum(r).unwrap()
 //     _ => todo!("other types of K"),
 //   }
 // }
-// pub fn v_d_product(l: K, r: K) -> Result<K, &'static str> { Ok(l + v_product(r).unwrap()) }
+// pub fn v_d_product(l: K, r: K) -> Result<K> { Ok(l + v_product(r).unwrap()) }
 
-pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_d_bang(l: K, r: K) -> Result<K> {
   match l {
     K::SymbolArray(_)
     | K::Symbol(_)
@@ -1195,25 +1196,29 @@ pub fn v_d_bang(l: K, r: K) -> Result<K, &'static str> {
   }
 }
 
-pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K> {
   match v {
-    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
-      let r: Vec<K> = v
-        .iter()
-        .cloned()
-        .map(|y|
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => {
+      match k_to_vec(x).map(|v| {
+        v.iter()
+          .map(|y|
              // apply_primitive(env, &name, None, KW::Noun(y.clone())).unwrap().unwrap_noun()
-             eval(env, vec![f.clone(), KW::Noun(y.clone())]).unwrap().unwrap_noun())
-        .collect();
-      promote_num(r.clone()).unwrap_or(K::List(r))
-    }),
-    _ => Err("type"),
+             eval(env, vec![f.clone(), KW::Noun(y.clone())])?.unwrap_noun())
+          .collect::<Result<Vec<K>>>()
+      })? {
+        Ok(r) => Ok(promote_num(r.clone()).unwrap_or(K::List(r))),
+        Err(e) => Err(e),
+      }
+    }
+    _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { todo!("each") }
+pub fn v_d_each(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
+  Err(RokError::Error("nyi: each".into()).into())
+}
 
 // Dispatch / based on inputs:  fold, over, fixedpoint
-pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K> {
   match v.clone() {
     KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
       ':' | '/' | '\\' => v_fixedpoint(env, v, x),
@@ -1222,13 +1227,13 @@ pub fn a_slash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     KW::Function { body: _, args, adverb: _ } => match args.len() {
       2 => v_fold(env, v, x),
       1 => v_fixedpoint(env, v, x),
-      _ => Err("rank"),
+      _ => Err(RokError::Rank.into()),
     },
     _ => panic!("impossible"),
   }
 }
 
-pub fn a_d_slash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+pub fn a_d_slash(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   // TODO check the rank of v and type of x and handle the different meanings of /
   // https://k.miraheze.org/wiki/For
   // https://k.miraheze.org/wiki/While
@@ -1243,33 +1248,32 @@ pub fn a_d_slash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
     KW::Function { body: _, args, adverb: _ } => match args.len() {
       2 => v_d_fold(env, v, x, y),
       1 => todo!("monadic v: {}", v),
-      _ => Err("rank"),
+      _ => Err(RokError::Rank.into()),
     },
     _ => panic!("impossible"),
   }
 }
 
-pub fn v_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+pub fn v_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K> {
   // fixedpoint and scan-fixedpoint are adverbs that apply a monadic function to
   // a given noun y until it stops changing, or the initial value has been repeated.
   let mut prev_r = x.clone();
   loop {
-    let r = eval(env, vec![v.clone(), KW::Noun(prev_r.clone())]).unwrap().unwrap_noun();
+    let r = eval(env, vec![v.clone(), KW::Noun(prev_r.clone())])?.unwrap_noun()?;
     if r == prev_r || r == x {
       return Ok(r);
     }
     prev_r = r;
   }
 }
-pub fn v_scan_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+pub fn v_scan_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K> {
   // same as v_fixedpoint() except return a K::List of all intermediate results
   match v.clone() {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x.clone()).and_then(|_| {
       let mut result: Vec<K> = vec![x.clone()];
       loop {
-        let r = eval(env, vec![f.clone(), KW::Noun(result[result.len() - 1].clone())])
-          .unwrap()
-          .unwrap_noun();
+        let r =
+          eval(env, vec![f.clone(), KW::Noun(result[result.len() - 1].clone())])?.unwrap_noun()?;
         if r == result[result.len() - 1] || r == x {
           match promote_num(result.clone()) {
             Ok(k) => return Ok(k),
@@ -1279,11 +1283,11 @@ pub fn v_scan_fixedpoint(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> 
         result.push(r);
       }
     }),
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
 
-pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K> {
   // split into list, then reduce
   match v {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).and_then(|v| {
@@ -1295,34 +1299,27 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
         )
         .unwrap()
         .unwrap_noun()
+        .unwrap()
       });
       match r {
         Some(k) => Ok(k.clone()),
-        None => Err("TODO not sure what this error case is"),
+        None => Err(RokError::Error("TODO not sure what this error case is".into()).into()),
       }
     }),
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+pub fn v_d_fold(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   if let KW::Verb { ref name } = v {
     let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) }; // TODO This will lose names if the fold verb does global assignment
-    Ok(
-      apply_primitive(
-        env,
-        &name.clone(),
-        Some(KW::Noun(x.clone())),
-        KW::Noun(v_fold(&mut e, v, y).unwrap()),
-      )
-      .unwrap()
-      .unwrap_noun(),
-    )
+    apply_primitive(env, &name.clone(), Some(KW::Noun(x.clone())), KW::Noun(v_fold(&mut e, v, y)?))?
+      .unwrap_noun()
   } else {
-    Err("type")
+    Err(RokError::Type.into())
   }
 }
 
-pub fn a_bslash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+pub fn a_bslash(env: &mut Env, v: KW, x: K) -> Result<K> {
   match v.clone() {
     KW::Verb { name } => match name.as_str().char_indices().nth_back(0).unwrap().1 {
       ':' | '/' | '\\' => v_scan_fixedpoint(env, v, x),
@@ -1331,13 +1328,13 @@ pub fn a_bslash(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
     KW::Function { body: _, args, adverb: _ } => match args.len() {
       2 => v_scan(env, v, x),
       1 => v_scan_fixedpoint(env, v, x),
-      _ => Err("rank"),
+      _ => Err(RokError::Rank.into()),
     },
     _ => panic!("impossible"),
   }
 }
 
-pub fn a_d_bslash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+pub fn a_d_bslash(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   // TODO check the rank of v and type of x and handle the different meanings of \
   // https://k.miraheze.org/wiki/For
   // https://k.miraheze.org/wiki/While
@@ -1352,13 +1349,13 @@ pub fn a_d_bslash(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
     KW::Function { body: _, args, adverb: _ } => match args.len() {
       2 => v_d_scan(env, v, x, y),
       1 => todo!("monadic v: {}", v),
-      _ => Err("rank"),
+      _ => Err(RokError::Rank.into()),
     },
     _ => panic!("impossible"),
   }
 }
 
-pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K> {
   // same as v_fold() except return a K::List of intermediate results
   // split into list, then scan
   match v {
@@ -1377,7 +1374,8 @@ pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
             ],
           )
           .unwrap()
-          .unwrap_noun(),
+          .unwrap_noun()
+          .unwrap(),
         )
       }
       match promote_num(result.clone()) {
@@ -1385,74 +1383,78 @@ pub fn v_scan(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
         _ => K::List(result),
       }
     }),
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_d_scan(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+pub fn v_d_scan(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   match v.clone() {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => {
-      let first: K = eval(
-        env,
-        vec![
-          f.clone(),
-          KW::FuncArgs(vec![
-            vec![KW::Noun(x.clone())],
-            vec![KW::Noun(v_first(y.clone()).unwrap())],
-          ]),
-        ],
-      )
-      .unwrap()
-      .unwrap_noun();
+      if y.is_empty() {
+        Ok(y)
+      } else {
+        let first: K = eval(
+          env,
+          vec![
+            f.clone(),
+            KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(v_first(y.clone())?)]]),
+          ],
+        )?
+        .unwrap_noun()?;
 
-      let rest: K = v_drop(K::Int(Some(1)), y).unwrap();
-      v_scan(env, v, v_concat(first, rest).unwrap())
+        let rest: K = v_drop(K::Int(Some(1)), y)?;
+        v_scan(env, v, v_concat(first, rest)?)
+      }
     }
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
 
-pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K, &'static str> {
+pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K> {
   match v {
-    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
-      let first: &K = &v[0];
-      let r: Vec<K> = v
-        .iter()
-        .zip(v.iter().skip(1))
-        .map(|(x, y)| {
-          // f[y,x] / yes y,x not x,y
-          eval(
-            env,
-            vec![
-              f.clone(),
-              KW::FuncArgs(vec![vec![KW::Noun(y.clone())], vec![KW::Noun(x.clone())]]),
-            ],
-          )
-          .unwrap()
-          .unwrap_noun()
-        })
-        .collect();
-      let r: Vec<K> = vec![first.clone()].into_iter().chain(r).collect();
-      promote_num(r.clone()).unwrap_or(K::List(r))
-    }),
-    _ => Err("type"),
+    ref f @ KW::Function { ref body, ref args, ref adverb } if args.len() == 1 => {
+      Err(RokError::Error("nyi: peach https://code.kx.com/q/basics/peach/".into()).into())
+    }
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => {
+      k_to_vec(x).map(|v| {
+        let first: &K = &v[0];
+        let r: Result<Vec<K>> = v
+          .iter()
+          .zip(v.iter().skip(1))
+          .map(|(x, y)| {
+            // f[y,x] / yes y,x not x,y
+            eval(
+              env,
+              vec![
+                f.clone(),
+                KW::FuncArgs(vec![vec![KW::Noun(y.clone())], vec![KW::Noun(x.clone())]]),
+              ],
+            )?
+            .unwrap_noun()
+          })
+          .collect();
+        match r {
+          Ok(r) => {
+            let r: Vec<K> = vec![first.clone()].into_iter().chain(r).collect();
+            Ok(promote_num(r.clone()).unwrap_or(K::List(r)))
+          }
+          Err(e) => Err(e)
+        }
+      })?
+    }
+    _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_eachprior_d_or_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
-  todo!("v_eachprior_d_or_windows()")
+pub fn v_eachprior_d_or_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
+  Err(RokError::Error("nyi: v_eachprior_d_or_windows()".into()).into())
 }
-pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
-  todo!("v_eachprior_d()")
-}
-pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> {
-  todo!("v_windows()")
-}
+pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Error("nyi: v_eachprior_d()".into()).into()) }
+pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Error("nyi: v_windows()".into()).into()) }
 
-pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   match v {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(y).map(|v| {
       let r: Vec<K> = v
         .iter()
-        .cloned()
         .map(|y| {
           eval(
             env,
@@ -1463,19 +1465,19 @@ pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str
           )
           .unwrap()
           .unwrap_noun()
+          .unwrap()
         })
         .collect();
       promote_num(r.clone()).unwrap_or(K::List(r))
     }),
-    _ => Err("type"),
+    _ => Err(RokError::Type.into()),
   }
 }
-pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str> {
+pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   match v {
-    f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).map(|v| {
-      let r: Vec<K> = v
+    f @ KW::Verb { .. } | f @ KW::Function { .. } => {
+      let r: Vec<K> = k_to_vec(x)?
         .iter()
-        .cloned()
         .map(|x| {
           eval(
             env,
@@ -1483,14 +1485,13 @@ pub fn v_d_eachleft(env: &mut Env, v: KW, x: K, y: K) -> Result<K, &'static str>
               f.clone(),
               KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]]),
             ],
-          )
-          .unwrap()
+          )?
           .unwrap_noun()
         })
-        .collect();
-      promote_num(r.clone()).unwrap_or(K::List(r))
-    }),
-    _ => Err("type"),
+        .collect::<Result<Vec<K>>>()?;
+      Ok(promote_num(r.clone()).unwrap_or(K::List(r)))
+    }
+    _ => Err(RokError::Type.into()),
   }
 }
 
@@ -1501,7 +1502,7 @@ pub fn strip_quotes(s: String) -> String {
     s
   }
 }
-pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
+pub fn v_makedict(l: K, r: K) -> Result<K> {
   debug!("v_makedict() l: {:?}", l);
   debug!("v_makedict() r: {:?}", r);
   match l {
@@ -1518,7 +1519,7 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
             repeat(v[0].clone()),
           ))))
         } else {
-          Err("length")
+          Err(RokError::Length.into())
         }
       }
       K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) | K::SymbolArray(_) => {
@@ -1529,8 +1530,8 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
         ))))
       }
       _ => {
-        if s.len() == 0 {
-          Err("length")
+        if s.is_empty() {
+          Err(RokError::Length.into())
         } else if s.len() == 1 {
           Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
         } else {
@@ -1543,13 +1544,13 @@ pub fn v_makedict(l: K, r: K) -> Result<K, &'static str> {
     },
     K::Symbol(s) => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
     _ => {
-      todo!("modulo")
+      Err(RokError::Error("nyi: modulo".into()).into())
     }
   }
 }
 
-pub fn v_colon(_r: K) -> Result<K, &'static str> { todo!(": monad") }
-pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
+pub fn v_colon(_r: K) -> Result<K> { Err(RokError::Error("nyi: : monad".into()).into()) }
+pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW> {
   debug!("l: {:?}, r: {:?}", l, r);
   match (&l, &r) {
     (K::Bool(0), KW::Noun(K::CharArray(a))) => Ok(KW::Noun(K::List(
@@ -1573,13 +1574,13 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
               Ok(KW::Noun(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap())))
             } else {
-              todo!("other file types")
+              Err(RokError::Error("nyi: other file types".into()).into())
             }
           }
-          _ => todo!("no extension"),
+          _ => Err(RokError::Error("nyi: no extension".into()).into()),
         }
       } else {
-        Err("path does not exist")
+        Err(RokError::Error("path does not exist".into()).into())
       }
     }
     (K::Name(n), r) => {
@@ -1591,7 +1592,7 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW, &'static str> {
   }
 }
 
-pub fn v_prm(_r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_in(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_has(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_within(_l: K, _r: K) -> Result<K, &'static str> { Err("nyi") }
+pub fn v_prm(_r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_in(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_has(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_within(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }

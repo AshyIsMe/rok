@@ -1,3 +1,5 @@
+#![feature(assert_matches)]
+use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::fs::{self, File};
 
@@ -9,7 +11,7 @@ use roklang::KW::*;
 fn k_eval(s: &str) -> K {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  let r = eval(&mut env, scan(s).unwrap()).unwrap().unwrap_noun();
+  let r = eval(&mut env, scan(s).unwrap()).unwrap().unwrap_noun().unwrap();
   println!("k_eval({}) = {}", s, r);
   r
 }
@@ -79,16 +81,17 @@ fn test_split_on() {
     KW::RB,
     KW::Noun(K::Bool(1)),
   ];
+  let res = split_on(tokens, KW::SC, KW::RB).unwrap();
   assert_eq!(
-    split_on(tokens, KW::SC, KW::RB),
-    Ok((
+    res,
+    (
       vec![
         vec![KW::Noun(K::Bool(1))],
         vec![KW::Noun(K::Int(Some(2)))],
         vec![KW::Noun(K::Int(Some(3)))]
       ],
       vec![KW::Noun(K::Bool(1)),]
-    ))
+    )
   );
 
   let tokens = vec![
@@ -105,16 +108,17 @@ fn test_split_on() {
     KW::RB,
     KW::Noun(K::Bool(1)),
   ];
+  let res = split_on(tokens, KW::SC, KW::RB).unwrap();
   assert_eq!(
-    split_on(tokens, KW::SC, KW::RB),
-    Ok((
+    res,
+    (
       vec![
         vec![KW::Noun(K::Bool(1))],
         vec![KW::LB, KW::Noun(K::Int(Some(2))), KW::SC, KW::Noun(K::Int(Some(3))), KW::RB],
         vec![KW::Noun(K::Int(Some(4)))]
       ],
       vec![KW::Noun(K::Bool(1)),]
-    ))
+    )
   );
 }
 
@@ -399,18 +403,55 @@ fn test_quoted_symbols() {
 #[test]
 fn test_length_errors() {
   let mut env = Env { names: HashMap::new(), parent: None };
-  assert_eq!(eval(&mut env, scan("1 2 3 + 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 + 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1.0 2.0 + 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 3 - 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 - 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1.0 2.0 - 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 3 * 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 * 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1.0 2.0 * 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 3 % 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1 2 % 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
-  assert_eq!(eval(&mut env, scan("1.0 2.0 % 3 4 5").unwrap()), Err::<KW, &'static str>("length"));
+
+  assert_matches!(
+    eval(&mut env, scan("1 2 3 + 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1 2 + 3 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1.0 2.0 + 3 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1 2 3 - 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1 2 - 3 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1.0 2.0 - 3 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1 2 3 * 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1 2 * 3 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1.0 2.0 * 3 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1 2 3 % 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1 2 % 3 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
+  assert_matches!(
+    eval(&mut env, scan("1.0 2.0 % 3 4 5").unwrap()).unwrap_err().downcast_ref::<RokError>(),
+    Some(RokError::Length)
+  );
 }
 
 #[test]
@@ -947,7 +988,7 @@ fn test_functions() {
   assert_eq!(eval(&mut env, scan("f 2").unwrap()).unwrap(), Noun(K::Int(Some(4))));
 
   assert_eq!(
-    eval(&mut env, scan("{x*2}!5").unwrap()).unwrap().unwrap_noun(),
+    eval(&mut env, scan("{x*2}!5").unwrap()).unwrap().unwrap_noun().unwrap(),
     K::IntArray(arr!([0, 2, 4, 6, 8i64]))
   );
 }
@@ -1484,23 +1525,23 @@ fn test_promote_nouns() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
   println!("promote_nouns(1, 1 2 3)");
-  let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
-  let r = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun();
+  let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun().unwrap();
+  let r = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(promote_nouns(l, r.clone()), (K::IntArray(arr!([1, 1, 1i64])), r));
 
   println!("promote_nouns(1 2 3, 1)");
-  let l = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun();
-  let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  let l = eval(&mut env, scan("1 2 3").unwrap()).unwrap().unwrap_noun().unwrap();
+  let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(promote_nouns(l.clone(), r), (l, K::IntArray(arr!([1, 1, 1i64]))));
 
   println!("promote_nouns(1, 1 2 3.0)");
-  let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
-  let r = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun();
+  let l = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun().unwrap();
+  let r = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(promote_nouns(l, r.clone()), (K::FloatArray(arr!([1.0, 1.0, 1.0f64])), r));
 
   println!("promote_nouns(1 2 3.0, 1)");
-  let l = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun();
-  let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun();
+  let l = eval(&mut env, scan("1 2 3.0").unwrap()).unwrap().unwrap_noun().unwrap();
+  let r = eval(&mut env, scan("1").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(promote_nouns(l.clone(), r), (l, K::FloatArray(arr!([1.0, 1.0, 1.0f64]))));
 }
 
@@ -1510,7 +1551,7 @@ fn test_split_strings() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
   //TODO fix parse error of 2 or more adverb chain
-  let res = eval(&mut env, scan(r#"","\'("1,2";"3,4")"#).unwrap()).unwrap().unwrap_noun();
+  let res = eval(&mut env, scan(r#"","\'("1,2";"3,4")"#).unwrap()).unwrap().unwrap_noun().unwrap();
 
   assert_eq!(
     res,
@@ -1525,7 +1566,7 @@ fn test_split_strings() {
 fn test_eval_verb() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  let res = eval(&mut env, scan(r#"."42""#).unwrap()).unwrap().unwrap_noun();
+  let res = eval(&mut env, scan(r#"."42""#).unwrap()).unwrap().unwrap_noun().unwrap();
 
   assert_eq!(res, K::Int(Some(42)));
 }
@@ -1534,10 +1575,10 @@ fn test_eval_verb() {
 fn test_concat() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  let res = eval(&mut env, scan("2,3").unwrap()).unwrap().unwrap_noun();
+  let res = eval(&mut env, scan("2,3").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(res, K::IntArray(arr!([2, 3i64])));
 
-  let res = eval(&mut env, scan("1 2,3 4.0").unwrap()).unwrap().unwrap_noun();
+  let res = eval(&mut env, scan("1 2,3 4.0").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(res, K::FloatArray(arr!([1., 2., 3., 4.0f64])));
 }
 
@@ -1545,13 +1586,13 @@ fn test_concat() {
 fn test_grade() {
   let mut env = Env { names: HashMap::new(), parent: None };
 
-  let res = eval(&mut env, scan("< 3 2 1").unwrap()).unwrap().unwrap_noun();
+  let res = eval(&mut env, scan("< 3 2 1").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(res, K::IntArray(arr!([2, 1, 0i64])));
 
-  let res = eval(&mut env, scan("< 3.0 2.5 1").unwrap()).unwrap().unwrap_noun();
+  let res = eval(&mut env, scan("< 3.0 2.5 1").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(res, K::IntArray(arr!([2, 1, 0i64])));
 
-  let res = eval(&mut env, scan("> 3 2 1").unwrap()).unwrap().unwrap_noun();
+  let res = eval(&mut env, scan("> 3 2 1").unwrap()).unwrap().unwrap_noun().unwrap();
   assert_eq!(res, K::IntArray(arr!([0i64, 1, 2])));
 }
 
@@ -1626,13 +1667,12 @@ fn test_comparisons() {
   assert_eq!(k_eval("1<+`a`b!(1 1 1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
   assert_eq!(k_eval("(+`a`b!(1 1 1;2 3 4))<3"), k_eval("+`a`b!(1 1 1;1 0 0)"));
 
-
   println!("test_comparisons() numbers");
   assert_eq!(k_eval("1>2"), k_eval("0"));
   assert_eq!(k_eval("1>1 2 3"), k_eval("0 0 0"));
   assert_eq!(k_eval("1.0>2"), k_eval("0"));
 
-  assert_eq!(k_eval("0N>1"), k_eval("0")); 
+  assert_eq!(k_eval("0N>1"), k_eval("0"));
   assert_eq!(k_eval("0n>1"), k_eval("0"));
   assert_eq!(k_eval("0n 0n>1"), k_eval("0 0"));
   // 0N>0n is an annoyance to implement because of promote_nouns().
@@ -1662,5 +1702,4 @@ fn test_comparisons() {
   println!("test_comparisons() tables");
   assert_eq!(k_eval("1>+`a`b!(1 1 1;2 3 4)"), k_eval("+`a`b!(0 0 0;1 1 1)"));
   assert_eq!(k_eval("(+`a`b!(1 1 1;2 3 4))>3"), k_eval("+`a`b!(1 1 1;1 0 0)"));
-
 }

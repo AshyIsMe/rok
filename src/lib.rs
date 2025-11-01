@@ -1,18 +1,19 @@
+use anyhow::Result;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use log::debug;
 use polars::prelude::*;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::{f64, fmt};
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::iter::zip;
 use std::path::Path;
-use std::{collections::VecDeque, iter::repeat, ops};
+use std::{collections::VecDeque, iter::repeat, iter::repeat_n, ops};
+use std::{f64, fmt};
+use thiserror::Error;
 
 mod verbs;
-
 pub use verbs::*;
 
 // oK.js is 1k lines of javascript in one file for a k6 interpreter.
@@ -78,6 +79,24 @@ pub enum KW /* KWords */ {
   FuncArgsStart, // [ but explicitly function arguments start
 }
 
+#[derive(Error, Debug)]
+pub enum RokError {
+  #[error("'domain")]
+  Domain,
+  #[error("'error\n{0}")]
+  Error(String),
+  #[error("'length")]
+  Length,
+  #[error("'nyi")]
+  NYI,
+  #[error("'parse\n{0}")]
+  Parse(&'static str),
+  #[error("'rank")]
+  Rank,
+  #[error("'type")]
+  Type,
+}
+
 impl K {
   pub fn is_empty(&self) -> bool { self.len() == 0 }
 
@@ -96,7 +115,7 @@ impl K {
       _ => 1,
     }
   }
-  pub fn fill(&self, n: usize) -> Result<K, &'static str> {
+  pub fn fill(&self, n: usize) -> Result<K> {
     use K::*;
     match n {
       0 => match self {
@@ -106,10 +125,10 @@ impl K {
         IntArray(_) | Int(_) => Ok(Int(None)),
         FloatArray(_) | Float(_) => Ok(K::Float(f64::NAN)),
         CharArray(_) | Char(_) => Ok(Char(' ')),
-        Dictionary(_) => Err("type"), // TODO right?
-        Table(_) => Err("type"),      // TODO right?
+        Dictionary(_) => Err(RokError::Type.into()), // TODO right?
+        Table(_) => Err(RokError::Type.into()),      // TODO right?
         List(_) => Ok(List(vec![])),
-        Name(_) => Err("type"), // TODO right?
+        Name(_) => Err(RokError::Type.into()), // TODO right?
       },
       _ => match self {
         Nil => todo!("List(vec![Nil, Nil, ...]) ???"),
@@ -125,7 +144,7 @@ impl K {
         IntArray(a) => {
           if n > a.len() {
             // Ok(IntArray(a.i64().unwrap().into_iter().chain(repeat(Some(0i64))).take(n).collect()))
-            Ok(IntArray(a.extend_constant(AnyValue::Int64(0i64), n - a.len()).unwrap()))
+            Ok(IntArray(a.extend_constant(AnyValue::Int64(0i64), n - a.len())?))
           } else {
             todo!("just take?")
           }
@@ -230,7 +249,7 @@ impl fmt::Display for K {
             .collect(),
         );
         let s = if s.len() < cols { s } else { s[..(cols - 2)].to_string() + ".." };
-        if b.len() == 0 {
+        if b.is_empty() {
           write!(f, "!0")
         } else if b.len() == 1 {
           write!(f, ",{}", s)
@@ -324,15 +343,8 @@ impl Hash for K {
         v.hash(state)
       }
       K::FloatArray(f) => {
-        let v: Vec<Option<String>> = f
-          .f64()
-          .unwrap()
-          .into_iter()
-          .map(|f| match f {
-            Some(f) => Some(f.to_string()),
-            None => None,
-          })
-          .collect();
+        let v: Vec<Option<String>> =
+          f.f64().unwrap().into_iter().map(|f| f.map(|f| f.to_string())).collect();
         v.hash(state)
       }
       K::CharArray(c) => c.hash(state),
@@ -353,9 +365,9 @@ impl From<String> for K {
 }
 
 impl TryFrom<Series> for K {
-  type Error = &'static str;
+  type Error = anyhow::Error;
 
-  fn try_from(s: Series) -> Result<Self, Self::Error> {
+  fn try_from(s: Series) -> Result<Self> {
     if s.i64().is_ok() || s.i32().is_ok() || s.u64().is_ok() || s.u32().is_ok() || s.u8().is_ok() {
       if s.min().unwrap() == Some(0) && s.max().unwrap() == Some(1) {
         // Ok(K::BoolArray(s.cast(&DataType::UInt8).unwrap()))
@@ -378,15 +390,15 @@ impl TryFrom<Series> for K {
       ))
     } else {
       todo!("try_from<Series>() nyi: {}", s);
-      // Err("type")
+      // Err(RokError::Type.into())
     }
   }
 }
 
 impl TryFrom<AnyValue<'_>> for K {
-  type Error = &'static str;
+  type Error = anyhow::Error;
 
-  fn try_from(v: AnyValue) -> Result<Self, Self::Error> {
+  fn try_from(v: AnyValue) -> Result<Self> {
     match v {
       // AnyValue::Boolean(b) => Ok(K::Bool(match b {
       //   true => 1,
@@ -405,27 +417,27 @@ impl TryFrom<AnyValue<'_>> for K {
       AnyValue::String(s) => Ok(K::CharArray(s.to_string())),
       _ => {
         println!("try_from() nyi: {}", v);
-        Err("type")
+        Err(RokError::Type.into())
       }
     }
   }
 }
 
 impl TryInto<Vec<K>> for K {
-  type Error = &'static str;
-  fn try_into(self) -> Result<Vec<K>, Self::Error> {
+  type Error = anyhow::Error;
+  fn try_into(self) -> Result<Vec<K>> {
     match self {
       K::SymbolArray(s) => Ok(s.iter().map(|s| K::from(s.to_string())).collect()),
-      _ => Err("nyi"),
+      _ => Err(RokError::NYI.into()),
     }
   }
 }
 
 impl KW {
-  pub fn unwrap_noun(&self) -> K {
+  pub fn unwrap_noun(&self) -> Result<K> {
     match self {
-      KW::Noun(n) => n.clone(),
-      _ => panic!("not a noun"),
+      KW::Noun(n) => Ok(n.clone()),
+      _ => Err(RokError::Error("not a noun".into()).into()),
     }
   }
 }
@@ -482,7 +494,7 @@ macro_rules! arr {
   };
 }
 
-pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
+pub fn k_to_vec(k: K) -> Result<Vec<K>> {
   match k {
     K::Bool(_) | K::Int(_) | K::Float(_) | K::Char(_) | K::Symbol(_) => Ok(vec![k]),
     K::List(v) => Ok(v),
@@ -526,12 +538,12 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>, &'static str> {
     ),
     K::CharArray(v) => Ok(v.chars().map(K::Char).collect()),
     K::SymbolArray(_v) => {
-      todo!("enlist(SymbolArray(...))")
+      Err(RokError::Error("nyi: enlist(SymbolArray(...))".into()).into())
     }
-    _ => todo!("k_to_vec({})", k),
+    _ => Err(RokError::Error(format!("nyi: k_to_vec({})", k)).into()),
   }
 }
-pub fn vec_to_list(nouns: Vec<KW>) -> Result<K, &'static str> {
+pub fn vec_to_list(nouns: Vec<KW>) -> Result<K> {
   if nouns.iter().all(|w| matches!(w, KW::Noun(K::Bool(_)))) {
     let v: Vec<u8> = nouns
       .iter()
@@ -587,26 +599,26 @@ pub fn vec_to_list(nouns: Vec<KW>) -> Result<K, &'static str> {
       .collect();
     Ok(K::List(v))
   } else {
-    Err("invalid list")
+    Err(RokError::Error("invalid list".into()).into())
   }
 }
 
-type V1 = fn(K) -> Result<K, &'static str>;
-type V2 = fn(K, K) -> Result<K, &'static str>;
-type V3 = fn(K, K, K) -> Result<K, &'static str>;
-type V4 = fn(K, K, K, K) -> Result<K, &'static str>;
+type V1 = fn(K) -> Result<K>;
+type V2 = fn(K, K) -> Result<K>;
+type V3 = fn(K, K, K) -> Result<K>;
+type V4 = fn(K, K, K, K) -> Result<K>;
 
-pub fn v_nyi1(_x: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_nyi2(_x: K, _y: K) -> Result<K, &'static str> { Err("nyi") }
-pub fn v_none1(_x: K) -> Result<K, &'static str> { Err("rank") }
-pub fn v_none2(_x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
-pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K, &'static str> { Err("rank") }
-pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K, &'static str> { Err("rank") }
-pub fn av_none1(_env: &mut Env, _v: KW, _x: K) -> Result<K, &'static str> { Err("rank") }
-pub fn av_d_none2(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K, &'static str> { Err("rank") }
+pub fn v_nyi1(_x: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_nyi2(_x: K, _y: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_none1(_x: K) -> Result<K> { Err(RokError::Rank.into()) }
+pub fn v_none2(_x: K, _y: K) -> Result<K> { Err(RokError::Rank.into()) }
+pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K> { Err(RokError::Rank.into()) }
+pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K> { Err(RokError::Rank.into()) }
+pub fn av_none1(_env: &mut Env, _v: KW, _x: K) -> Result<K> { Err(RokError::Rank.into()) }
+pub fn av_d_none2(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Rank.into()) }
 
-type AV1 = fn(&mut Env, KW, K) -> Result<K, &'static str>;
-type AV2 = fn(&mut Env, KW, K, K) -> Result<K, &'static str>;
+type AV1 = fn(&mut Env, KW, K) -> Result<K>;
+type AV2 = fn(&mut Env, KW, K, K) -> Result<K>;
 
 type VerbDispatchTable = IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)>;
 
@@ -736,7 +748,7 @@ pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
   ])
 }
 
-pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<KW, &'static str> {
+pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<KW> {
   // See https://github.com/JohnEarnest/ok/blob/gh-pages/oK.js
   //        a          l           a-a         l-a         a-l         l-l         triad    tetrad
   // ":" : [ident,     ident,      rident,     rident,     rident,     rident,     null,    null  ],
@@ -798,12 +810,12 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
           }
         }
         (None, KW::Noun(r)) => (if r.len() > 1 { m_l } else { m_a })(r).map(KW::Noun),
-        _ => {
-          panic!("impossible")
-        }
+        _ => Err(RokError::Error("impossible".into()).into()),
       },
       None => {
-        let t = if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 2..]) {
+        let t = if v.len() < 2 {
+          None
+        } else if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 2..]) {
           Some((2, (m_a, d_a)))
         } else if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 1..]) {
           Some((1, (m_a, d_a)))
@@ -818,15 +830,15 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
             (None, KW::Noun(r)) => {
               m_a(env, KW::Verb { name: v[..v.len() - adv_len].to_string() }, r).map(KW::Noun)
             }
-            _ => todo!("other adverb cases"),
+            _ => Err(RokError::Error("NYI: other adverb cases".into()).into()),
           },
-          None => todo!("NotYetImplemented {}", v),
+          None => Err(RokError::Error(format!("NYI: {}", v)).into()),
         }
       }
     },
   }
 }
-pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
+pub fn apply_adverb(a: &str, l: KW) -> Result<KW> {
   // Return a new Verb that implements the appropriate adverb behaviour
   match l {
     KW::Verb { name } => {
@@ -838,13 +850,13 @@ pub fn apply_adverb(a: &str, l: KW) -> Result<KW, &'static str> {
     }
     KW::Function { body, args, adverb: None } => match a {
       "\'" | "/" | "\\" => Ok(KW::Function { body, args, adverb: Some(a.to_string()) }),
-      _ => panic!("invalid adverb"),
+      _ => Err(RokError::Error("invalid adverb".into()).into()),
     },
     KW::Function { body: _, args: _, adverb: Some(_adverb) } => todo!("function nested adverbs"),
     _ => panic!("verb required"),
   }
 }
-pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str> {
+pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW> {
   match f {
     KW::Function { body, args, adverb: Some(adverb) } => {
       let adverbs = adverbs_table();
@@ -853,12 +865,12 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
         Some((m_a, _d_a)) => match arg {
           KW::Noun(x) => m_a(env, KW::Function { body, args, adverb: None }, x).map(KW::Noun),
           KW::FuncArgs(_exprs) => {
-            todo!("dyad/triad/etc adverb modified functions")
+            Err(RokError::Error("nyi: dyad/triad/etc adverb modified functions".into()).into())
             // d_a(env, f , l, r).map(KW::Noun)
           }
           _ => todo!("other adverb cases"),
         },
-        None => todo!("NotYetImplemented {}", adverb),
+        None => Err(RokError::Error(format!("nyi: {}", adverb)).into()),
       }
     }
     KW::Function { body, args, adverb: None } => match arg {
@@ -877,7 +889,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
         let exprs: Vec<KW> =
           exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
         match exprs.len().cmp(&args.len()) {
-          Ordering::Greater => Err("rank error"),
+          Ordering::Greater => Err(RokError::Rank.into()),
           Ordering::Less => todo!("currying: args: {:?}", args),
           Ordering::Equal => {
             let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
@@ -896,7 +908,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW, &'static str>
         match exprs.len() {
           0 | 1 => todo!("currying: exprs: {:?}", exprs),
           2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
-          _ => Err("rank error"),
+          _ => Err(RokError::Rank.into()),
         }
       }
       _ => panic!("impossible"),
@@ -916,51 +928,51 @@ pub fn promote_nouns(l: K, r: K) -> (K, K) {
   match (&l, &r) {
     (K::Bool(l), K::Int(_)) => (K::Int(Some(*l as i64)), r),
     (K::Bool(l), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Bool(l), K::BoolArray(_)) => (K::BoolArray(repeat(*l).take(r.len()).collect()), r),
-    (K::Bool(l), K::IntArray(_)) => (K::IntArray(repeat(*l as i64).take(r.len()).collect()), r),
-    (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(repeat(*l as f64).take(r.len()).collect()), r),
+    (K::Bool(l), K::BoolArray(_)) => (K::BoolArray(repeat_n(*l, r.len()).collect()), r),
+    (K::Bool(l), K::IntArray(_)) => (K::IntArray(repeat_n(*l as i64, r.len()).collect()), r),
+    (K::Bool(l), K::FloatArray(_)) => (K::FloatArray(repeat_n(*l as f64, r.len()).collect()), r),
 
     (K::Int(_), K::Bool(r)) => (l, K::Int(Some(*r as i64))),
     (K::Int(Some(l)), K::Float(_)) => (K::Float(*l as f64), r),
-    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(repeat(*l).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
-    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(repeat(*l).take(r.len()).collect()), r),
-    (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(repeat(*l as f64).take(r.len()).collect()), r),
+    (K::Int(Some(l)), K::BoolArray(r)) => (K::IntArray(repeat_n(*l, r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(Some(l)), K::IntArray(_)) => (K::IntArray(repeat_n(*l, r.len()).collect()), r),
+    (K::Int(Some(l)), K::FloatArray(_)) => (K::FloatArray(repeat_n(*l as f64, r.len()).collect()), r),
     (K::Int(None), K::Float(_)) => (K::Float(f64::NAN), r),
-    (K::Int(None), K::BoolArray(r)) => (K::IntArray(repeat(None::<i64>).take(r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
-    (K::Int(None), K::IntArray(_)) => (K::IntArray(repeat(None::<i64>).take(r.len()).collect()), r),
-    (K::Int(None), K::FloatArray(_)) => (K::FloatArray(repeat(f64::NAN).take(r.len()).collect()), r),
+    (K::Int(None), K::BoolArray(r)) => (K::IntArray(repeat_n(None::<i64>, r.len()).collect()), K::IntArray(r.cast(&DataType::Int64).unwrap())),
+    (K::Int(None), K::IntArray(_)) => (K::IntArray(repeat_n(None::<i64>, r.len()).collect()), r),
+    (K::Int(None), K::FloatArray(_)) => (K::FloatArray(repeat_n(f64::NAN, r.len()).collect()), r),
 
     (K::Float(_), K::Bool(r)) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(Some(r))) => (l, K::Float(*r as f64)),
     (K::Float(_), K::Int(None)) => (l, K::Float(f64::NAN)),
-    (K::Float(l), K::BoolArray(r)) => (K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
-    (K::Float(l), K::IntArray(r)) => {(K::FloatArray(repeat(l).take(r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
-    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(repeat(l).take(r.len()).collect()), r),
+    (K::Float(l), K::BoolArray(r)) => (K::FloatArray(repeat_n(l, r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap())),
+    (K::Float(l), K::IntArray(r)) => {(K::FloatArray(repeat_n(l, r.len()).collect()), K::FloatArray(r.cast(&DataType::Float64).unwrap()))}
+    (K::Float(l), K::FloatArray(_)) => (K::FloatArray(repeat_n(l, r.len()).collect()), r),
 
     // (K::Char(_l), K::Int(_)) => panic!("nyi"), // TODO
     // (K::Char(_l), K::Float(_)) => panic!("nyi"), // TODO
-    (K::Char(l), K::CharArray(_)) => (K::CharArray(repeat(*l).take(r.len()).collect()), r),
+    (K::Char(l), K::CharArray(_)) => (K::CharArray(repeat_n(*l, r.len()).collect()), r),
     // (K::Char(_l), K::IntArray(_)) => panic!("nyi"), // TODO
     // (K::Char(_l), K::FloatArray(_)) => panic!("nyi"), // TODO
 
-    (K::BoolArray(_), K::Bool(r)) => (l.clone(), K::BoolArray(repeat(*r as f64).take(l.len()).collect())),
-    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(r).take(l.len()).collect())),
-    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat(None::<i64>).take(l.len()).collect()))}
-    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(r).take(l.len()).collect()))}
+    (K::BoolArray(_), K::Bool(r)) => (l.clone(), K::BoolArray(repeat_n(*r as f64, l.len()).collect())),
+    (K::BoolArray(l), K::Int(Some(r))) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat_n(r, l.len()).collect())),
+    (K::BoolArray(l), K::Int(None)) => {(K::IntArray(l.cast(&DataType::Int64).unwrap()), K::IntArray(repeat_n(None::<i64>, l.len()).collect()))}
+    (K::BoolArray(l), K::Float(r)) => {(K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat_n(r, l.len()).collect()))}
     (K::BoolArray(l), K::IntArray(_)) => (K::IntArray(l.cast(&DataType::Int64).unwrap()), r),
     (K::BoolArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
-    (K::IntArray(_), K::Bool(r)) => (l.clone(), K::IntArray(repeat(*r as i64).take(l.len()).collect())),
-    (K::IntArray(_), K::Int(Some(r))) => (l.clone(), K::IntArray(repeat(r).take(l.len()).collect())),
-    (K::IntArray(_), K::Int(None)) => (l.clone(), K::IntArray(repeat(None::<i64>).take(l.len()).collect())),
-    (K::IntArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat(*r).take(l.len()).collect())),
+    (K::IntArray(_), K::Bool(r)) => (l.clone(), K::IntArray(repeat_n(*r as i64, l.len()).collect())),
+    (K::IntArray(_), K::Int(Some(r))) => (l.clone(), K::IntArray(repeat_n(r, l.len()).collect())),
+    (K::IntArray(_), K::Int(None)) => (l.clone(), K::IntArray(repeat_n(None::<i64>, l.len()).collect())),
+    (K::IntArray(l), K::Float(r)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), K::FloatArray(repeat_n(*r, l.len()).collect())),
     (K::IntArray(_), K::BoolArray(r)) => (l, K::IntArray(r.cast(&DataType::Int64).unwrap())),
     (K::IntArray(l), K::FloatArray(_)) => (K::FloatArray(l.cast(&DataType::Float64).unwrap()), r),
 
-    (K::FloatArray(_), K::Bool(r)) => (l.clone(), K::FloatArray(repeat(*r as f64).take(l.len()).collect())),
-    (K::FloatArray(_), K::Int(Some(r))) => (l.clone(), K::FloatArray(repeat(*r as f64).take(l.len()).collect())),
-    (K::FloatArray(_), K::Int(None)) => (l.clone(), K::FloatArray(repeat(f64::NAN).take(l.len()).collect())),
-    (K::FloatArray(_), K::Float(r)) => (l.clone(), K::FloatArray(repeat(r).take(l.len()).collect())),
+    (K::FloatArray(_), K::Bool(r)) => (l.clone(), K::FloatArray(repeat_n(*r as f64, l.len()).collect())),
+    (K::FloatArray(_), K::Int(Some(r))) => (l.clone(), K::FloatArray(repeat_n(*r as f64, l.len()).collect())),
+    (K::FloatArray(_), K::Int(None)) => (l.clone(), K::FloatArray(repeat_n(f64::NAN, l.len()).collect())),
+    (K::FloatArray(_), K::Float(r)) => (l.clone(), K::FloatArray(repeat_n(r, l.len()).collect())),
     (K::FloatArray(_), K::BoolArray(r)) => (l, K::FloatArray(r.cast(&DataType::Int64).unwrap())),
     (K::FloatArray(_), K::IntArray(r)) => (l, K::FloatArray(r.cast(&DataType::Float64).unwrap())),
 
@@ -1009,11 +1021,13 @@ macro_rules! impl_op {
             (K::BoolArray(l), K::BoolArray(r)) => K::IntArray((l.cast(&DataType::Int64).unwrap() $op r.cast(&DataType::Int64).unwrap()).unwrap()),
             (K::IntArray(l), K::IntArray(r)) => K::IntArray((l $op r).unwrap()),
             (K::FloatArray(l), K::FloatArray(r)) => K::FloatArray((l $op r).unwrap()),
-            (_, K::Dictionary(_)) => todo!("dict"),
-            (K::Dictionary(_), _) => todo!("dict"),
-            (_, K::Table(_)) => todo!("table"),
-            (K::Table(_), _) => todo!("table"),
-          _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc. self: {}, r: {}", $self, $r),
+            // HACK: symbols instead of RokError() due to impl ops
+            (_, K::Dictionary(_)) => K::Symbol("nyi: dict".into()),
+            (K::Dictionary(_), _) => K::Symbol("nyi: dict".into()),
+            (_, K::Table(_)) => K::Symbol("nyi: table".into()),
+            (K::Table(_), _) => K::Symbol("nyi: table".into()),
+          // _ => todo!("various $op pairs - LOTS MORE to do still: char/dicts/tables/etc. self: {}, r: {}", $self, $r),
+          _ => K::Symbol(format!("nyi: various $op pairs - LOTS MORE to do still: char/dicts/tables/etc. self: {}, r: {}", $self, $r)),
         }
     };
 }
@@ -1032,24 +1046,24 @@ impl ops::Mul for K {
 }
 impl ops::Div for K {
   type Output = Self;
-  fn div(self, r: Self) -> Self::Output { 
-    //TODO this doesn't gracefully handle divide by zero. in k 0n~0%0 
-    impl_op!(/, div, self, r) 
+  fn div(self, r: Self) -> Self::Output {
+    //TODO this doesn't gracefully handle divide by zero. in k 0n~0%0
+    impl_op!(/, div, self, r)
   }
 }
 
-fn len_ok(l: &K, r: &K) -> Result<bool, &'static str> {
+fn len_ok(l: &K, r: &K) -> Result<bool> {
   match (l, r) {
     (K::Dictionary(_), K::Dictionary(_)) => Ok(true),
     (l @ K::Table(_), r @ K::Table(_)) => match l.len() == r.len() {
       true => Ok(true),
-      false => Err("length"),
+      false => Err(RokError::Length.into()),
     },
     _ => {
       if l.len() == r.len() || l.len() == 1 || r.len() == 1 {
         Ok(true)
       } else {
-        Err("length")
+        Err(RokError::Length.into())
       }
     }
   }
@@ -1061,9 +1075,9 @@ pub struct Env {
   pub parent: Option<Box<Env>>,
 }
 
-fn resolve_names(env: Env, fragment: (KW, KW, KW, KW)) -> Result<(KW, KW, KW, KW), &'static str> {
+fn resolve_names(env: Env, fragment: (KW, KW, KW, KW)) -> Result<(KW, KW, KW, KW)> {
   //Resolve Names only on the RHS of assignment
-  let words = vec![fragment.0.clone(), fragment.1.clone(), fragment.2.clone(), fragment.3.clone()];
+  let words = [fragment.0.clone(), fragment.1.clone(), fragment.2.clone(), fragment.3.clone()];
   let mut resolved_words = Vec::new();
   for w in words.iter().rev() {
     match w {
@@ -1092,7 +1106,7 @@ fn resolve_names(env: Env, fragment: (KW, KW, KW, KW)) -> Result<(KW, KW, KW, KW
   Ok(new_words.iter().cloned().collect_tuple().unwrap())
 }
 
-pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
+pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW> {
   let mut queue = VecDeque::from([vec![KW::StartOfLine], sentence].concat());
   let mut stack: VecDeque<KW> = VecDeque::new();
 
@@ -1100,11 +1114,11 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
   while !converged {
     // debug!("stack: {stack:?}");
     let fragment = resolve_names(env.clone(), get_fragment(&mut stack)).unwrap();
-    let result: Result<Vec<KW>, &'static str> = match fragment {
+    let result: Result<Vec<KW>> = match fragment {
       (w1, w2 @ KW::Cond { .. }, any1, any2) if matches!(w1, KW::StartOfLine | KW::LP) => {
         match parse_cond(env, w2) {
           Ok(r) => Ok(vec![w1, r, any1, any2]),
-          Err(e) => Err(e),
+          Err(e) => Err(RokError::Error(format!("{e}")).into()),
         }
       }
       (w, KW::Verb { name }, x @ KW::Noun(_), any) if matches!(w, KW::StartOfLine | KW::LP) => {
@@ -1163,18 +1177,18 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
             .filter(|w| !matches!(*w, KW::SC) && !matches!(*w, KW::RP))
             .collect();
           Ok(vec![KW::Noun(
-            vec_to_list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat()).unwrap(),
+            vec_to_list([vec![KW::Noun(n1), KW::Noun(n2)], nouns.into()].concat())?,
           )])
         } else {
-          Err("invalid list syntax")
+          Err(RokError::Error("invalid list syntax".into()).into())
         }
       }
       (w1, KW::Exprs(exprs), w3, w4) /* if matches!(w1, KW::StartOfLine | KW::LP)*/ => {
-        let res: Result<Vec<KW>, &'static str> =
+        let res: Result<Vec<KW>> =
           exprs.iter().map(|sentence| eval(env, sentence.clone())).collect();
         match res {
           Ok(res) => Ok(vec![w1, res.last().unwrap().clone(), w3, w4]),
-          Err(e) => Err(e),
+          Err(e) => Err(RokError::Error(format!("{e}")).into()),
         }
       }
       (w1, w2, w3, w4) => match queue.pop_back() {
@@ -1200,7 +1214,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW, &'static str> {
     Ok(r[0].clone())
   } else {
     debug!("{:?}", r);
-    Err("parse error")
+    Err(RokError::Parse("").into())
   }
 }
 
@@ -1212,7 +1226,7 @@ fn get_fragment(stack: &mut VecDeque<KW>) -> (KW, KW, KW, KW) {
     .expect("infinite iterator can't be empty")
 }
 
-fn parse_cond(env: &mut Env, kw: KW) -> Result<KW, &'static str> {
+fn parse_cond(env: &mut Env, kw: KW) -> Result<KW> {
   match kw {
     KW::Cond(exprs) => {
       // $[if;then;elif;then;...;else]
@@ -1225,7 +1239,7 @@ fn parse_cond(env: &mut Env, kw: KW) -> Result<KW, &'static str> {
             Ok(KW::Noun(K::Bool(0))) => continue,
             Ok(KW::Noun(K::Int(Some(0)))) => continue,
             Ok(_) => return eval(env, val.to_vec()),
-            Err(e) => return Err(e),
+            Err(e) => return Err(RokError::Error(format!("{e}")).into()),
           }
         } else if pv.len() == 1 {
           return eval(env, pv[0].clone()); // final else case
@@ -1239,11 +1253,9 @@ fn parse_cond(env: &mut Env, kw: KW) -> Result<KW, &'static str> {
   }
 }
 
-pub fn scan(code: &str) -> Result<Vec<KW>, &'static str> {
-  scan_pass3(scan_pass2(scan_pass1(code)?)?)
-}
+pub fn scan(code: &str) -> Result<Vec<KW>> { scan_pass3(scan_pass2(scan_pass1(code)?)?) }
 
-pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
+pub fn scan_pass1(code: &str) -> Result<Vec<KW>> {
   // First tokenization pass.
   let mut words = vec![];
   let mut skip: usize = 0;
@@ -1317,12 +1329,12 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
         }
       }
       '"' => {
-        let (j, k) = scan_string(&code[i..]).unwrap();
+        let (j, k) = scan_string(&code[i..])?;
         words.push(k);
         skip = j;
       }
       '`' => {
-        let (j, k) = scan_symbol(&code[i..]).unwrap();
+        let (j, k) = scan_symbol(&code[i..])?;
         words.push(k);
         skip = j;
       }
@@ -1368,19 +1380,17 @@ pub fn scan_pass1(code: &str) -> Result<Vec<KW>, &'static str> {
       '\'' | '/' | '\\' => words.push(KW::Adverb { name: c.to_string() }),
       ' ' | '\t' | '\n' => continue,
       'a'..='z' | 'A'..='Z' => {
-        let (j, k) = scan_name(&code[i..]).unwrap();
+        let (j, k) = scan_name(&code[i..])?;
         words.push(k);
         skip = j;
       }
-      _ => return Err("TODO: scan()"),
+      _ => return Err(RokError::Error("TODO: scan()".into()).into()),
     };
   }
   Ok(words)
 }
 
-pub fn split_on(
-  tokens: Vec<KW>, delim: KW, end_tok: KW,
-) -> Result<(Vec<Vec<KW>>, Vec<KW>), &'static str> {
+pub fn split_on(tokens: Vec<KW>, delim: KW, end_tok: KW) -> Result<(Vec<Vec<KW>>, Vec<KW>)> {
   // Split tokens on delim token until end token.
   // Depth of 0 meaning we keep track of nested parens, brackets, funcs etc
   let mut depth = 0;
@@ -1388,7 +1398,8 @@ pub fn split_on(
   let mut start = 0;
   for i in 0..tokens.len() {
     if depth < 0 {
-      return Err("mismatched parens, brackets or curly brackets"); // TODO better message
+      return Err(RokError::Parse("mismatched parens, brackets or curly brackets").into());
+      // TODO better message
     }
     if start > i {
       continue;
@@ -1421,7 +1432,7 @@ pub fn split_on(
   Ok((splits, tokens[start..].to_vec()))
 }
 
-pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
+pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>> {
   // Second tokenization pass, raw tokens into basic parsed tokens.
   // Parse out raw tokens into "pass2" form:
   // - Function{_}
@@ -1465,7 +1476,7 @@ pub fn scan_pass2(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
   Ok(tkns)
 }
 
-pub fn scan_pass3(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
+pub fn scan_pass3(tokens: Vec<KW>) -> Result<Vec<KW>> {
   // wrap un bracketed exprs in brackets
   // "a:2;a+2" => "[a:2;a+2]"
 
@@ -1477,7 +1488,7 @@ pub fn scan_pass3(tokens: Vec<KW>) -> Result<Vec<KW>, &'static str> {
   }
 }
 
-fn scan_function(tokens: Vec<KW>) -> Result<(KW, Vec<KW>), &'static str> {
+fn scan_function(tokens: Vec<KW>) -> Result<(KW, Vec<KW>)> {
   let mut depth = 0; // nested functions depth
   for i in 0..tokens.len() {
     match tokens.get(i) {
@@ -1500,10 +1511,10 @@ fn scan_function(tokens: Vec<KW>) -> Result<(KW, Vec<KW>), &'static str> {
       None => panic!("impossible"),
     }
   }
-  Err("parse error: mismatched brackets")
+  Err(RokError::Parse("parse error: mismatched brackets").into())
 }
 
-fn scan_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static str> {
+fn scan_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>)> {
   if let Some(KW::LB) = body.first() {
     // TODO
     // - {[a;b] {x+y}[a;b]} // nested functions also need to work
@@ -1517,10 +1528,10 @@ fn scan_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static 
             .collect();
           Ok((args, body[i + 1..].to_vec()))
         } else {
-          Err("parse error: invalid function args")
+          Err(RokError::Parse("parse error: invalid function args").into())
         }
       }
-      None => Err("parse error: mismatched square brackets"),
+      None => Err(RokError::Parse("parse error: mismatched square brackets").into()),
     }
   } else {
     // - {x + y + z} or {z * x + y} => vec!["x","y","z"]
@@ -1548,7 +1559,7 @@ fn scan_function_args(body: Vec<KW>) -> Result<(Vec<String>, Vec<KW>), &'static 
   }
 }
 
-pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
+pub fn scan_number(code: &str) -> Result<(usize, KW)> {
   // read until first char outside 0123456789.-
   // split on space and parse to numeric
   //
@@ -1589,11 +1600,16 @@ pub fn scan_number(code: &str) -> Result<(usize, KW), &'static str> {
       _ => Ok((l, KW::Noun(promote_num(nums).unwrap()))),
     }
   } else {
-    Err("syntax error: a sentence starting with a digit must contain a valid number")
+    Err(
+      RokError::Error(
+        "syntax error: a sentence starting with a digit must contain a valid number".into(),
+      )
+      .into(),
+    )
   }
 }
 
-pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
+pub fn scan_string(code: &str) -> Result<(usize, KW)> {
   // read string, accounting for C style escapes: \", \n, \t, etc
   if !code.starts_with('"') {
     panic!("called scan_string() on invalid input")
@@ -1615,7 +1631,7 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
           Some('t') => s.push('\t'),
           Some('n') => s.push('\n'),
           // TODO: handle the rest
-          _ => return Err("parse error: invalid string"),
+          _ => return Err(RokError::Parse("parse error: invalid string").into()),
         }
         i += 1; // skip next char.
       } else {
@@ -1623,11 +1639,11 @@ pub fn scan_string(code: &str) -> Result<(usize, KW), &'static str> {
       }
       i += 1;
     }
-    Err("parse error: unmatched \"")
+    Err(RokError::Parse("parse error: unmatched \"").into())
   }
 }
 
-pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
+pub fn scan_symbol(code: &str) -> Result<(usize, KW)> {
   // read a Symbol or SymbolArray
   //
   // read until first char outside [a-z0-9._`]
@@ -1667,10 +1683,10 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
             ss.extend(vec![c.to_string()]);
             i += len + 1
           }
-          Err(e) => return Err(e),
+          Err(e) => return Err(RokError::Error(format!("{e}")).into()),
           _ => panic!("impossible"),
         },
-        Some('"') if !b_in_sym => return Err("parse error"),
+        Some('"') if !b_in_sym => return Err(RokError::Parse("parse").into()),
         Some(c) => {
           if !(c.is_ascii_alphanumeric()
             || c.is_ascii_whitespace()
@@ -1707,7 +1723,7 @@ pub fn scan_symbol(code: &str) -> Result<(usize, KW), &'static str> {
   }
 }
 
-pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
+pub fn scan_name(code: &str) -> Result<(usize, KW)> {
   // read a single Name
   // a Name extends until the first symbol character or space
   let sentence = match code.find(|c: char| !(c.is_ascii_alphanumeric() || ['.'].contains(&c))) {
@@ -1717,7 +1733,7 @@ pub fn scan_name(code: &str) -> Result<(usize, KW), &'static str> {
   Ok((sentence.len() - 1, KW::Noun(K::Name(sentence.into()))))
 }
 
-pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
+pub fn scan_num_token(term: &str) -> Result<K> {
   let i = if !term.starts_with('-') && term.contains('-') {
     //handle "1-1"
     term.find('-').unwrap()
@@ -1740,13 +1756,13 @@ pub fn scan_num_token(term: &str) -> Result<K, &'static str> {
       } else if let Ok(f) = term[..i].parse::<f64>() {
         Ok(K::Float(f))
       } else {
-        Err("invalid num token")
+        Err(RokError::Error("invalid num token".into()).into())
       }
     }
   }
 }
 
-pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
+pub fn promote_num(nums: Vec<K>) -> Result<K> {
   if nums.iter().all(|k| matches!(k, K::Float(_) | K::Int(_) | K::Bool(_))) {
     if nums.iter().any(|k| matches!(k, K::Float(_))) {
       let fa: Vec<f64> = nums
@@ -1806,6 +1822,6 @@ pub fn promote_num(nums: Vec<K>) -> Result<K, &'static str> {
       panic!("impossible")
     }
   } else {
-    Err("invalid nums")
+    Err(RokError::Error("invalid nums".into()).into())
   }
 }
