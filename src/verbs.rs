@@ -347,7 +347,7 @@ pub fn v_times(l: K, r: K) -> Result<K> {
     _ => atomicdyad!(*, v_times, mul, l, r),
   }
 }
-pub fn v_sqrt(_x: K) -> Result<K> { todo!("implement sqrt") }
+pub fn v_sqrt(_x: K) -> Result<K> { Err(RokError::Error("nyi: implement sqrt".into()).into()) }
 pub fn v_divide(l: K, r: K) -> Result<K> {
   match (&l, &r) {
     (K::Bool(_), K::Bool(0)) => Ok(K::Float(f64::NAN)),
@@ -358,7 +358,7 @@ pub fn v_divide(l: K, r: K) -> Result<K> {
 }
 pub fn v_keys_odometer(x: K) -> Result<K> {
   match x {
-    K::Dictionary(_) => todo!("implement keys"),
+    K::Dictionary(_) => Err(RokError::Error("nyi: implement keys".into()).into()),
     K::Table(df) => Ok(K::SymbolArray(
       Series::new("", df.fields().iter().cloned().map(|f| f.name.into()).collect::<Vec<String>>())
         .cast(&DataType::Categorical(None, CategoricalOrdering::Lexical))
@@ -445,8 +445,8 @@ pub fn v_min(l: K, r: K) -> Result<K> {
     )),
     (K::List(_l), K::List(_r)) => Err(RokError::NYI.into()),
     (K::Dictionary(_l), K::Dictionary(_r)) => Err(RokError::NYI.into()),
-    (_, K::Table(_)) => todo!("table"),
-    (K::Table(_), _) => todo!("table"),
+    (_, K::Table(_)) => Err(RokError::Error("nyi: table".into()).into()),
+    (K::Table(_), _) => Err(RokError::Error("nyi: table".into()).into()),
     _ => Err(RokError::Error("nyi - wtf".into()).into()),
   })
 }
@@ -477,8 +477,8 @@ pub fn v_max(l: K, r: K) -> Result<K> {
     )),
     (K::List(_l), K::List(_r)) => Err(RokError::NYI.into()),
     (K::Dictionary(_l), K::Dictionary(_r)) => Err(RokError::NYI.into()),
-    (_, K::Table(_)) => todo!("table"),
-    (K::Table(_), _) => todo!("table"),
+    (_, K::Table(_)) => Err(RokError::Error("nyi: table".into()).into()),
+    (K::Table(_), _) => Err(RokError::Error("nyi: table".into()).into()),
     _ => Err(RokError::Error("nyi - wtf".into()).into()),
   })
 }
@@ -619,7 +619,7 @@ pub fn v_lesser(x: K, y: K) -> Result<K> {
       }
     })))),
     (K::Table(_l), K::Table(_r)) => {
-      todo!("table")
+      Err(RokError::Error("nyi: table".into()).into())
     }
     (l, ref r @ K::Table(_)) => {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
@@ -712,7 +712,7 @@ pub fn v_greater(x: K, y: K) -> Result<K> {
       }
     })))),
     (K::Table(_l), K::Table(_r)) => {
-      todo!("table")
+      Err(RokError::Error("nyi: table".into()).into())
     }
     (l, ref r @ K::Table(_)) => {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
@@ -757,22 +757,22 @@ pub fn v_concat(x: K, y: K) -> Result<K> {
       promote_num(vec![x, y])
     }
     (K::BoolArray(x) | K::IntArray(x) | K::FloatArray(x), K::FloatArray(y)) => {
-      Ok(K::FloatArray(x.to_float().unwrap().extend(&y).unwrap().clone()))
+      Ok(K::FloatArray(x.to_float()?.extend(&y)?.clone()))
     }
     (K::FloatArray(mut x), K::BoolArray(y) | K::IntArray(y)) => {
-      Ok(K::FloatArray(x.extend(&y.to_float().unwrap()).unwrap().clone()))
+      Ok(K::FloatArray(x.extend(&y.to_float()?)?.clone()))
     }
     (K::BoolArray(x) | K::IntArray(x), K::IntArray(y)) => {
-      Ok(K::IntArray(x.cast(&DataType::Int64).unwrap().extend(&y).unwrap().clone()))
+      Ok(K::IntArray(x.cast(&DataType::Int64)?.extend(&y)?.clone()))
     }
     (K::BoolArray(mut x), K::BoolArray(y)) => {
-      Ok(K::IntArray(x.extend(&y.cast(&DataType::Boolean).unwrap()).unwrap().clone()))
+      Ok(K::IntArray(x.extend(&y.cast(&DataType::Boolean)?)?.clone()))
     }
     (K::Bool(_) | K::Int(_) | K::Float(_), K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_)) => {
-      v_concat(v_enlist(x).unwrap(), y)
+      v_concat(v_enlist(x)?, y)
     }
     (K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_), K::Bool(_) | K::Int(_) | K::Float(_)) => {
-      v_concat(x, v_enlist(y).unwrap())
+      v_concat(x, v_enlist(y)?)
     }
     (K::Char(x), K::Char(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
     (K::CharArray(x), K::Char(y)) => Ok(K::CharArray(format!("{}{}", x, y))),
@@ -824,9 +824,9 @@ pub fn v_dfmt(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 pub fn v_pad(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 pub fn v_cast(l: K, _r: K) -> Result<K> {
   match l {
-    K::Symbol(s) if s == "c" => todo!("cast to string"),
-    K::Symbol(s) if s == "i" => todo!("cast to int"),
-    K::Symbol(s) if s == "f" => todo!("cast to float"),
+    K::Symbol(s) if s == "c" => Err(RokError::Error("nyi: cast to string".into()).into()),
+    K::Symbol(s) if s == "i" => Err(RokError::Error("nyi: cast to int".into()).into()),
+    K::Symbol(s) if s == "f" => Err(RokError::Error("nyi: cast to float".into()).into()),
     _ => Err(RokError::Type.into()),
   }
 }
@@ -866,7 +866,7 @@ pub fn v_rand(l: K, r: K) -> Result<K> {
       Ok(K::IntArray(Series::new("", v)))
     }
     (K::Int(Some(x)), K::Int(Some(_y))) if x < 0 => {
-      todo!("nyi v_rand with no repeats")
+      Err(RokError::Error("nyi: nyi v_rand with no repeats".into()).into())
     }
     (K::Int(Some(_x)), y) if y.len() > 1 => {
       let idxs = v_rand(l, K::Int(Some(y.len() as i64))).unwrap();
@@ -878,9 +878,9 @@ pub fn v_rand(l: K, r: K) -> Result<K> {
 pub fn v_find(x: K, y: K) -> Result<K> {
   // find index of every item of y in x
   match (x, y) {
-    (K::BoolArray(_x), K::BoolArray(_y)) => todo!("BoolArray "),
-    (K::IntArray(_x), K::IntArray(_y)) => todo!("IntArray "),
-    (K::FloatArray(_x), K::FloatArray(_y)) => todo!("FloatArray "),
+    (K::BoolArray(_x), K::BoolArray(_y)) => Err(RokError::Error("nyi: v_find BoolArray".into()).into()),
+    (K::IntArray(_x), K::IntArray(_y)) => Err(RokError::Error("nyi: v_find IntArray".into()).into()),
+    (K::FloatArray(_x), K::FloatArray(_y)) => Err(RokError::Error("nyi: v_find FloatArray".into()).into()),
     (K::CharArray(x), K::CharArray(y)) => {
       if let K::CharArray(uniq_y) = v_unique(K::CharArray(y.clone())).unwrap() {
         let map: IndexMap<char, Option<i64>> = uniq_y
@@ -930,9 +930,9 @@ pub fn v_at(l: K, r: K) -> Result<K> {
       K::SymbolArray(_) | K::BoolArray(_) | K::IntArray(_) | K::FloatArray(_) | K::CharArray(_) => {
         l.fill(0)
       }
-      K::List(_v) => todo!("v_at"),
-      K::Dictionary(_d) => todo!("v_at"),
-      K::Table(_df) => todo!("v_at"),
+      K::List(_v) => Err(RokError::Error("nyi: v_at List".into()).into()),
+      K::Dictionary(_d) => Err(RokError::Error("nyi: v_at Dictionary".into()).into()),
+      K::Table(_df) => Err(RokError::Error("nyi: v_at Table".into()).into()),
       _ => Err(RokError::Type.into()),
     },
     K::Bool(i) => {
@@ -1001,25 +1001,25 @@ pub fn v_at(l: K, r: K) -> Result<K> {
         K::SymbolArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::SymbolArray(a)),
-            _ => todo!("index out of bounds - this shouldn't be an error"),
+            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
           }
         }
         K::BoolArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::BoolArray(a)),
-            _ => todo!("index out of bounds - this shouldn't be an error"),
+            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
           }
         }
         K::IntArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::IntArray(a)),
-            _ => todo!("index out of bounds - this shouldn't be an error"),
+            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
           }
         }
         K::FloatArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::FloatArray(a)),
-            _ => todo!("index out of bounds - this shouldn't be an error"),
+            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
           }
         }
         K::CharArray(a) => Ok(K::CharArray(
@@ -1445,10 +1445,10 @@ pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K> {
   }
 }
 pub fn v_eachprior_d_or_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
-  todo!("v_eachprior_d_or_windows()")
+  Err(RokError::Error("nyi: v_eachprior_d_or_windows()".into()).into())
 }
-pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { todo!("v_eachprior_d()") }
-pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { todo!("v_windows()") }
+pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Error("nyi: v_eachprior_d()".into()).into()) }
+pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Error("nyi: v_windows()".into()).into()) }
 
 pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   match v {
@@ -1544,12 +1544,12 @@ pub fn v_makedict(l: K, r: K) -> Result<K> {
     },
     K::Symbol(s) => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
     _ => {
-      todo!("modulo")
+      Err(RokError::Error("nyi: modulo".into()).into())
     }
   }
 }
 
-pub fn v_colon(_r: K) -> Result<K> { todo!(": monad") }
+pub fn v_colon(_r: K) -> Result<K> { Err(RokError::Error("nyi: : monad".into()).into()) }
 pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW> {
   debug!("l: {:?}, r: {:?}", l, r);
   match (&l, &r) {
@@ -1574,10 +1574,10 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW> {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
               Ok(KW::Noun(K::Table(ParquetReader::new(File::open(p).unwrap()).finish().unwrap())))
             } else {
-              todo!("other file types")
+              Err(RokError::Error("nyi: other file types".into()).into())
             }
           }
-          _ => todo!("no extension"),
+          _ => Err(RokError::Error("nyi: no extension".into()).into()),
         }
       } else {
         Err(RokError::Error("path does not exist".into()).into())
