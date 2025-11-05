@@ -618,9 +618,7 @@ pub fn v_lesser(x: K, y: K) -> Result<K> {
         _ => None,
       }
     })))),
-    (K::Table(_l), K::Table(_r)) => {
-      Err(RokError::Error("nyi: table".into()).into())
-    }
+    (K::Table(_l), K::Table(_r)) => Err(RokError::Error("nyi: table".into()).into()),
     (l, ref r @ K::Table(_)) => {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
       v_flip(v_lesser(l, v_flip(r.clone()).unwrap()).unwrap())
@@ -711,9 +709,7 @@ pub fn v_greater(x: K, y: K) -> Result<K> {
         _ => None,
       }
     })))),
-    (K::Table(_l), K::Table(_r)) => {
-      Err(RokError::Error("nyi: table".into()).into())
-    }
+    (K::Table(_l), K::Table(_r)) => Err(RokError::Error("nyi: table".into()).into()),
     (l, ref r @ K::Table(_)) => {
       // TODO: faster. hack: flip to dict, v_lesser(l, r), flip back to table
       v_flip(v_lesser(l, v_flip(r.clone()).unwrap()).unwrap())
@@ -878,9 +874,15 @@ pub fn v_rand(l: K, r: K) -> Result<K> {
 pub fn v_find(x: K, y: K) -> Result<K> {
   // find index of every item of y in x
   match (x, y) {
-    (K::BoolArray(_x), K::BoolArray(_y)) => Err(RokError::Error("nyi: v_find BoolArray".into()).into()),
-    (K::IntArray(_x), K::IntArray(_y)) => Err(RokError::Error("nyi: v_find IntArray".into()).into()),
-    (K::FloatArray(_x), K::FloatArray(_y)) => Err(RokError::Error("nyi: v_find FloatArray".into()).into()),
+    (K::BoolArray(_x), K::BoolArray(_y)) => {
+      Err(RokError::Error("nyi: v_find BoolArray".into()).into())
+    }
+    (K::IntArray(_x), K::IntArray(_y)) => {
+      Err(RokError::Error("nyi: v_find IntArray".into()).into())
+    }
+    (K::FloatArray(_x), K::FloatArray(_y)) => {
+      Err(RokError::Error("nyi: v_find FloatArray".into()).into())
+    }
     (K::CharArray(x), K::CharArray(y)) => {
       if let K::CharArray(uniq_y) = v_unique(K::CharArray(y.clone())).unwrap() {
         let map: IndexMap<char, Option<i64>> = uniq_y
@@ -1001,25 +1003,37 @@ pub fn v_at(l: K, r: K) -> Result<K> {
         K::SymbolArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::SymbolArray(a)),
-            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
+            _ => Err(
+              RokError::Error("nyi: index out of bounds - this shouldn't be an error".into())
+                .into(),
+            ),
           }
         }
         K::BoolArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::BoolArray(a)),
-            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
+            _ => Err(
+              RokError::Error("nyi: index out of bounds - this shouldn't be an error".into())
+                .into(),
+            ),
           }
         }
         K::IntArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::IntArray(a)),
-            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
+            _ => Err(
+              RokError::Error("nyi: index out of bounds - this shouldn't be an error".into())
+                .into(),
+            ),
           }
         }
         K::FloatArray(a) => {
           match a.clone().append(&Series::new_null("", 1)).unwrap().take_slice(&idcs) {
             Ok(a) => Ok(K::FloatArray(a)),
-            _ => Err(RokError::Error("nyi: index out of bounds - this shouldn't be an error".into()).into()),
+            _ => Err(
+              RokError::Error("nyi: index out of bounds - this shouldn't be an error".into())
+                .into(),
+            ),
           }
         }
         K::CharArray(a) => Ok(K::CharArray(
@@ -1089,7 +1103,7 @@ pub fn v_at(l: K, r: K) -> Result<K> {
         .collect();
       Ok(K::List(keys.into_iter().map(|k| v_at(l.clone(), k).unwrap()).collect()))
     }
-    _ => todo!("v_at({:?}, {:?})", l, r),
+    _ => Err(RokError::Error(format!("v_at({:?}, {:?})", l, r)).into()),
   }
 }
 
@@ -1437,7 +1451,7 @@ pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K> {
             let r: Vec<K> = vec![first.clone()].into_iter().chain(r).collect();
             Ok(promote_num(r.clone()).unwrap_or(K::List(r)))
           }
-          Err(e) => Err(e)
+          Err(e) => Err(e),
         }
       })?
     }
@@ -1447,13 +1461,17 @@ pub fn v_eachprior(env: &mut Env, v: KW, x: K) -> Result<K> {
 pub fn v_eachprior_d_or_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
   Err(RokError::Error("nyi: v_eachprior_d_or_windows()".into()).into())
 }
-pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Error("nyi: v_eachprior_d()".into()).into()) }
-pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Error("nyi: v_windows()".into()).into()) }
+pub fn v_eachprior_d(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
+  Err(RokError::Error("nyi: v_eachprior_d()".into()).into())
+}
+pub fn v_windows(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> {
+  Err(RokError::Error("nyi: v_windows()".into()).into())
+}
 
 pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
   match v {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(y).map(|v| {
-      let r: Vec<K> = v
+      let r: Result<Vec<K>> = v
         .iter()
         .map(|y| {
           eval(
@@ -1462,14 +1480,15 @@ pub fn v_d_eachright(env: &mut Env, v: KW, x: K, y: K) -> Result<K> {
               f.clone(),
               KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]]),
             ],
-          )
-          .unwrap()
+          )?
           .unwrap_noun()
-          .unwrap()
         })
         .collect();
-      promote_num(r.clone()).unwrap_or(K::List(r))
-    }),
+      match r {
+        Ok(r) => Ok(promote_num(r.clone()).unwrap_or(K::List(r))),
+        Err(e) => Err(e),
+      }
+    })?,
     _ => Err(RokError::Type.into()),
   }
 }
@@ -1526,14 +1545,14 @@ pub fn v_makedict(l: K, r: K) -> Result<K> {
         // `a`b`c!1 2 3 => `a`b`c!(1;2;3)
         Ok(K::Dictionary(IndexMap::from_iter(zip(
           s.iter().map(|s| strip_quotes(s.to_string())),
-          k_to_vec(r).unwrap().iter().cloned(),
+          k_to_vec(r)?.iter().cloned(),
         ))))
       }
       _ => {
         if s.is_empty() {
           Err(RokError::Length.into())
         } else if s.len() == 1 {
-          Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0).unwrap().to_string()), r)])))
+          Ok(K::Dictionary(IndexMap::from([(strip_quotes(s.get(0)?.to_string()), r)])))
         } else {
           Ok(K::Dictionary(IndexMap::from_iter(zip(
             s.iter().map(|s| strip_quotes(s.to_string())),
@@ -1543,9 +1562,7 @@ pub fn v_makedict(l: K, r: K) -> Result<K> {
       }
     },
     K::Symbol(s) => Ok(K::Dictionary(IndexMap::from([(s, r)]))),
-    _ => {
-      Err(RokError::Error("nyi: modulo".into()).into())
-    }
+    _ => Err(RokError::Error("nyi: modulo".into()).into()),
   }
 }
 
@@ -1554,7 +1571,7 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW> {
   debug!("l: {:?}, r: {:?}", l, r);
   match (&l, &r) {
     (K::Bool(0), KW::Noun(K::CharArray(a))) => Ok(KW::Noun(K::List(
-      std::fs::read_to_string(a).unwrap().lines().map(String::from).map(K::from).collect(),
+      std::fs::read_to_string(a)?.lines().map(String::from).map(K::from).collect(),
     ))),
     (K::Int(Some(2i64)), KW::Noun(K::Symbol(s))) => {
       let p = Path::new(&s);
@@ -1565,10 +1582,8 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW> {
               Ok(KW::Noun(K::Table(
                 CsvReadOptions::default()
                   .with_has_header(true)
-                  .try_into_reader_with_file_path(Some(p.to_path_buf()))
-                  .unwrap()
-                  .finish()
-                  .unwrap(),
+                  .try_into_reader_with_file_path(Some(p.to_path_buf()))?
+                  .finish()?,
               )))
             } else if e == "parquet" {
               // let lf1 = LazyFrame::scan_parquet(p, Default::default()).unwrap();
@@ -1588,7 +1603,7 @@ pub fn v_d_colon(env: &mut Env, l: K, r: KW) -> Result<KW> {
       Ok(r.clone())
     }
     (_, KW::Noun(r)) => Ok(KW::Noun(v_rident(l, r.clone()).unwrap())),
-    _ => panic!("impossible"),
+    _ => Err(RokError::Error("impossible".into()).into()),
   }
 }
 

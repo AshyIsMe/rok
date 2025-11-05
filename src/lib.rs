@@ -537,9 +537,7 @@ pub fn k_to_vec(k: K) -> Result<Vec<K>> {
         .collect(),
     ),
     K::CharArray(v) => Ok(v.chars().map(K::Char).collect()),
-    K::SymbolArray(_v) => {
-      Err(RokError::Error("nyi: enlist(SymbolArray(...))".into()).into())
-    }
+    K::SymbolArray(_v) => Err(RokError::Error("nyi: enlist(SymbolArray(...))".into()).into()),
     _ => Err(RokError::Error(format!("nyi: k_to_vec({})", k)).into()),
   }
 }
@@ -882,15 +880,17 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW> {
             e.names.extend([(args[0].clone(), KW::Noun(x.clone()))]);
             eval(&mut e, body)
           }
-          _ => todo!("currying - body: {:?}, args: {:?}", body, args),
+          _ => Err(
+            RokError::Error(format!("nyi: currying - body: {:?}, args: {:?}", body, args)).into(),
+          ),
         }
       }
       KW::FuncArgs(exprs) => {
         let exprs: Vec<KW> =
-          exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
+          exprs.iter().map(|sentence| eval(env, sentence.clone())).collect::<Result<Vec<KW>>>()?;
         match exprs.len().cmp(&args.len()) {
           Ordering::Greater => Err(RokError::Rank.into()),
-          Ordering::Less => todo!("currying: args: {:?}", args),
+          Ordering::Less => Err(RokError::Error(format!("nyi: currying: args: {:?}", args)).into()),
           Ordering::Equal => {
             let mut e = Env { names: HashMap::new(), parent: Some(Box::new(env.clone())) };
             e.names.extend(zip(args, exprs).collect::<Vec<(String, KW)>>());
@@ -898,15 +898,15 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW> {
           }
         }
       }
-      _ => todo!("apply_function other cases?"),
+      _ => Err(RokError::Error("nyi: apply_function other cases?".into()).into()),
     },
     KW::Verb { name } => match arg {
       KW::Noun(_) => apply_primitive(env, &name, None, arg),
       KW::FuncArgs(exprs) => {
         let exprs: Vec<KW> =
-          exprs.iter().map(|sentence| eval(env, sentence.clone()).unwrap()).collect();
+          exprs.iter().map(|sentence| eval(env, sentence.clone())).collect::<Result<Vec<KW>>>()?;
         match exprs.len() {
-          0 | 1 => todo!("currying: exprs: {:?}", exprs),
+          0 | 1 => Err(RokError::Error(format!("currying: exprs: {:?}", exprs)).into()),
           2 => apply_primitive(env, &name, Some(exprs[0].clone()), exprs[1].clone()),
           _ => Err(RokError::Rank.into()),
         }
