@@ -1,7 +1,7 @@
-use roklang::*;
 use anyhow::Result;
+use roklang::*;
 use std::collections::HashMap;
-use std::fs::{File};
+use std::fs::File;
 use std::io::Read;
 
 fn k_eval(s: &str) -> Result<KW> {
@@ -38,6 +38,7 @@ fn test_ngnk_tests() {
 
   assert!(lines.len() > 0);
   let mut test_count = 0;
+  let mut passed_tests = 0;
   let mut failed_tests = 0;
 
   // TODO add support for these lines
@@ -61,7 +62,7 @@ fn test_ngnk_tests() {
         let res_r = k_eval(t[1]);
         let fail = match (&res_l, &res_r) {
           (Ok(l), Ok(r)) if l == r => false,
-          _ => true
+          _ => true,
         };
         if fail {
           failed_tests += 1;
@@ -70,10 +71,12 @@ fn test_ngnk_tests() {
             Ok(k) => println!("{}", k),
             Err(_) => println!("{:?}", res_l),
           }
+        } else {
+          passed_tests += 1;
         }
       }
     }
   }
-  println!("test_count: {}\nfailed_tests: {}", test_count, failed_tests);
+  println!("\ntest_count: {}\npassed: {}\nfailed: {}", test_count, passed_tests, failed_tests);
   assert!(failed_tests == 0);
 }
