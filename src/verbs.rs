@@ -194,14 +194,15 @@ pub fn v_flip(x: K) -> Result<K> {
           .map(|(k, v)| match v {
             K::SymbolArray(s) | K::BoolArray(s) | K::IntArray(s) | K::FloatArray(s) => {
               match s.len() {
-                1 => {
-                  Series::new(&k.to_string(), s.extend_constant(s.get(0).unwrap(), *len).unwrap())
-                }
-                _ => Series::new(&k.to_string(), s.clone()),
+                1 => Ok(Series::new(
+                  &k.to_string(),
+                  s.extend_constant(s.get(0).unwrap(), *len).unwrap(),
+                )),
+                _ => Ok(Series::new(&k.to_string(), s.clone())),
               }
             }
             // | K::CharArray(s) => Series::new(&k.to_string(), s.clone()),
-            K::CharArray(s) => Series::new(&k.to_string(), s),
+            K::CharArray(s) => Ok(Series::new(&k.to_string(), s)),
             K::List(v) => {
               if v.iter().all(|i| match i {
                 K::CharArray(_) => true,
@@ -209,30 +210,32 @@ pub fn v_flip(x: K) -> Result<K> {
                 _ => false,
               }) {
                 let vs: Vec<String> = v.iter().map(|s| s.to_string()).collect();
-                Series::new(&k.to_string(), vs.clone())
+                Ok(Series::new(&k.to_string(), vs.clone()))
               } else {
-                // Err(RokError::Type.into())
-                panic!("type error?")
+                Err(RokError::Type.into())
+                // panic!("type error?")
               }
             }
-            K::Bool(b) => Series::new(&k.to_string(), repeat_n(*b, *len).collect::<Vec<u8>>()),
+            K::Bool(b) => Ok(Series::new(&k.to_string(), repeat_n(*b, *len).collect::<Vec<u8>>())),
             K::Int(Some(i)) => {
-              Series::new(&k.to_string(), repeat_n(*i, *len).collect::<Vec<i64>>())
+              Ok(Series::new(&k.to_string(), repeat_n(*i, *len).collect::<Vec<i64>>()))
             }
-            K::Int(None) => Series::full_null(&k.to_string(), *len, &DataType::Int64),
-            K::Float(f) => Series::new(&k.to_string(), repeat_n(*f, *len).collect::<Vec<f64>>()),
+            K::Int(None) => Ok(Series::full_null(&k.to_string(), *len, &DataType::Int64)),
+            K::Float(f) => {
+              Ok(Series::new(&k.to_string(), repeat_n(*f, *len).collect::<Vec<f64>>()))
+            }
             K::Symbol(s) => {
-              Series::new(&k.to_string(), repeat_n(s.clone(), *len).collect::<Vec<String>>())
+              Ok(Series::new(&k.to_string(), repeat_n(s.clone(), *len).collect::<Vec<String>>()))
             }
             // K::Char(c) => Series::new(&k.to_string(), std::iter::repeat(*c.to_string()).take(*len).collect::<Vec<String>>()),
-            K::Char(_c) => todo!("handle char"),
-            K::Table(_df) => todo!("why is Table here?"),
+            K::Char(_c) => Err(RokError::Error("handle char".into()).into()),
+            K::Table(_df) => Err(RokError::Error("why is Table here?".into()).into()),
             _ => {
               println!("v_flip(x): x: {}", x);
               panic!("impossible")
             }
           })
-          .collect();
+          .collect::<Result<Vec<Series>>>()?;
         Ok(K::Table(DataFrame::new(cols).unwrap()))
       }
     }
@@ -324,17 +327,21 @@ pub fn v_negate(x: K) -> Result<K> { Ok(K::Int(Some(-1i64)) * x) }
 pub fn v_minus(l: K, r: K) -> Result<K> { atomicdyad!(-, v_minus, sub, l, r) }
 
 pub fn v_first(x: K) -> Result<K> {
-  match x {
-    K::Bool(_) => Ok(x),
-    K::Int(_) => Ok(x),
-    K::Float(_) => Ok(x),
-    K::Char(_) => Ok(x),
-    K::BoolArray(a) => Ok(K::Bool(a.bool().unwrap().get(0).unwrap() as u8)),
-    K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(0).unwrap()))),
-    K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(0).unwrap())),
-    K::CharArray(a) => Ok(K::Char(a.chars().next().unwrap_or(' '))),
-    K::List(l) => Ok(l.first().unwrap().clone()),
-    _ => Err(RokError::NYI.into()),
+  if x.len() == 0 {
+    Ok(x)
+  } else {
+    match x {
+      K::Bool(_) => Ok(x),
+      K::Int(_) => Ok(x),
+      K::Float(_) => Ok(x),
+      K::Char(_) => Ok(x),
+      K::BoolArray(a) => Ok(K::Bool(a.bool().unwrap().get(0).unwrap() as u8)),
+      K::IntArray(a) => Ok(K::Int(Some(a.i64().unwrap().get(0).unwrap()))),
+      K::FloatArray(a) => Ok(K::Float(a.f64().unwrap().get(0).unwrap())),
+      K::CharArray(a) => Ok(K::Char(a.chars().next().unwrap_or(' '))),
+      K::List(l) => Ok(l.first().unwrap().clone()),
+      _ => Err(RokError::NYI.into()),
+    }
   }
 }
 
@@ -484,56 +491,60 @@ pub fn v_max(l: K, r: K) -> Result<K> {
 }
 
 pub fn v_asc(x: K) -> Result<K> {
-  match x {
-    K::BoolArray(x) => {
-      let mut map: BTreeMap<Option<bool>, Vec<usize>> = BTreeMap::new();
-      for (i, v) in x.bool().unwrap().iter().enumerate() {
-        if map.contains_key(&v) {
-          let vec = map.get(&v).unwrap();
-          map.insert(v, vec.iter().chain([i].iter()).cloned().collect());
-        } else {
-          map.insert(v, vec![i]);
+  if x.len() < 2 {
+    Ok(x)
+  } else {
+    match x {
+      K::BoolArray(x) => {
+        let mut map: BTreeMap<Option<bool>, Vec<usize>> = BTreeMap::new();
+        for (i, v) in x.bool().unwrap().iter().enumerate() {
+          if map.contains_key(&v) {
+            let vec = map.get(&v).unwrap();
+            map.insert(v, vec.iter().chain([i].iter()).cloned().collect());
+          } else {
+            map.insert(v, vec![i]);
+          }
         }
+        let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
+        Ok(K::BoolArray(arr!(v)))
       }
-      let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
-      Ok(K::BoolArray(arr!(v)))
-    }
-    K::IntArray(x) => {
-      let mut map: BTreeMap<Option<i64>, Vec<usize>> = BTreeMap::new();
-      for (i, v) in x.i64().unwrap().iter().enumerate() {
-        if map.contains_key(&v) {
-          let vec = map.get(&v).unwrap();
-          map.insert(v, vec.iter().chain([i].iter()).cloned().collect());
-        } else {
-          map.insert(v, vec![i]);
+      K::IntArray(x) => {
+        let mut map: BTreeMap<Option<i64>, Vec<usize>> = BTreeMap::new();
+        for (i, v) in x.i64().unwrap().iter().enumerate() {
+          if map.contains_key(&v) {
+            let vec = map.get(&v).unwrap();
+            map.insert(v, vec.iter().chain([i].iter()).cloned().collect());
+          } else {
+            map.insert(v, vec![i]);
+          }
         }
+        let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
+        Ok(K::IntArray(arr!(v)))
       }
-      let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
-      Ok(K::IntArray(arr!(v)))
-    }
-    K::FloatArray(x) => {
-      // f64 is only PartialOrd but we need something with Ord here.
-      // This is a terrible hack and probably terrible for performance.
-      let scaled_ints: Vec<Option<i128>> =
-        (x * 1e9).f64().unwrap().into_iter().map(|f| f.map(|f| f as i128)).collect();
-      let mut map: BTreeMap<Option<i128>, Vec<usize>> = BTreeMap::new();
-      for (i, v) in scaled_ints.iter().enumerate() {
-        if map.contains_key(v) {
-          let vec = map.get(v).unwrap();
-          map.insert(*v, vec.iter().chain([i].iter()).cloned().collect());
-        } else {
-          map.insert(*v, vec![i]);
+      K::FloatArray(x) => {
+        // f64 is only PartialOrd but we need something with Ord here.
+        // This is a terrible hack and probably terrible for performance.
+        let scaled_ints: Vec<Option<i128>> =
+          (x * 1e9).f64().unwrap().into_iter().map(|f| f.map(|f| f as i128)).collect();
+        let mut map: BTreeMap<Option<i128>, Vec<usize>> = BTreeMap::new();
+        for (i, v) in scaled_ints.iter().enumerate() {
+          if map.contains_key(v) {
+            let vec = map.get(v).unwrap();
+            map.insert(*v, vec.iter().chain([i].iter()).cloned().collect());
+          } else {
+            map.insert(*v, vec![i]);
+          }
         }
+        let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
+        Ok(K::IntArray(arr!(v)))
       }
-      let v: Vec<i64> = map.values().flat_map(|v| v.iter().map(|v| *v as i64)).collect();
-      Ok(K::IntArray(arr!(v)))
+      _ => Err(RokError::NYI.into()),
     }
-    _ => Err(RokError::NYI.into()),
   }
 }
 
 pub fn v_desc(x: K) -> Result<K> {
-  v_reverse(v_asc(x).unwrap()) /* TODO: faster */
+  v_reverse(v_asc(x)?) /* TODO: faster */
 }
 
 pub fn v_lesser(x: K, y: K) -> Result<K> {
@@ -1305,20 +1316,19 @@ pub fn v_fold(env: &mut Env, v: KW, x: K) -> Result<K> {
   // split into list, then reduce
   match v {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => k_to_vec(x).and_then(|v| {
-      let r = v.iter().cloned().reduce(|x, y| {
+      let mut acc: K = v.get(0).ok_or(RokError::Length)?.clone();
+      for y in v.iter().skip(1).cloned() {
         // apply_primitive(env, &name, Some(KW::Noun(x.clone())), KW::Noun(y.clone())).unwrap().unwrap_noun()
-        eval(
+        acc = eval(
           env,
-          vec![f.clone(), KW::FuncArgs(vec![vec![KW::Noun(x.clone())], vec![KW::Noun(y.clone())]])],
-        )
-        .unwrap()
-        .unwrap_noun()
-        .unwrap()
-      });
-      match r {
-        Some(k) => Ok(k.clone()),
-        None => Err(RokError::Error("TODO not sure what this error case is".into()).into()),
+          vec![
+            f.clone(),
+            KW::FuncArgs(vec![vec![KW::Noun(acc.clone())], vec![KW::Noun(y.clone())]]),
+          ],
+        )?
+        .unwrap_noun()?
       }
+      Ok(acc)
     }),
     _ => Err(RokError::Type.into()),
   }
