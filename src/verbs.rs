@@ -320,12 +320,20 @@ macro_rules! atomicdyad {
       (l, K::List(rv)) => {
         Ok(K::List(rv.iter().map(|y| $v(l.clone(), y.clone()).unwrap()).collect()))
       }
+      (l@K::Char(_) | l@K::CharArray(_), r@K::Char(_) | r@K::CharArray(_)) => len_ok(&l, &r).and_then(|_| Ok(v_cast(K::Symbol("i".into()), l)? $op v_cast(K::Symbol("i".into()), r)?)),
+      (l, r@K::Char(_) | r@K::CharArray(_)) => len_ok(&l, &r).and_then(|_| Ok(l $op v_cast(K::Symbol("i".into()), r)?)),
+      (l@K::Char(_) | l@K::CharArray(_), r) => len_ok(&l, &r).and_then(|_| Ok(v_cast(K::Symbol("i".into()), l)? $op r)),
       (l,r) => len_ok(&l, &r).and_then(|_| Ok(l $op r)),
     }
   };
 }
 pub fn v_plus(l: K, r: K) -> Result<K> { atomicdyad!(+, v_plus, add, l, r) }
-pub fn v_negate(x: K) -> Result<K> { Ok(K::Int(Some(-1i64)) * x) }
+pub fn v_negate(x: K) -> Result<K> {
+  match x {
+    K::Char(_) | K::CharArray(_) => Ok(K::Int(Some(-1i64)) * v_cast(K::Symbol("i".into()), x)?),
+    _ => Ok(K::Int(Some(-1i64)) * x),
+  }
+}
 pub fn v_minus(l: K, r: K) -> Result<K> { atomicdyad!(-, v_minus, sub, l, r) }
 
 pub fn v_first(x: K) -> Result<K> {
@@ -736,8 +744,8 @@ pub fn v_greater(x: K, y: K) -> Result<K> {
 }
 
 pub fn v_not(_r: K) -> Result<K> { Err(RokError::NYI.into()) }
-pub fn v_match(x: K, y: K) -> Result<K> { 
-  match (x,y) {
+pub fn v_match(x: K, y: K) -> Result<K> {
+  match (x, y) {
     (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
     (K::Int(l), K::Int(r)) => Ok(K::Bool((l == r) as u8)),
     (K::Float(l), K::Float(r)) => Ok(K::Bool((l == r) as u8)),
@@ -751,7 +759,7 @@ pub fn v_match(x: K, y: K) -> Result<K> {
     (K::List(l), K::List(r)) => Ok(K::Bool((l == r) as u8)),
     (K::Dictionary(l), K::Dictionary(r)) => Ok(K::Bool((l == r) as u8)),
     (K::Table(l), K::Table(r)) => Ok(K::Bool((l == r) as u8)),
-    _ => Err(RokError::NYI.into()) 
+    _ => Err(RokError::NYI.into()),
   }
 }
 
@@ -846,12 +854,26 @@ pub fn v_delete(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 pub fn v_cut(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 
 pub fn v_string(_r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_d_dollar(l: K, r: K) -> Result<K> {
+  match l {
+    K::Symbol(_) => v_cast(l, r),
+    _ => Err(RokError::NYI.into()),
+  }
+}
 pub fn v_dfmt(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
 pub fn v_pad(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
-pub fn v_cast(l: K, _r: K) -> Result<K> {
+pub fn v_cast(l: K, r: K) -> Result<K> {
   match l {
     K::Symbol(s) if s == "c" => Err(RokError::Error("nyi: cast to string".into()).into()),
-    K::Symbol(s) if s == "i" => Err(RokError::Error("nyi: cast to int".into()).into()),
+    K::Symbol(s) if s == "i" => match r {
+      K::Char(c) => Ok(K::Int(Some((c as u32) as i64))),
+      K::CharArray(s) => Ok(K::IntArray(arr!(s
+        .chars()
+        .into_iter()
+        .map(|i| (i as u32) as i64)
+        .collect::<Vec<i64>>()))),
+      _ => Err(RokError::Error("nyi: cast to int".into()).into()),
+    },
     K::Symbol(s) if s == "f" => Err(RokError::Error("nyi: cast to float".into()).into()),
     _ => Err(RokError::Type.into()),
   }

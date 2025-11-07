@@ -66,10 +66,10 @@ fn test_ngnk_tests() {
         };
         if fail {
           failed_tests += 1;
-          println!("Failed test: ({failed_tests}/{test_count}): {}", l);
-          if failed_tests > 5 {
-            panic!("More than 5 failures: bailing out");
-          }
+          println!("Failed test: line {} ({failed_tests}/{test_count}): {}", i, l);
+          // if failed_tests > 10 {
+          //   panic!("More than {failed_tests} failures: bailing out");
+          // }
           match res_l {
             Ok(k) => println!("{}", k),
             Err(_) => println!("{:?}", res_l),

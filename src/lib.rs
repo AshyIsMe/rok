@@ -641,7 +641,7 @@ pub fn primitives_table() -> VerbDispatchTable {
     ("^", (v_isnull, v_isnull, v_fill, v_except, v_fill, v_except, v_none3, v_none4)),
     ("#", (v_count, v_count, v_take, v_reshape, v_take, v_reshape, v_none3, v_none4,)),
     ("_", (v_floor, v_floor, v_drop, v_delete, v_drop, v_cut, v_none3, v_none4,)),
-    ("$", (v_string, v_string, v_dfmt, v_dfmt, v_dfmt, v_dfmt, v_none3, v_none4,)),
+    ("$", (v_string, v_string, v_d_dollar, v_d_dollar, v_d_dollar, v_d_dollar, v_none3, v_none4,)),
     ("?", (v_randfloat, v_unique, v_rand, v_find, v_rand, v_find, v_splice, v_none4,)),
     ("@", (v_type, v_type, v_at, v_at, v_at, v_at, v_amend3, v_amend4,)),
     (".", (v_eval, v_eval, v_dot, v_dot, v_dot, v_dot, v_deepamend3, v_deepamend4,)),
