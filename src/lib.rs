@@ -553,13 +553,14 @@ pub fn vec_to_list(nouns: Vec<KW>) -> Result<K> {
     Ok(K::BoolArray(arr!(v)))
   } else if nouns
     .iter()
-    .all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Int(Some(_)))))
+    .all(|w| matches!(w, KW::Noun(K::Bool(_))) || matches!(w, KW::Noun(K::Int(_))))
   {
-    let v: Vec<i64> = nouns
+    let v: Vec<Option<i64>> = nouns
       .iter()
       .map(|w| match w {
-        KW::Noun(K::Bool(b)) => *b as i64,
-        KW::Noun(K::Int(Some(i))) => *i,
+        KW::Noun(K::Bool(b)) => Some(*b as i64),
+        KW::Noun(K::Int(Some(i))) => Some(*i),
+        KW::Noun(K::Int(None)) => None,
         _ => panic!("impossible"),
       })
       .collect();
