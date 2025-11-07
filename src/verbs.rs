@@ -71,12 +71,14 @@ pub fn v_equal(x: K, y: K) -> Result<K> {
     (K::Int(Some(l)), K::Int(Some(r))) => Ok(K::Bool((l == r) as u8)),
     (K::Int(None), K::Int(_)) | (K::Int(_), K::Int(None)) => Ok(K::Bool(0)),
     (K::Float(l), K::Float(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Symbol(l), K::Symbol(r)) => Ok(K::Bool((l == r) as u8)),
     (K::BoolArray(l), K::BoolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
     (K::IntArray(l), K::IntArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
     (K::FloatArray(l), K::FloatArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
     (K::CharArray(l), K::CharArray(r)) => {
       Ok(K::BoolArray(arr!(l.chars().zip(r.chars()).map(|(l, r)| l == r).collect::<Vec<bool>>())))
     }
+    (K::SymbolArray(l), K::SymbolArray(r)) => Ok(K::BoolArray(l.equal(&r).unwrap().into())),
     (K::List(l), K::List(r)) => Ok(K::BoolArray(arr!(zip(l.iter(), r.iter())
       .map(|(l, r)| {
         let (l, r) = promote_nouns(l.clone(), r.clone());
@@ -734,7 +736,24 @@ pub fn v_greater(x: K, y: K) -> Result<K> {
 }
 
 pub fn v_not(_r: K) -> Result<K> { Err(RokError::NYI.into()) }
-pub fn v_match(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_match(x: K, y: K) -> Result<K> { 
+  match (x,y) {
+    (K::Bool(l), K::Bool(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Int(l), K::Int(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Float(l), K::Float(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Char(l), K::Char(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Symbol(l), K::Symbol(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::SymbolArray(l), K::SymbolArray(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::BoolArray(l), K::BoolArray(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::IntArray(l), K::IntArray(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::FloatArray(l), K::FloatArray(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::CharArray(l), K::CharArray(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::List(l), K::List(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Dictionary(l), K::Dictionary(r)) => Ok(K::Bool((l == r) as u8)),
+    (K::Table(l), K::Table(r)) => Ok(K::Bool((l == r) as u8)),
+    _ => Err(RokError::NYI.into()) 
+  }
+}
 
 pub fn v_enlist(x: K) -> Result<K> {
   match x {
