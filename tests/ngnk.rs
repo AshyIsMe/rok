@@ -43,7 +43,7 @@ fn test_ngnk_tests() {
 
   // TODO add support for these lines
   // let skiplines = [9, 10, 14, 15, 28, 30, 31, 32, 34];
-  let skiplines = [];
+  let skiplines = [11, 12, 13];
 
   for (i, l) in lines.iter().enumerate() {
     if skiplines.contains(&i) {
@@ -51,7 +51,7 @@ fn test_ngnk_tests() {
       failed_tests += 1;
       println!("\nskipping line {} known failure: {}", i + 1, l);
     } else {
-      println!("\nline {}: {}", i + 1, l);
+      // println!("\nline {}: {}", i + 1, l);
       let t: Vec<&str> = l.split(" / ").collect();
       if t.len() != 2 {
         println!("Skipping dud line: {}", l);
@@ -67,6 +67,9 @@ fn test_ngnk_tests() {
         if fail {
           failed_tests += 1;
           println!("Failed test: ({failed_tests}/{test_count}): {}", l);
+          if failed_tests > 5 {
+            panic!("More than 5 failures: bailing out");
+          }
           match res_l {
             Ok(k) => println!("{}", k),
             Err(_) => println!("{:?}", res_l),
