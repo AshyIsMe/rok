@@ -22,7 +22,7 @@ RUST_LOG=rok=debug cargo run
 
 ## ngn/k tests
 
-See [Tests.md]
+See [Tests.md](Tests.md)
 
 ## example
 
