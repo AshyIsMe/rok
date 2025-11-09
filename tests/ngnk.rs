@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::io::Write;
 use roklang::*;
 use std::collections::HashMap;
 use std::fs::File;
@@ -43,7 +44,7 @@ fn test_ngnk_tests() {
 
   // TODO add support for these lines
   // let skiplines = [9, 10, 14, 15, 28, 30, 31, 32, 34];
-  let skiplines = [11, 12, 13];
+  let skiplines = [];
 
   for (i, l) in lines.iter().enumerate() {
     if skiplines.contains(&i) {
@@ -83,5 +84,11 @@ fn test_ngnk_tests() {
     }
   }
   println!("\ntest_count: {}\npassed: {}\nfailed: {}", test_count, passed_tests, failed_tests);
+
+  let mut w = File::create("Tests.md").unwrap();
+  writeln!(&mut w, "# ngn/k tests\n").unwrap();
+  writeln!(&mut w, "The ngn/k tests come from here: \n\t- https://codeberg.org/ngn/k/src/branch/master/t/t.k").unwrap();
+  writeln!(&mut w, "\ntest_count: {}\npassed: {}\nfailed: {}", test_count, passed_tests, failed_tests).unwrap();
+
   assert!(failed_tests == 0);
 }
