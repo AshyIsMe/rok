@@ -1169,6 +1169,7 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW> {
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587
       (KW::LP, w, KW::RP, any) => Ok(vec![w.clone(), any.clone()]), // 8 paren
+      (KW::LP, KW::RP, any1, any2 ) => Ok(vec![KW::Noun(K::List(vec![])), any1.clone(), any2.clone()]),
       (KW::LP, KW::Noun(n1), KW::SC, KW::Noun(n2)) => {
         // List
         if let Some(i) = stack.iter().position(|w| matches!(w, KW::RP)) {

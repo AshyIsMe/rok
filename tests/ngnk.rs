@@ -53,8 +53,9 @@ fn test_ngnk_tests() {
     } else {
       // println!("\nline {}: {}", i + 1, l);
       let t: Vec<&str> = l.split(" / ").collect();
-      if t.len() != 2 {
-        println!("Skipping dud line: {}", l);
+      if l.chars().next() == Some('/') || t.len() != 2 {
+        // comment or other
+        // println!("Skipping dud line: {}", l);
       } else {
         test_count += 1;
         //   assert_eq!(k_eval(t[0]), k_eval(t[1]));
@@ -67,6 +68,7 @@ fn test_ngnk_tests() {
         if fail {
           failed_tests += 1;
           println!("Failed test: line {} ({failed_tests}/{test_count}): {}", i, l);
+          // Useful for debugging:
           // if failed_tests > 10 {
           //   panic!("More than {failed_tests} failures: bailing out");
           // }
