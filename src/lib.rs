@@ -63,6 +63,7 @@ pub enum KW /* KWords */ {
   Verb { name: String },
   Adverb { name: String },
   // DerivedVerb { verb: Box<KW>, adverb: String }, // TODO represent modified verbs/functions like this? eg. +/ or {2*x}'
+  // Projection { verb: Box<KW>, args: Vec<Option<KW>> }, // TODO
   Exprs(Vec<Vec<KW>>),    // list of expressions: [e1;e2;e3]
   FuncArgs(Vec<Vec<KW>>), // function arguments: f[a1;a2;3]
   Cond(Vec<Vec<KW>>),     // conditional form $[p;t;f]
@@ -615,9 +616,12 @@ pub fn v_none3(_x: K, _y: K, _z: K) -> Result<K> { Err(RokError::Rank.into()) }
 pub fn v_none4(_a: K, _b: K, _c: K, _d: K) -> Result<K> { Err(RokError::Rank.into()) }
 pub fn av_none1(_env: &mut Env, _v: KW, _x: K) -> Result<K> { Err(RokError::Rank.into()) }
 pub fn av_d_none2(_env: &mut Env, _v: KW, _x: K, _y: K) -> Result<K> { Err(RokError::Rank.into()) }
+pub fn av_nyi3(_env: &mut Env, _v: KW, _x: KW, _y: KW) -> Result<K> { Err(RokError::NYI.into()) }
 
 type AV1 = fn(&mut Env, KW, K) -> Result<K>;
 type AV2 = fn(&mut Env, KW, K, K) -> Result<K>;
+//Adverb n-adic: Noun [Verb] Adverb FuncArgs
+type AVN = fn(&mut Env, KW /*Verb Adverb */, KW /* x */, KW /* y */) -> Result<K>;
 
 type VerbDispatchTable = IndexMap<&'static str, (V1, V1, V2, V2, V2, V2, V3, V4)>;
 
@@ -736,14 +740,26 @@ pub fn specialcombinations_table() -> VerbDispatchTable {
   ])
 }
 
-pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2)> {
+// TODO: adverbs have more parse table cases than just monadic and dyadic:
+// ' also has v_case, v_binarysearch, and n-adic each:
+// - v_case: 0 1 0'["abc";"xyz"]   / "ayc"
+// - https://wiki.k-language.dev/wiki/Binary_search
+// - n-adic each: {x+y-z}'[1 2 3;4 5 6;7 8 9]
+//
+// This will need additional cases in the parse table in eval().
+// To complicate this further, case is actually n-ary:
+// https://code.kx.com/q/ref/maps/#case
+// q) 0 2 0'["abc";"xyz";"123";"789"]
+// "a2c"
+//
+pub fn adverbs_table() -> IndexMap<&'static str, (AV1, AV2, AVN)> {
   IndexMap::from([
-    ("'", (v_each as AV1, v_d_each as AV2)),
-    ("/", (a_slash, a_d_slash)),    // over fixedpoint for while
-    ("\\", (a_bslash, a_d_bslash)), // scan scan-fixedpoint scan-for scan-while
-    ("':", (v_eachprior, v_eachprior_d_or_windows)),
-    ("/:", (av_none1, v_d_eachright)),
-    ("\\:", (av_none1, v_d_eachleft)),
+    ("'", (v_each as AV1, v_d_each as AV2, v_d_quote as AVN)),
+    ("/", (a_slash, a_d_slash, av_nyi3)), // over fixedpoint for while
+    ("\\", (a_bslash, a_d_bslash, av_nyi3)), // scan scan-fixedpoint scan-for scan-while
+    ("':", (v_eachprior, v_eachprior_d_or_windows, av_nyi3)),
+    ("/:", (av_none1, v_d_eachright, av_nyi3)),
+    ("\\:", (av_none1, v_d_eachleft, av_nyi3)),
   ])
 }
 
@@ -812,26 +828,42 @@ pub fn apply_primitive(env: &mut Env, v: &str, l: Option<KW>, r: KW) -> Result<K
         _ => Err(RokError::Error("impossible".into()).into()),
       },
       None => {
+        // adverb
         let t = if v.len() < 2 {
-          None
-        } else if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 2..]) {
-          Some((2, (m_a, d_a)))
-        } else if let Some((m_a, d_a)) = adverbs.get(&v[v.len() - 1..]) {
-          Some((1, (m_a, d_a)))
+          if let Some((m_a, d_a, avn)) = adverbs.get(&v) {
+            Some((1, (m_a, d_a, avn)))
+          } else {
+            None
+          }
+        } else if let Some((m_a, d_a, avn)) = adverbs.get(&v[v.len() - 2..]) {
+          Some((2, (m_a, d_a, avn)))
+        } else if let Some((m_a, d_a, avn)) = adverbs.get(&v[v.len() - 1..]) {
+          Some((1, (m_a, d_a, avn)))
         } else {
           None
         };
         match t {
-          Some((adv_len, (m_a, d_a))) => match (l, r) {
+          Some((adv_len, (m_a, d_a, avn))) => match (l, r.clone()) {
+            (Some(l@KW::Noun(_)), KW::FuncArgs(_)) => {
+              if v.len() < 2 {
+                avn(env, KW::Verb{ name: v.to_string() }, l, r).map(KW::Noun)
+              } else {
+                Err(RokError::Error("NYI: Adverb case: Noun Verb Adverb FuncArgs".into()).into())
+              }
+            }
             (Some(KW::Noun(l)), KW::Noun(r)) => {
-              d_a(env, KW::Verb { name: v[..v.len() - adv_len].to_string() }, l, r).map(KW::Noun)
+                d_a(env, KW::Verb { name: v[..v.len() - adv_len].to_string() }, l, r).map(KW::Noun)
             }
             (None, KW::Noun(r)) => {
               m_a(env, KW::Verb { name: v[..v.len() - adv_len].to_string() }, r).map(KW::Noun)
             }
             _ => Err(RokError::Error("NYI: other adverb cases".into()).into()),
           },
-          None => Err(RokError::Error(format!("NYI: {}", v)).into()),
+          None => {
+            println!("Todo: extra adverb cases like case and binarysearch");
+            println!("v: \"{v}\", l: {l:?}, r: {r}");
+            Err(RokError::Error(format!("NYI: {}", v)).into())
+          }
         }
       }
     },
@@ -861,7 +893,7 @@ pub fn apply_function(env: &mut Env, f: KW, arg: KW) -> Result<KW> {
       let adverbs = adverbs_table();
       let adverb: &str = &adverb;
       match adverbs.get(adverb) {
-        Some((m_a, _d_a)) => match arg {
+        Some((m_a, _d_a, _av3)) => match arg {
           KW::Noun(x) => m_a(env, KW::Function { body, args, adverb: None }, x).map(KW::Noun),
           KW::FuncArgs(_exprs) => {
             Err(RokError::Error("nyi: dyad/triad/etc adverb modified functions".into()).into())
@@ -1165,6 +1197,10 @@ pub fn eval(env: &mut Env, sentence: Vec<KW>) -> Result<KW> {
       }
       (any, x @ KW::Noun(_), KW::Adverb { name }, y @ KW::Noun(_)) => {
         // 4 dyad adverb (special cases, they're actually verbs)
+        apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
+      }
+      (any, x @ KW::Noun(_), KW::Adverb { name }, y @ KW::FuncArgs(_)) => {
+        // 4 dyad adverb (more special cases, they're actually verbs)
         apply_primitive(env, &name, Some(x.clone()), y.clone()).map(|r| vec![any, r])
       }
       // TODO: rest of the J (K is similar!) parse table (minus forks/hooks) https://www.jsoftware.com/help/jforc/parsing_and_execution_ii.htm#_Toc191734587

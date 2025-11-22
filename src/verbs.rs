@@ -1262,6 +1262,30 @@ pub fn v_d_bang(l: K, r: K) -> Result<K> {
   }
 }
 
+pub fn v_d_quote(_env: &mut Env, _v: KW, x: KW, y: KW) -> Result<K> {
+  // dispatch dyadic verb form of '
+  match (x, y) {
+    // (KW::Noun(K::IntArray(_)), KW::FuncArgs(_)) => todo!("todo"),
+    _ => Err(RokError::Error("v_d_quote().  Dispatch of dyadic ' ".into()).into()),
+  }
+}
+pub fn v_binarysearch(_l: K, _r: K) -> Result<K> { Err(RokError::NYI.into()) }
+pub fn v_case(_l: K, _r: K) -> Result<K> {
+  // https://code.kx.com/q/ref/maps/#case
+  // https://codeberg.org/ngn/k/commit/319fcaa609e2099c33f04d5373393df46fe78810
+  // 0 1 0'["abc";"xyz"]   / "ayc"
+  // Err(RokError::NYI.into())
+  todo!("AA TODO nyi")
+}
+
+pub fn v_quote(env: &mut Env, v: KW, x: K) -> Result<K> {
+  // dispatch adverb ' variants
+  match v {
+    KW::Verb { .. } | KW::Function { .. } => v_each(env, v, x),
+    KW::Nothing => todo!(),
+    _ => Err(RokError::NYI.into()),
+  }
+}
 pub fn v_each(env: &mut Env, v: KW, x: K) -> Result<K> {
   match v {
     f @ KW::Verb { .. } | f @ KW::Function { .. } => {
