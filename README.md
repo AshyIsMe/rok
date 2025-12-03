@@ -20,6 +20,9 @@ oK.js is under 1k lines of javascript, can we do the same in under 1k lines of r
 RUST_LOG=rok=debug cargo run
 ```
 
+## ngn/k tests
+
+See [Tests.md](Tests.md)
 
 ## example
 

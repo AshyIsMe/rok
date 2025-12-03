@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::io::Write;
 use roklang::*;
 use std::collections::HashMap;
 use std::fs::File;
@@ -51,10 +52,11 @@ fn test_ngnk_tests() {
       failed_tests += 1;
       println!("\nskipping line {} known failure: {}", i + 1, l);
     } else {
-      println!("\nline {}: {}", i + 1, l);
+      // println!("\nline {}: {}", i + 1, l);
       let t: Vec<&str> = l.split(" / ").collect();
-      if t.len() != 2 {
-        println!("Skipping dud line: {}", l);
+      if l.chars().next() == Some('/') || t.len() != 2 {
+        // comment or other
+        // println!("Skipping dud line: {}", l);
       } else {
         test_count += 1;
         //   assert_eq!(k_eval(t[0]), k_eval(t[1]));
@@ -66,7 +68,11 @@ fn test_ngnk_tests() {
         };
         if fail {
           failed_tests += 1;
-          println!("Failed test: ({failed_tests}/{test_count}): {}", l);
+          println!("Failed test: line {} ({failed_tests}/{test_count}): {}", i, l);
+          // Useful for debugging:
+          // if failed_tests > 10 {
+          //   panic!("More than {failed_tests} failures: bailing out");
+          // }
           match res_l {
             Ok(k) => println!("{}", k),
             Err(_) => println!("{:?}", res_l),
@@ -78,5 +84,11 @@ fn test_ngnk_tests() {
     }
   }
   println!("\ntest_count: {}\npassed: {}\nfailed: {}", test_count, passed_tests, failed_tests);
+
+  let mut w = File::create("Tests.md").unwrap();
+  writeln!(&mut w, "# ngn/k tests\n").unwrap();
+  writeln!(&mut w, "The ngn/k tests come from here: \n\t- https://codeberg.org/ngn/k/src/branch/master/t/t.k").unwrap();
+  writeln!(&mut w, "\ntest_count: {}\npassed: {}\nfailed: {}", test_count, passed_tests, failed_tests).unwrap();
+
   assert!(failed_tests == 0);
 }
