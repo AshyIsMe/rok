@@ -122,3 +122,13 @@ fn test_aoc2015_12_03() {
   // let expected = eval(&mut env, scan("1234").unwrap()).unwrap(); // 4403 too high
   // assert_eq!(res, expected);
 }
+
+#[test]
+fn test_aoc2025_12_01() {
+  let mut env = Env { names: HashMap::new(), parent: None };
+
+  let s = r#"50{100!x+y}\{.(" -"@"L"=*x),1_x}'x:("L68";"L30";"R48";"L5";"R60";"L55";"L1;""L99";"R14";"L82")"#;
+  let res = eval(&mut env, scan(s).unwrap()).unwrap();
+  let expected = eval(&mut env, scan("3").unwrap()).unwrap();
+  assert_eq!(res, expected);
+}
